@@ -1,0 +1,10 @@
+{
+  "description": "Connect medical students with physician mentors through a user-friendly platform for guidance, questions, and clinical education support.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
