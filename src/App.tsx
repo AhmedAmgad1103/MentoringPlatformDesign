@@ -65,7 +65,7 @@ function Logo({ compact = false }: { compact?: boolean }) {
 
 function Avatar({ email, size = "md" }: { email: string; size?: "sm" | "md" | "lg" }) {
   const initial = (email[0] || "U").toUpperCase();
-  return <div className={\`avatar avatar-\${size}\`}>{initial}</div>;
+  return <div className={`avatar avatar-${size}`}>{initial}</div>;
 }
 
 function Button({
@@ -88,7 +88,7 @@ function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={\`btn btn-\${variant} \${full ? "btn-full" : ""}\`}
+      className={`btn btn-${variant} ${full ? "btn-full" : ""}`}
     >
       {children}
     </button>
@@ -124,7 +124,7 @@ function AppShell({
 
   return (
     <div className="app-shell">
-      <aside className={\`sidebar \${mobileOpen ? "sidebar-open" : ""}\`}>
+      <aside className={`sidebar ${mobileOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-top">
           <Logo />
           <button className="mobile-close" onClick={() => setMobileOpen(false)}>
@@ -144,7 +144,7 @@ function AppShell({
           {nav.map((item) => (
             <button
               key={item.id}
-              className={\`nav-item \${screen === item.id ? "active" : ""}\`}
+              className={`nav-item ${screen === item.id ? "active" : ""}`}
               onClick={() => {
                 setScreen(item.id);
                 setMobileOpen(false);
@@ -288,7 +288,7 @@ function QuestionCard({
     <button className="question-card" onClick={() => onOpen(question)}>
       <div className="question-card-top">
         <span className="category-pill">{question.category}</span>
-        <span className={\`status-pill \${answered ? "status-answered" : "status-pending"}\`}>
+        <span className={`status-pill ${answered ? "status-answered" : "status-pending"}`}>
           {answered ? "Answered" : "Awaiting response"}
         </span>
       </div>
@@ -465,7 +465,7 @@ function AskQuestion({
               <button
                 type="button"
                 key={value}
-                className={\`choice-card \${privacy === value ? "selected" : ""}\`}
+                className={`choice-card ${privacy === value ? "selected" : ""}`}
                 onClick={() => setPrivacy(value)}
               >
                 <strong>{name}</strong>
@@ -560,7 +560,7 @@ function QuestionDetail({ question, onBack }: { question: Question; onBack: () =
         <article className="detail-card">
           <div className="question-card-top">
             <span className="category-pill">{question.category}</span>
-            <span className={\`status-pill \${question.status.toLowerCase().includes("answered") ? "status-answered" : "status-pending"}\`}>
+            <span className={`status-pill ${question.status.toLowerCase().includes("answered") ? "status-answered" : "status-pending"}`}>
               {question.status}
             </span>
           </div>
@@ -646,7 +646,7 @@ function RoleWorkspace({ role }: { role: "mentor" | "admin" }) {
 
 function Toast({ message, kind, onClose }: { message: string; kind: "success" | "error" | "info"; onClose: () => void }) {
   return (
-    <div className={\`toast toast-\${kind}\`}>
+    <div className={`toast toast-${kind}`}>
       <span>{message}</span>
       <button onClick={onClose}><Icon name="close" size={14} /></button>
     </div>
