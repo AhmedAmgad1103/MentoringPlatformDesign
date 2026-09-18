@@ -2424,15 +2424,6 @@ function DashboardScreen({
 
                 <div className="flex flex-col gap-2">
                   <Button
-                    variant="primary"
-                    size="sm"
-                    fullWidth
-                    onClick={() => onToast("success", "Opening message thread with Dr. Khaled…")}
-                  >
-                    <Icons.MessageCircle />
-                    Message Mentor
-                  </Button>
-                  <Button
                     variant="secondary"
                     size="sm"
                     fullWidth
@@ -4254,7 +4245,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader
-          onBack={() => setStep("select")}
+          onBack={onBack}
           title="Ask My Mentor"
           subtitle="Private question to Dr. Mariam Khaled"
         />
@@ -4354,7 +4345,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader
-          onBack={() => setStep("select")}
+          onBack={onBack}
           title="Ask Any Mentor"
           subtitle="Visible to all physician mentors at the school"
         />
@@ -4559,7 +4550,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader
-          onBack={() => setStep("select")}
+          onBack={onBack}
           title="Ask Anonymously"
           subtitle="Your identity is fully protected"
         />
