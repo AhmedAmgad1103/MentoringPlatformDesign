@@ -1972,6 +1972,7 @@ function DashboardScreen({
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+  const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -2279,7 +2280,7 @@ function DashboardScreen({
                 <button
                   className="text-sm font-medium flex items-center gap-1.5 self-start mt-1"
                   style={{ color: C.primary }}
-                  onClick={() => onToast("info", "Loading all questions…")}
+                  onClick={() => onNavigate("feed")}
                 >
                   View all questions <Icons.ChevronRight />
                 </button>
@@ -2422,7 +2423,7 @@ function DashboardScreen({
                   { name: "Dr. James Chen", specialty: "Emergency Medicine", available: true, photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=80&h=80&fit=crop" },
                   { name: "Dr. Priya Patel", specialty: "Neurology", available: false, photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=80&h=80&fit=crop" },
                 ].map((m) => (
-                  <Card key={m.name} className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onToast("info", `Viewing ${m.name}'s profile…`)}>
+                  <Card key={m.name} className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedSuggestedMentor(m)}>
                     <div className="relative flex-shrink-0">
                       <img src={m.photo} alt={m.name} className="w-10 h-10 rounded-full object-cover" />
                       <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={m.available} /></span>
@@ -2439,6 +2440,43 @@ function DashboardScreen({
           </div>
         </div>
       </main>
+
+      {selectedSuggestedMentor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedSuggestedMentor(null); }}
+        >
+          <div className="bg-white rounded-2xl card-shadow-lg w-full max-w-md p-6 fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-4">
+              <div className="relative flex-shrink-0">
+                <img src={selectedSuggestedMentor.photo} alt={selectedSuggestedMentor.name} className="w-16 h-16 rounded-full object-cover" />
+                <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={selectedSuggestedMentor.available} /></span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-bold" style={{ color: C.text }}>{selectedSuggestedMentor.name}</h3>
+                  <button type="button" onClick={() => setSelectedSuggestedMentor(null)} className="text-lg px-2 hover:opacity-70" style={{ color: C.textSec }}>✕</button>
+                </div>
+                <p className="text-sm mt-1" style={{ color: C.textSec }}>{selectedSuggestedMentor.specialty}</p>
+                <div className="mt-3">
+                  <Badge variant={selectedSuggestedMentor.available ? "success" : "pending"}>
+                    {selectedSuggestedMentor.available ? "Available now" : "Currently busy"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 p-4 rounded-xl" style={{ backgroundColor: C.primaryLight, border: "1px solid " + C.border }}>
+              <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
+                Mentor profile preview. Their full profile and mentor-matching flow can be connected to the backend later.
+              </p>
+            </div>
+            <div className="flex justify-end mt-5">
+              <Button variant="secondary" size="sm" onClick={() => setSelectedSuggestedMentor(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
