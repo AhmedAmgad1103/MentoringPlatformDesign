@@ -5502,6 +5502,7 @@ function MentorDashboardScreen({
   const notifReadIds: number[] = [];
   const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [showAllMentees, setShowAllMentees] = useState(false);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5729,7 +5730,12 @@ function MentorDashboardScreen({
                 <div className="section-accent-bar" style={{ backgroundColor: C.success, minHeight: 24 }} />
                 <h2 className="text-sm font-bold" style={{ color: C.text }}>My Mentees</h2>
               </div>
-              <button className="text-xs font-semibold flex items-center gap-1" style={{ color: C.primary }}>
+              <button
+                type="button"
+                className="text-xs font-semibold flex items-center gap-1"
+                style={{ color: C.primary }}
+                onClick={() => setShowAllMentees(true)}
+              >
                 View all <Icons.ChevronRight />
               </button>
             </div>
@@ -5891,6 +5897,67 @@ function MentorDashboardScreen({
           )}
         </div>
       </main>
+
+      {showAllMentees && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAllMentees(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl card-shadow-lg w-full max-w-2xl max-h-[80vh] overflow-hidden fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: "1px solid " + C.border }}
+            >
+              <div>
+                <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
+                <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllMentees(false)}
+                className="text-lg px-2 hover:opacity-70"
+                style={{ color: C.textSec }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex flex-col gap-3">
+              {MENTOR_MENTEES_DATA.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{ backgroundColor: C.bg, border: "1px solid " + C.border }}
+                >
+                  <div className="relative flex-shrink-0">
+                    <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover" />
+                    <span className="absolute -bottom-0.5 -right-0.5">
+                      <StatusDot available={m.active} />
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold" style={{ color: C.text }}>{m.name}</div>
+                    <div className="text-xs" style={{ color: C.textSec }}>{m.year} · {m.track}</div>
+                    <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
+                      {m.active ? "● Active now" : "Last active: " + m.lastActivity}
+                    </div>
+                  </div>
+                  <span className="text-xs" style={{ color: C.textSec }}>
+                    {m.totalQuestions} questions
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {messageTarget && (
         <div
