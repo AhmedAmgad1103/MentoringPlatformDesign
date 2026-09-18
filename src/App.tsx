@@ -10,6 +10,7 @@ type Screen =
   | "onboarding-mentor"
   | "dashboard"
   | "ask-question"
+  | "ask-my-mentor"
   | "feed"
   | "question-detail"
   | "notifications-page"
@@ -2171,7 +2172,7 @@ function DashboardScreen({
               key={qa.title}
               className="quick-action-card rounded-2xl p-5 cursor-pointer card-shadow"
               style={{ backgroundColor: qa.color, border: `1.5px solid ${qa.border}` }}
-              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : onNavigate("ask-question")}
+              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? onNavigate("ask-my-mentor") : onNavigate("ask-question")}
             >
               <div className="mb-3">{qa.icon}</div>
               <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
@@ -2404,7 +2405,7 @@ function DashboardScreen({
                     variant="secondary"
                     size="sm"
                     fullWidth
-                    onClick={() => onNavigate("ask-question")}
+                    onClick={() => onNavigate("ask-my-mentor")}
                   >
                     Ask My Mentor
                   </Button>
@@ -4025,12 +4026,14 @@ function AskQuestionScreen({
   onBack,
   onNavigate,
   onToast,
+  initialStep = "select",
 }: {
   onBack: () => void;
   onNavigate: (s: Screen) => void;
   onToast: (t: ToastType, msg: string) => void;
+  initialStep?: AskStep;
 }) {
-  const [step, setStep] = useState<AskStep>("select");
+  const [step, setStep] = useState<AskStep>(initialStep);
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
   const [category, setCategory] = useState("");
@@ -5465,6 +5468,8 @@ function MentorDashboardScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
+  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  const [messageText, setMessageText] = useState("");
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5725,7 +5730,7 @@ function MentorDashboardScreen({
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => onToast("info", `Opening message thread with ${m.name}…`)}
+                      onClick={() => { setMessageTarget(m); setMessageText(""); }}
                     >
                       <Icons.MessageCircle />
                       Message
@@ -5837,6 +5842,86 @@ function MentorDashboardScreen({
           )}
         </div>
       </main>
+
+      {messageTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setMessageTarget(null);
+              setMessageText("");
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl card-shadow-lg w-full max-w-md fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-3">
+                <img src={messageTarget.photo} alt={messageTarget.name} className="w-9 h-9 rounded-full object-cover" />
+                <div>
+                  <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
+                  <div className="text-xs" style={{ color: C.textSec }}>{messageTarget.year} · {messageTarget.track}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setMessageTarget(null); setMessageText(""); }}
+                className="p-1.5 rounded-lg hover:opacity-70"
+                style={{ color: C.textSec }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5">
+              <textarea
+                autoFocus
+                rows={6}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Write a message to your mentee…"
+                className="w-full px-3.5 py-3 rounded-xl text-sm outline-none resize-none"
+                style={{ border: `1.5px solid ${C.border}`, color: C.text, backgroundColor: "#fff" }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = C.primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px rgba(91,78,191,0.12)`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              />
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setMessageTarget(null); setMessageText(""); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!messageText.trim()}
+                  onClick={() => {
+                    onToast("success", `Message sent to ${messageTarget.name}.`);
+                    setMessageTarget(null);
+                    setMessageText("");
+                  }}
+                >
+                  Send Message
+                </Button>
+              </div>
+              <p className="text-xs mt-3" style={{ color: C.textSec }}>
+                Demo mode: this opens a working placeholder message composer. Backend messaging can be connected later.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7215,6 +7300,10 @@ function AdminScreen({
 }) {
   const [section, setSection] = useState<AdminSection>(initialSection);
 
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
+
   function handleNav(s: AdminSection) {
     setSection(s);
     const map: Record<AdminSection, Screen> = {
@@ -8114,6 +8203,14 @@ export default function App() {
       )}
       {screen === "ask-question" && (
         <AskQuestionScreen
+          onBack={() => setScreen("dashboard")}
+          onNavigate={setScreen}
+          onToast={addToast}
+        />
+      )}
+      {screen === "ask-my-mentor" && (
+        <AskQuestionScreen
+          initialStep="my-mentor"
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
           onToast={addToast}
