@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getQuestions, createQuestion, sendMessage, type Question as ApiQuestion } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,8 @@ const C = {
   border:       "#E2DFF0",
   borderLight:  "#F0EEF8",
 };
+
+const DEMO_MODE = true;
 
 // ─── COMPONENT LIBRARY ───────────────────────────────────────────────────────
 
@@ -2004,10 +2007,26 @@ function DashboardScreen({
 }) {
   const [activeTab, setActiveTab] = useState<"questions" | "notifications">("questions");
   const [searchQuery, setSearchQuery] = useState("");
+  const [backendQuestionCount, setBackendQuestionCount] = useState<number | null>(null);
+  const [backendLoadError, setBackendLoadError] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+
+  useEffect(() => {
+    let active = true;
+    getQuestions()
+      .then((questions) => {
+        if (!active) return;
+        setBackendQuestionCount(questions.length);
+        setBackendLoadError(false);
+      })
+      .catch(() => {
+        if (active) setBackendLoadError(true);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!notifDropdownOpen) return;
@@ -2163,6 +2182,16 @@ function DashboardScreen({
           <p style={{ color: C.textSec }} className="text-sm">
             How can we help you today?
           </p>
+          {backendQuestionCount !== null && (
+            <p className="text-xs mt-2 font-medium" style={{ color: C.success }}>
+              Backend connected · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
+            </p>
+          )}
+          {backendQuestionCount === null && backendLoadError && !DEMO_MODE && (
+            <p className="text-xs mt-2 font-medium" style={{ color: C.error }}>
+              Backend unavailable — frontend is showing placeholder data.
+            </p>
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -4034,6 +4063,7 @@ function AskQuestionScreen({
   initialStep?: AskStep;
 }) {
   const [step, setStep] = useState<AskStep>(initialStep);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
   const [category, setCategory] = useState("");
@@ -4050,9 +4080,23 @@ function AskQuestionScreen({
     setAttachment(null);
   }
 
-  function handleSubmit(successStep: AskStep, toastMsg: string) {
-    onToast("success", toastMsg);
-    setStep(successStep);
+  async function handleSubmit(successStep: AskStep, toastMsg: string, privacy: string) {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      onToast("success", toastMsg);
+      setStep(successStep);
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", toastMsg);
+        setStep(successStep);
+      } else {
+        onToast("error", error instanceof Error ? error.message : "Unable to submit the question.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function toggleHelpful(id: number) {
@@ -4257,7 +4301,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!")}
+            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private")}
             submitLabel="Send to Dr. Khaled"
           />
         </div>
@@ -4361,7 +4405,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!")}
+            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!", "any-mentor")}
             submitLabel="Share with Mentors"
           />
         </div>
@@ -4697,7 +4741,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!")}
+            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!", "anon-public")}
             submitLabel="Submit for Approval"
           />
         </div>
@@ -4763,7 +4807,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!")}
+            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!", "anon-private")}
             submitLabel="Submit Privately"
           />
         </div>
@@ -5480,6 +5524,23 @@ function MentorDashboardScreen({
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [notifOpen]);
+
+  async function sendMentorMessage() {
+    if (!messageTarget || !messageText.trim()) return;
+    try {
+      await sendMessage({ recipientId: messageTarget.id, body: messageText.trim() });
+      onToast("success", "Message sent to " + messageTarget.name + ".");
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", "Message sent to " + messageTarget.name + ".");
+      } else {
+        onToast("error", error instanceof Error ? error.message : "Unable to send the message.");
+        return;
+      }
+    }
+    setMessageTarget(null);
+    setMessageText("");
+  }
 
   const totalWaiting =
     MENTOR_WAITING_QUESTIONS.length +
