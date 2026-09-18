@@ -12,6 +12,8 @@ type Screen =
   | "dashboard"
   | "ask-question"
   | "ask-my-mentor"
+  | "ask-any-mentor"
+  | "ask-anonymous"
   | "feed"
   | "question-detail"
   | "notifications-page"
@@ -2201,7 +2203,7 @@ function DashboardScreen({
               key={qa.title}
               className="quick-action-card rounded-2xl p-5 cursor-pointer card-shadow"
               style={{ backgroundColor: qa.color, border: `1.5px solid ${qa.border}` }}
-              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? onNavigate("ask-my-mentor") : onNavigate("ask-question")}
+              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? onNavigate("ask-my-mentor") : qa.title === "Ask Any Mentor" ? onNavigate("ask-any-mentor") : qa.title === "Ask Anonymously" ? onNavigate("ask-anonymous") : onNavigate("ask-question")}
             >
               <div className="mb-3">{qa.icon}</div>
               <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
@@ -8272,6 +8274,22 @@ export default function App() {
       {screen === "ask-my-mentor" && (
         <AskQuestionScreen
           initialStep="my-mentor"
+          onBack={() => setScreen("dashboard")}
+          onNavigate={setScreen}
+          onToast={addToast}
+        />
+      )}
+      {screen === "ask-any-mentor" && (
+        <AskQuestionScreen
+          initialStep="any-mentor"
+          onBack={() => setScreen("dashboard")}
+          onNavigate={setScreen}
+          onToast={addToast}
+        />
+      )}
+      {screen === "ask-anonymous" && (
+        <AskQuestionScreen
+          initialStep="anonymous"
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
           onToast={addToast}
