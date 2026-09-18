@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { getQuestions, createQuestion, sendMessage, type Question as ApiQuestion } from "./api";
+import { getQuestions, createQuestion, sendMessage } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
