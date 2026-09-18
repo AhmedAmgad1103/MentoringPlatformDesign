@@ -1490,9 +1490,52 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
 function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) {
   const [selected, setSelected] = useState<Role>(null);
 
+  const roles: { role: Role; icon: React.ReactNode; title: string; sub: string; label: string }[] = [
+    {
+      role: "mentee",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
+          <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M22 14l2 2-3 3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "I am looking for guidance",
+      sub: "Connect with physician mentors, ask questions, and get support on your medical education journey.",
+      label: "Medical Student",
+    },
+    {
+      role: "mentor",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
+          <path d="M4 26c0-4.418 3.582-7 8-7s8 3.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
+          <path d="M19.5 18.5c1-.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M22 9.5v2.5l1.5 1" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "I want to become a mentor",
+      sub: "Share your clinical expertise and guide the next generation of medical professionals.",
+      label: "Physician / Resident",
+    },
+    {
+      role: "admin",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <path d="M16 4l9 4v6c0 6-3.8 11.3-9 14-5.2-2.7-9-8-9-14V8l9-4Z" stroke={C.primary} strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="m11.5 15.5 3 3 6-6" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "I manage the platform",
+      sub: "Manage users, questions, moderation, reports, and platform settings.",
+      label: "Administrator",
+    },
+  ];
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-      <div className="w-full max-w-xl fade-in">
+      <div className="w-full max-w-3xl fade-in">
         <div className="text-center mb-10">
           <Logo size="md" />
           <h1 className="text-2xl font-bold mt-6 mb-2" style={{ color: C.text }}>
@@ -1503,37 +1546,8 @@ function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) 
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-          {[
-            {
-              role: "mentee" as Role,
-              icon: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
-                  <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M22 14l2 2-3 3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ),
-              title: "I am looking for guidance",
-              sub: "Connect with physician mentors, ask questions, and get support on your medical education journey.",
-              label: "Medical Student",
-            },
-            {
-              role: "mentor" as Role,
-              icon: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
-                  <path d="M4 26c0-4.418 3.582-7 8-7s8 3.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                  <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
-                  <path d="M19.5 18.5c1-0.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M22 9.5v2.5l1.5 1" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ),
-              title: "I want to become a mentor",
-              sub: "Share your clinical expertise and guide the next generation of medical professionals.",
-              label: "Physician / Resident",
-            },
-          ].map(({ role, icon, title, sub, label }) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {roles.map(({ role, icon, title, sub, label }) => (
             <div
               key={role}
               className="role-card border-2 rounded-2xl p-6 flex flex-col gap-4"
@@ -1561,14 +1575,8 @@ function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) 
                 </p>
               </div>
               {selected === role && (
-                <div
-                  className="self-start flex items-center gap-1.5 text-xs font-semibold"
-                  style={{ color: C.primary }}
-                >
-                  <span
-                    className="w-4 h-4 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: C.primary }}
-                  >
+                <div className="self-start flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.primary }}>
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.primary }}>
                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                       <path d="M1.5 4l1.5 1.5 3.5-3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -7960,8 +7968,15 @@ export default function App() {
   }
 
   function handleRoleSelect(r: Role) {
+    if (!r) return;
     setRole(r);
-    setScreen(r === "mentee" ? "onboarding-mentee" : r === "mentor" ? "onboarding-mentor" : "dashboard");
+    setScreen(
+      r === "mentee"
+        ? "onboarding-mentee"
+        : r === "mentor"
+          ? "onboarding-mentor"
+          : "admin-dashboard",
+    );
   }
 
   function openQuestion(id: number) {
@@ -7988,7 +8003,12 @@ export default function App() {
     onMarkAllRead: markAllNotifsRead,
   };
 
-  const showMobileNav = screen !== "login" && screen !== "verify" && !screen.startsWith("onboarding") && !screen.startsWith("admin");
+  const showMobileNav =
+    role !== "admin" &&
+    screen !== "login" &&
+    screen !== "verify" &&
+    !screen.startsWith("onboarding") &&
+    !screen.startsWith("admin");
 
   return (
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
@@ -8022,7 +8042,7 @@ export default function App() {
         <OnboardingMentorScreen
           onNext={() => {
             addToast("success", "Mentor profile submitted for review!");
-            setScreen("dashboard");
+            setScreen("mentor-dashboard");
           }}
         />
       )}
@@ -8109,46 +8129,6 @@ export default function App() {
           onNavigate={setScreen}
           notifCount={ALL_NOTIFICATIONS.filter(n => !n.read && !notifReadIds.includes(n.id)).length}
         />
-      )}
-
-      {/* Dev navigation strip */}
-      {screen !== "login" && (
-        <div
-          className="dev-nav-strip fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-3 py-2 rounded-2xl card-shadow-lg"
-          style={{ backgroundColor: "#1A1D23", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          {(
-            [
-              { s: "login", label: "Login" },
-              { s: "verify", label: "Verify" },
-              { s: "onboarding-role", label: "Role" },
-              { s: "onboarding-mentee", label: "Mentee OB" },
-              { s: "onboarding-mentor", label: "Mentor OB" },
-              { s: "dashboard", label: "Dashboard" },
-              { s: "ask-question", label: "Ask Q" },
-              { s: "feed", label: "Feed" },
-              { s: "question-detail", label: "Detail" },
-              { s: "notifications-page", label: "Notifs" },
-              { s: "mentor-dashboard", label: "Mentor DB" },
-              { s: "mentor-answer" as Screen, label: "M. Answer", onClick: () => { setQuestionToAnswer(MENTOR_WAITING_QUESTIONS[0]); setScreen("mentor-answer"); } },
-              { s: "admin-dashboard" as Screen, label: "Admin" },
-              { s: "mentee-profile" as Screen, label: "Mentee ↗" },
-              { s: "mentor-profile" as Screen, label: "Mentor ↗" },
-            ] as { s: Screen; label: string; onClick?: () => void }[]
-          ).map(({ s, label, onClick }) => (
-            <button
-              key={s}
-              onClick={onClick ?? (() => setScreen(s))}
-              className="px-3 py-1 rounded-xl text-xs font-medium transition-all"
-              style={{
-                backgroundColor: screen === s ? C.primary : "transparent",
-                color: screen === s ? "#fff" : "rgba(255,255,255,0.5)",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       )}
 
       {/* Toast container */}
