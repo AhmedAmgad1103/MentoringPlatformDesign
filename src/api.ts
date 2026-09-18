@@ -13,7 +13,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
+      Accept: "application/json",
       "Content-Type": "application/json",
       ...(options?.headers || {}),
     },
@@ -24,6 +26,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(message || `Request failed with status ${response.status}`);
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
 
@@ -36,9 +39,18 @@ export function createQuestion(payload: {
   category: string;
   body: string;
   privacy: string;
-  authorEmail: string;
 }) {
   return request<Question>("/api/questions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function sendMessage(payload: {
+  recipientId: number;
+  body: string;
+}) {
+  return request<{ id: number; recipientId: number; body: string }>("/api/messages", {
     method: "POST",
     body: JSON.stringify(payload),
   });
