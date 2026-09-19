@@ -156,21 +156,27 @@ export async function login(email: string, role: "mentee" | "mentor" | "admin" =
     json: "true",
   });
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+  await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
+    redirect: "manual",
     body,
   });
 
-  if (!response.ok) {
+  const session = await request<{ user?: { email?: string; role?: string } }>(
+    "/api/auth/session",
+    { method: "GET" },
+  );
+
+  if (!session.user?.email) {
     throw new Error("Unable to sign in");
   }
 
-  return { ok: true };
+  return { ok: true, user: session.user };
 }
 
 export function logout() {
