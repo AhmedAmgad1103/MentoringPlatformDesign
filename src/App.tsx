@@ -787,6 +787,7 @@ interface FeedQuestion {
   date: string;
   responses: number;
   helpful: number;
+  boosted: number;
   tags: string[];
 }
 
@@ -2825,10 +2826,14 @@ function CategoryBadge({ category }: { category: string }) {
 
 function FeedQuestionCard({
   question,
-  onClick,
+  onClick,,
+  isBoosted,
+  onToggleBoost
 }: {
   question: FeedQuestion;
   onClick: () => void;
+  isBoosted: boolean;
+  onToggleBoost: (id: number) => void;
 }) {
   return (
     <Card
@@ -2928,7 +2933,23 @@ function FeedQuestionCard({
             </svg>
             <strong style={{ color: C.text }}>{question.helpful}</strong> helpful
           </span>
-          <span
+              <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleBoost(question.id);
+              }}
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full transition-colors"
+              style={{
+                backgroundColor: isBoosted ? C.primary : C.primaryLight,
+                color: isBoosted ? "#fff" : C.primary,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
+              </svg>
+              {question.boosted + (isBoosted ? 1 : 0)}
+            </button>
+        <span
             className="ml-auto flex items-center gap-1 text-xs font-semibold"
             style={{ color: C.primary }}
           >
@@ -2960,7 +2981,16 @@ function FeedScreen({
 }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<"recent" | "helpful" | "answered">("recent");
+  const [sort, setSort] = useState<"recent" | "helpful" | "answered" | "boosted">("recent");
+  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
+
+  const toggleBoost = (id: number) => {
+    setBoostedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -2997,6 +3027,8 @@ function FeedScreen({
   }).sort((a, b) => {
     if (sort === "helpful") return b.helpful - a.helpful;
     if (sort === "answered") return b.responses - a.responses;
+    if (sort === "boosted")
+      return (b.boosted + (boostedIds.has(b.id) ? 1 : 0)) - (a.boosted + (boostedIds.has(a.id) ? 1 : 0));
     return b.id - a.id;
   });
 
@@ -3146,6 +3178,7 @@ function FeedScreen({
                 { v: "recent", label: "Most Recent" },
                 { v: "helpful", label: "Most Helpful" },
                 { v: "answered", label: "Most Answered" },
+                { v: "boosted", label: "Most Boosted" },
               ] as const
             ).map(({ v, label }) => (
               <button
@@ -3172,6 +3205,8 @@ function FeedScreen({
                 key={q.id}
                 question={q}
                 onClick={() => onOpenQuestion(q.id)}
+                isBoosted={boostedIds.has(q.id)}
+                onToggleBoost={toggleBoost}
               />
             ))}
           </div>
