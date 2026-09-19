@@ -2243,12 +2243,12 @@ function DashboardScreen({
           </p>
           {backendQuestionCount !== null && (
             <p className="text-xs mt-2 font-medium" style={{ color: C.success }}>
-              Backend connected · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
+              Demo data loaded · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
             </p>
           )}
-          {backendQuestionCount === null && backendLoadError && !DEMO_MODE && (
+          {backendQuestionCount === null && backendLoadError && (
             <p className="text-xs mt-2 font-medium" style={{ color: C.error }}>
-              Backend unavailable — frontend is showing placeholder data.
+              Demo data could not be loaded.
             </p>
           )}
         </div>
