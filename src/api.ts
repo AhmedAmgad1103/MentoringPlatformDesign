@@ -151,7 +151,8 @@ export async function login(email: string, role: "mentee" | "mentor" | "admin" =
     csrfToken: csrf.csrfToken,
     email,
     role,
-    callbackUrl: "/",
+    callbackUrl: "http://localhost:8443/",
+    redirect: "false",
     json: "true",
   });
 
