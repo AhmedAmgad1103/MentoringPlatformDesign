@@ -163,11 +163,10 @@ export async function login(email: string, role: "mentee" | "mentor" | "admin" =
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
-    redirect: "manual",
     body,
   });
 
-  if (!response.ok && response.status !== 302 && response.status !== 303) {
+  if (!response.ok) {
     throw new Error("Unable to sign in");
   }
 
