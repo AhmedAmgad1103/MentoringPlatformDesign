@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { getQuestions, createQuestion, sendMessage } from "./api";
+import { getQuestions, createQuestion, sendMessage, login } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -1251,11 +1251,18 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin:
     setEmailError(validateEmail(email));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setTouched(true);
     const err = validateEmail(email);
     setEmailError(err);
-    if (!err && email && password) onNext();
+    if (err || !email || !password) return;
+
+    try {
+      await login(email, "mentee");
+      onNext();
+    } catch (error) {
+      setEmailError(error instanceof Error ? error.message : "Unable to sign in. Please try again.");
+    }
   }
 
   const isValid = email.endsWith(".edu") && password.length >= 1;
