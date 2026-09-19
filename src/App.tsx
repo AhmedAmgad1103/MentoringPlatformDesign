@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getQuestions, createQuestion, sendMessage } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -10,6 +11,9 @@ type Screen =
   | "onboarding-mentor"
   | "dashboard"
   | "ask-question"
+  | "ask-my-mentor"
+  | "ask-any-mentor"
+  | "ask-anonymous"
   | "feed"
   | "question-detail"
   | "notifications-page"
@@ -22,7 +26,8 @@ type Screen =
   | "admin-reports"
   | "admin-settings"
   | "mentee-profile"
-  | "mentor-profile";
+  | "mentor-profile"
+  | "leaderboard";
 
 type Role = "mentee" | "mentor" | "admin" | null;
 
@@ -60,6 +65,8 @@ const C = {
   border:       "#E2DFF0",
   borderLight:  "#F0EEF8",
 };
+
+const DEMO_MODE = true;
 
 // ─── COMPONENT LIBRARY ───────────────────────────────────────────────────────
 
@@ -651,7 +658,53 @@ const MENTOR = {
   years: 12,
   hospital: "University Medical Center",
   bio: "Board-certified internist with 12 years of clinical and teaching experience. Passionate about helping students navigate boards and residency applications.",
+  points: 285,
 };
+
+// ─── MENTOR REWARD SYSTEM ────────────────────────────────────────────────────
+
+const MENTOR_TIERS = [
+  { min: 0,   label: "New Mentor",     emoji: "🌱", color: C.textSec,  bg: C.borderLight },
+  { min: 50,  label: "Active Mentor",  emoji: "⭐", color: C.success,  bg: C.successLight },
+  { min: 150, label: "Trusted Mentor", emoji: "🏅", color: C.primary,  bg: C.primaryLight },
+  { min: 300, label: "Top Mentor",     emoji: "👑", color: C.pending,  bg: C.pendingLight },
+] as const;
+
+function getMentorTier(points: number) {
+  let tier = MENTOR_TIERS[0];
+  for (const t of MENTOR_TIERS) {
+    if (points >= t.min) tier = t;
+  }
+  const idx = MENTOR_TIERS.indexOf(tier);
+  const next = MENTOR_TIERS[idx + 1] ?? null;
+  const progress = next
+    ? Math.min(100, Math.round(((points - tier.min) / (next.min - tier.min)) * 100))
+    : 100;
+  return { ...tier, next, progress };
+}
+
+function MentorTierBadge({ points, size = "sm" }: { points: number; size?: "sm" | "md" }) {
+  const tier = getMentorTier(points);
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full font-semibold ${
+        size === "sm" ? "text-xs px-2 py-0.5" : "text-sm px-3 py-1"
+      }`}
+      style={{ backgroundColor: tier.bg, color: tier.color }}
+    >
+      <span>{tier.emoji}</span> {tier.label}
+    </span>
+  );
+}
+
+const LEADERBOARD_MENTORS = [
+  { id: 1, name: "Dr. Mariam Khaled", specialty: "Internal Medicine", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=120&h=120&fit=crop&auto=format", points: 285 },
+  { id: 2, name: "Dr. Amara Osei", specialty: "Family Medicine", photo: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=120&h=120&fit=crop&auto=format", points: 340 },
+  { id: 3, name: "Dr. Priya Patel", specialty: "Neurology", photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=120&h=120&fit=crop&auto=format", points: 198 },
+  { id: 4, name: "Dr. Samuel Chen", specialty: "Surgery", photo: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=120&h=120&fit=crop&auto=format", points: 132 },
+  { id: 5, name: "Dr. Layla Ahmed", specialty: "Pediatrics", photo: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=120&h=120&fit=crop&auto=format", points: 61 },
+  { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
+].sort((a, b) => b.points - a.points);
 
 const QUESTIONS = [
   {
@@ -781,6 +834,7 @@ interface FeedQuestion {
   date: string;
   responses: number;
   helpful: number;
+  boosted: number;
   tags: string[];
 }
 
@@ -794,6 +848,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 29, 2026",
     responses: 4,
     helpful: 23,
+    boosted: 15,
     tags: ["Step 2 CK", "Boards", "Study Schedule"],
   },
   {
@@ -805,6 +860,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 27, 2026",
     responses: 6,
     helpful: 31,
+    boosted: 24,
     tags: ["Surgery", "Clerkship", "M3"],
   },
   {
@@ -816,6 +872,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 25, 2026",
     responses: 3,
     helpful: 18,
+    boosted: 9,
     tags: ["Research", "M3", "Residency"],
   },
   {
@@ -827,6 +884,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 24, 2026",
     responses: 8,
     helpful: 47,
+    boosted: 33,
     tags: ["Wellness", "M1", "Mental Health"],
   },
   {
@@ -838,6 +896,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 22, 2026",
     responses: 5,
     helpful: 29,
+    boosted: 19,
     tags: ["Specialty", "M2", "Career"],
   },
   {
@@ -849,6 +908,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 20, 2026",
     responses: 2,
     helpful: 11,
+    boosted: 6,
     tags: ["Abstract", "Conference", "Writing"],
   },
   {
@@ -860,6 +920,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 18, 2026",
     responses: 7,
     helpful: 38,
+    boosted: 27,
     tags: ["Burnout", "Step 1", "Mental Health"],
   },
   {
@@ -871,6 +932,7 @@ const FEED_QUESTIONS: FeedQuestion[] = [
     date: "Aug 16, 2026",
     responses: 4,
     helpful: 22,
+    boosted: 14,
     tags: ["Communication", "Oncology", "Clinical"],
   },
 ];
@@ -1165,7 +1227,7 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 // ─── SCREEN: LOGIN ────────────────────────────────────────────────────────────
 
-function LoginScreen({ onNext }: { onNext: () => void }) {
+function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin: (role: Exclude<Role, null>) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -1360,6 +1422,50 @@ function LoginScreen({ onNext }: { onNext: () => void }) {
               Continue with School Email (SSO)
             </Button>
 
+            <div
+              className="rounded-2xl p-4 mt-2"
+              style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}
+            >
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <p className="text-sm font-semibold" style={{ color: C.text }}>Demo / Placeholder Accounts</p>
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
+                  style={{ backgroundColor: "#fff", color: C.primary }}
+                >
+                  Frontend only
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
+                These buttons skip verification and onboarding so you can test each dashboard with placeholder data.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onDemoLogin("mentee")}
+                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
+                  style={{ backgroundColor: "#fff", color: C.primary, border: `1px solid ${C.border}` }}
+                >
+                  Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDemoLogin("mentor")}
+                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
+                  style={{ backgroundColor: "#fff", color: C.success, border: `1px solid ${C.border}` }}
+                >
+                  Mentor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDemoLogin("admin")}
+                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
+                  style={{ backgroundColor: "#fff", color: "#92400E", border: `1px solid ${C.border}` }}
+                >
+                  Admin
+                </button>
+              </div>
+            </div>
+
             <p className="text-center text-sm" style={{ color: C.textSec }}>
               Don't have an account?{" "}
               <button className="font-semibold" style={{ color: C.primary }} onClick={onNext}>
@@ -1490,9 +1596,52 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
 function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) {
   const [selected, setSelected] = useState<Role>(null);
 
+  const roles: { role: Role; icon: React.ReactNode; title: string; sub: string; label: string }[] = [
+    {
+      role: "mentee",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
+          <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M22 14l2 2-3 3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "I am looking for guidance",
+      sub: "Connect with physician mentors, ask questions, and get support on your medical education journey.",
+      label: "Medical Student",
+    },
+    {
+      role: "mentor",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
+          <path d="M4 26c0-4.418 3.582-7 8-7s8 3.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
+          <path d="M19.5 18.5c1-.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M22 9.5v2.5l1.5 1" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "I want to become a mentor",
+      sub: "Share your clinical expertise and guide the next generation of medical professionals.",
+      label: "Physician / Resident",
+    },
+    {
+      role: "admin",
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <path d="M16 4l9 4v6c0 6-3.8 11.3-9 14-5.2-2.7-9-8-9-14V8l9-4Z" stroke={C.primary} strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="m11.5 15.5 3 3 6-6" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      title: "I manage the platform",
+      sub: "Manage users, questions, moderation, reports, and platform settings.",
+      label: "Administrator",
+    },
+  ];
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-      <div className="w-full max-w-xl fade-in">
+      <div className="w-full max-w-3xl fade-in">
         <div className="text-center mb-10">
           <Logo size="md" />
           <h1 className="text-2xl font-bold mt-6 mb-2" style={{ color: C.text }}>
@@ -1503,37 +1652,8 @@ function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) 
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-          {[
-            {
-              role: "mentee" as Role,
-              icon: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
-                  <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M22 14l2 2-3 3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ),
-              title: "I am looking for guidance",
-              sub: "Connect with physician mentors, ask questions, and get support on your medical education journey.",
-              label: "Medical Student",
-            },
-            {
-              role: "mentor" as Role,
-              icon: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
-                  <path d="M4 26c0-4.418 3.582-7 8-7s8 3.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                  <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
-                  <path d="M19.5 18.5c1-0.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M22 9.5v2.5l1.5 1" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ),
-              title: "I want to become a mentor",
-              sub: "Share your clinical expertise and guide the next generation of medical professionals.",
-              label: "Physician / Resident",
-            },
-          ].map(({ role, icon, title, sub, label }) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {roles.map(({ role, icon, title, sub, label }) => (
             <div
               key={role}
               className="role-card border-2 rounded-2xl p-6 flex flex-col gap-4"
@@ -1561,14 +1681,8 @@ function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) 
                 </p>
               </div>
               {selected === role && (
-                <div
-                  className="self-start flex items-center gap-1.5 text-xs font-semibold"
-                  style={{ color: C.primary }}
-                >
-                  <span
-                    className="w-4 h-4 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: C.primary }}
-                  >
+                <div className="self-start flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.primary }}>
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.primary }}>
                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                       <path d="M1.5 4l1.5 1.5 3.5-3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1951,10 +2065,27 @@ function DashboardScreen({
 }) {
   const [activeTab, setActiveTab] = useState<"questions" | "notifications">("questions");
   const [searchQuery, setSearchQuery] = useState("");
+  const [backendQuestionCount, setBackendQuestionCount] = useState<number | null>(null);
+  const [backendLoadError, setBackendLoadError] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+  const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getQuestions()
+      .then((questions) => {
+        if (!active) return;
+        setBackendQuestionCount(questions.length);
+        setBackendLoadError(false);
+      })
+      .catch(() => {
+        if (active) setBackendLoadError(true);
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!notifDropdownOpen) return;
@@ -2110,6 +2241,16 @@ function DashboardScreen({
           <p style={{ color: C.textSec }} className="text-sm">
             How can we help you today?
           </p>
+          {backendQuestionCount !== null && (
+            <p className="text-xs mt-2 font-medium" style={{ color: C.success }}>
+              Backend connected · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
+            </p>
+          )}
+          {backendQuestionCount === null && backendLoadError && !DEMO_MODE && (
+            <p className="text-xs mt-2 font-medium" style={{ color: C.error }}>
+              Backend unavailable — frontend is showing placeholder data.
+            </p>
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -2119,7 +2260,7 @@ function DashboardScreen({
               key={qa.title}
               className="quick-action-card rounded-2xl p-5 cursor-pointer card-shadow"
               style={{ backgroundColor: qa.color, border: `1.5px solid ${qa.border}` }}
-              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : onNavigate("ask-question")}
+              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? onNavigate("ask-my-mentor") : qa.title === "Ask Any Mentor" ? onNavigate("ask-any-mentor") : qa.title === "Ask Anonymously" ? onNavigate("ask-anonymous") : onNavigate("ask-question")}
             >
               <div className="mb-3">{qa.icon}</div>
               <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
@@ -2238,7 +2379,7 @@ function DashboardScreen({
                 <button
                   className="text-sm font-medium flex items-center gap-1.5 self-start mt-1"
                   style={{ color: C.primary }}
-                  onClick={() => onToast("info", "Loading all questions…")}
+                  onClick={() => onNavigate("feed")}
                 >
                   View all questions <Icons.ChevronRight />
                 </button>
@@ -2316,9 +2457,12 @@ function DashboardScreen({
                     <div className="text-xs mt-0.5 mb-1.5" style={{ color: C.textSec }}>
                       {MENTOR.specialty} · {MENTOR.hospital}
                     </div>
-                    <Badge variant={MENTOR.available ? "success" : "pending"}>
-                      {MENTOR.available ? "Available" : "Busy"}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant={MENTOR.available ? "success" : "pending"}>
+                        {MENTOR.available ? "Available" : "Busy"}
+                      </Badge>
+                      <MentorTierBadge points={MENTOR.points} />
+                    </div>
                   </div>
                 </div>
 
@@ -2340,22 +2484,20 @@ function DashboardScreen({
 
                 <div className="flex flex-col gap-2">
                   <Button
-                    variant="primary"
-                    size="sm"
-                    fullWidth
-                    onClick={() => onToast("success", "Opening message thread with Dr. Khaled…")}
-                  >
-                    <Icons.MessageCircle />
-                    Message Mentor
-                  </Button>
-                  <Button
                     variant="secondary"
                     size="sm"
                     fullWidth
-                    onClick={() => onNavigate("ask-question")}
+                    onClick={() => onNavigate("ask-my-mentor")}
                   >
                     Ask My Mentor
                   </Button>
+                  <button
+                    onClick={() => onNavigate("leaderboard")}
+                    className="text-xs font-semibold text-center py-1"
+                    style={{ color: C.primary }}
+                  >
+                    🏆 See Top Mentors
+                  </button>
                 </div>
               </Card>
             </div>
@@ -2390,7 +2532,7 @@ function DashboardScreen({
                   { name: "Dr. James Chen", specialty: "Emergency Medicine", available: true, photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=80&h=80&fit=crop" },
                   { name: "Dr. Priya Patel", specialty: "Neurology", available: false, photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=80&h=80&fit=crop" },
                 ].map((m) => (
-                  <Card key={m.name} className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onToast("info", `Viewing ${m.name}'s profile…`)}>
+                  <Card key={m.name} className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedSuggestedMentor(m)}>
                     <div className="relative flex-shrink-0">
                       <img src={m.photo} alt={m.name} className="w-10 h-10 rounded-full object-cover" />
                       <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={m.available} /></span>
@@ -2407,6 +2549,43 @@ function DashboardScreen({
           </div>
         </div>
       </main>
+
+      {selectedSuggestedMentor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedSuggestedMentor(null); }}
+        >
+          <div className="bg-white rounded-2xl card-shadow-lg w-full max-w-md p-6 fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-4">
+              <div className="relative flex-shrink-0">
+                <img src={selectedSuggestedMentor.photo} alt={selectedSuggestedMentor.name} className="w-16 h-16 rounded-full object-cover" />
+                <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={selectedSuggestedMentor.available} /></span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-bold" style={{ color: C.text }}>{selectedSuggestedMentor.name}</h3>
+                  <button type="button" onClick={() => setSelectedSuggestedMentor(null)} className="text-lg px-2 hover:opacity-70" style={{ color: C.textSec }}>✕</button>
+                </div>
+                <p className="text-sm mt-1" style={{ color: C.textSec }}>{selectedSuggestedMentor.specialty}</p>
+                <div className="mt-3">
+                  <Badge variant={selectedSuggestedMentor.available ? "success" : "pending"}>
+                    {selectedSuggestedMentor.available ? "Available now" : "Currently busy"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 p-4 rounded-xl" style={{ backgroundColor: C.primaryLight, border: "1px solid " + C.border }}>
+              <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
+                Mentor profile preview. Their full profile and mentor-matching flow can be connected to the backend later.
+              </p>
+            </div>
+            <div className="flex justify-end mt-5">
+              <Button variant="secondary" size="sm" onClick={() => setSelectedSuggestedMentor(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2713,9 +2892,13 @@ function CategoryBadge({ category }: { category: string }) {
 function FeedQuestionCard({
   question,
   onClick,
+  isBoosted,
+  onToggleBoost,
 }: {
   question: FeedQuestion;
   onClick: () => void;
+  isBoosted: boolean;
+  onToggleBoost: (id: number) => void;
 }) {
   return (
     <Card
@@ -2815,7 +2998,23 @@ function FeedQuestionCard({
             </svg>
             <strong style={{ color: C.text }}>{question.helpful}</strong> helpful
           </span>
-          <span
+              <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleBoost(question.id);
+              }}
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full transition-colors"
+              style={{
+                backgroundColor: isBoosted ? C.primary : C.primaryLight,
+                color: isBoosted ? "#fff" : C.primary,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
+              </svg>
+              {question.boosted + (isBoosted ? 1 : 0)}
+            </button>
+        <span
             className="ml-auto flex items-center gap-1 text-xs font-semibold"
             style={{ color: C.primary }}
           >
@@ -2847,7 +3046,16 @@ function FeedScreen({
 }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [sort, setSort] = useState<"recent" | "helpful" | "answered">("recent");
+  const [sort, setSort] = useState<"recent" | "helpful" | "answered" | "boosted">("recent");
+  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
+
+  const toggleBoost = (id: number) => {
+    setBoostedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -2884,6 +3092,8 @@ function FeedScreen({
   }).sort((a, b) => {
     if (sort === "helpful") return b.helpful - a.helpful;
     if (sort === "answered") return b.responses - a.responses;
+    if (sort === "boosted")
+      return (b.boosted + (boostedIds.has(b.id) ? 1 : 0)) - (a.boosted + (boostedIds.has(a.id) ? 1 : 0));
     return b.id - a.id;
   });
 
@@ -3033,6 +3243,7 @@ function FeedScreen({
                 { v: "recent", label: "Most Recent" },
                 { v: "helpful", label: "Most Helpful" },
                 { v: "answered", label: "Most Answered" },
+                { v: "boosted", label: "Most Boosted" },
               ] as const
             ).map(({ v, label }) => (
               <button
@@ -3059,6 +3270,8 @@ function FeedScreen({
                 key={q.id}
                 question={q}
                 onClick={() => onOpenQuestion(q.id)}
+                isBoosted={boostedIds.has(q.id)}
+                onToggleBoost={toggleBoost}
               />
             ))}
           </div>
@@ -3118,8 +3331,17 @@ function QuestionDetailScreen({
 }) {
   const [sort, setSort] = useState<"helpful" | "newest">("helpful");
   const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
+  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  const toggleBoost = (id: number) => {
+    setBoostedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const unread = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
 
@@ -3315,6 +3537,19 @@ function QuestionDetailScreen({
               <span>
                 <strong style={{ color: C.text }}>{question.helpful}</strong> helpful
               </span>
+              <button
+                onClick={() => toggleBoost(question.id)}
+                className="flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full transition-colors"
+                style={{
+                  backgroundColor: boostedIds.has(question.id) ? C.primary : C.primaryLight,
+                  color: boostedIds.has(question.id) ? "#fff" : C.primary,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
+                </svg>
+                {question.boosted + (boostedIds.has(question.id) ? 1 : 0)}
+              </button>
             </div>
           </div>
         </Card>
@@ -3973,12 +4208,15 @@ function AskQuestionScreen({
   onBack,
   onNavigate,
   onToast,
+  initialStep = "select",
 }: {
   onBack: () => void;
   onNavigate: (s: Screen) => void;
   onToast: (t: ToastType, msg: string) => void;
+  initialStep?: AskStep;
 }) {
-  const [step, setStep] = useState<AskStep>("select");
+  const [step, setStep] = useState<AskStep>(initialStep);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
   const [category, setCategory] = useState("");
@@ -3995,9 +4233,23 @@ function AskQuestionScreen({
     setAttachment(null);
   }
 
-  function handleSubmit(successStep: AskStep, toastMsg: string) {
-    onToast("success", toastMsg);
-    setStep(successStep);
+  async function handleSubmit(successStep: AskStep, toastMsg: string, privacy: string) {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      onToast("success", toastMsg);
+      setStep(successStep);
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", toastMsg);
+        setStep(successStep);
+      } else {
+        onToast("error", error instanceof Error ? error.message : "Unable to submit the question.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function toggleHelpful(id: number) {
@@ -4153,7 +4405,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader
-          onBack={() => setStep("select")}
+          onBack={onBack}
           title="Ask My Mentor"
           subtitle="Private question to Dr. Mariam Khaled"
         />
@@ -4202,7 +4454,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!")}
+            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private")}
             submitLabel="Send to Dr. Khaled"
           />
         </div>
@@ -4253,7 +4505,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader
-          onBack={() => setStep("select")}
+          onBack={onBack}
           title="Ask Any Mentor"
           subtitle="Visible to all physician mentors at the school"
         />
@@ -4306,7 +4558,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!")}
+            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!", "any-mentor")}
             submitLabel="Share with Mentors"
           />
         </div>
@@ -4458,7 +4710,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader
-          onBack={() => setStep("select")}
+          onBack={onBack}
           title="Ask Anonymously"
           subtitle="Your identity is fully protected"
         />
@@ -4642,7 +4894,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!")}
+            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!", "anon-public")}
             submitLabel="Submit for Approval"
           />
         </div>
@@ -4708,7 +4960,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!")}
+            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!", "anon-private")}
             submitLabel="Submit Privately"
           />
         </div>
@@ -5413,6 +5665,9 @@ function MentorDashboardScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
+  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [showAllMentees, setShowAllMentees] = useState(false);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5423,6 +5678,23 @@ function MentorDashboardScreen({
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [notifOpen]);
+
+  async function sendMentorMessage() {
+    if (!messageTarget || !messageText.trim()) return;
+    try {
+      await sendMessage({ recipientId: messageTarget.id, body: messageText.trim() });
+      onToast("success", "Message sent to " + messageTarget.name + ".");
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", "Message sent to " + messageTarget.name + ".");
+      } else {
+        onToast("error", error instanceof Error ? error.message : "Unable to send the message.");
+        return;
+      }
+    }
+    setMessageTarget(null);
+    setMessageText("");
+  }
 
   const totalWaiting =
     MENTOR_WAITING_QUESTIONS.length +
@@ -5566,6 +5838,50 @@ function MentorDashboardScreen({
           </p>
         </div>
 
+        {/* Rewards banner */}
+        {(() => {
+          const tier = getMentorTier(MENTOR.points);
+          return (
+            <Card className="p-5 mb-6 fade-in flex items-center gap-5 flex-wrap">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
+                style={{ backgroundColor: tier.bg }}
+              >
+                {tier.emoji}
+              </div>
+              <div className="flex-1 min-w-[180px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="stat-numeral" style={{ color: tier.color }}>
+                    {MENTOR.points}
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: C.textSec }}>
+                    reward points
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MentorTierBadge points={MENTOR.points} size="md" />
+                  {tier.next && (
+                    <span className="text-xs" style={{ color: C.textSec }}>
+                      {tier.next.min - MENTOR.points} points to {tier.next.label}
+                    </span>
+                  )}
+                </div>
+                {tier.next && (
+                  <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight, maxWidth: 280 }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${tier.progress}%`, backgroundColor: tier.color, transition: "width 0.4s ease" }}
+                    />
+                  </div>
+                )}
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
+                🏆 Top Mentors
+              </Button>
+            </Card>
+          );
+        })()}
+
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
           {STATS.map((s) => (
@@ -5623,7 +5939,12 @@ function MentorDashboardScreen({
                 <div className="section-accent-bar" style={{ backgroundColor: C.success, minHeight: 24 }} />
                 <h2 className="text-sm font-bold" style={{ color: C.text }}>My Mentees</h2>
               </div>
-              <button className="text-xs font-semibold flex items-center gap-1" style={{ color: C.primary }}>
+              <button
+                type="button"
+                className="text-xs font-semibold flex items-center gap-1"
+                style={{ color: C.primary }}
+                onClick={() => setShowAllMentees(true)}
+              >
                 View all <Icons.ChevronRight />
               </button>
             </div>
@@ -5673,7 +5994,7 @@ function MentorDashboardScreen({
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => onToast("info", `Opening message thread with ${m.name}…`)}
+                      onClick={() => { setMessageTarget(m); setMessageText(""); }}
                     >
                       <Icons.MessageCircle />
                       Message
@@ -5785,6 +6106,147 @@ function MentorDashboardScreen({
           )}
         </div>
       </main>
+
+      {showAllMentees && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAllMentees(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl card-shadow-lg w-full max-w-2xl max-h-[80vh] overflow-hidden fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: "1px solid " + C.border }}
+            >
+              <div>
+                <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
+                <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllMentees(false)}
+                className="text-lg px-2 hover:opacity-70"
+                style={{ color: C.textSec }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex flex-col gap-3">
+              {MENTOR_MENTEES_DATA.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{ backgroundColor: C.bg, border: "1px solid " + C.border }}
+                >
+                  <div className="relative flex-shrink-0">
+                    <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover" />
+                    <span className="absolute -bottom-0.5 -right-0.5">
+                      <StatusDot available={m.active} />
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold" style={{ color: C.text }}>{m.name}</div>
+                    <div className="text-xs" style={{ color: C.textSec }}>{m.year} · {m.track}</div>
+                    <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
+                      {m.active ? "● Active now" : "Last active: " + m.lastActivity}
+                    </div>
+                  </div>
+                  <span className="text-xs" style={{ color: C.textSec }}>
+                    {m.totalQuestions} questions
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {messageTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setMessageTarget(null);
+              setMessageText("");
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl card-shadow-lg w-full max-w-md fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-3">
+                <img src={messageTarget.photo} alt={messageTarget.name} className="w-9 h-9 rounded-full object-cover" />
+                <div>
+                  <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
+                  <div className="text-xs" style={{ color: C.textSec }}>{messageTarget.year} · {messageTarget.track}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setMessageTarget(null); setMessageText(""); }}
+                className="p-1.5 rounded-lg hover:opacity-70"
+                style={{ color: C.textSec }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5">
+              <textarea
+                autoFocus
+                rows={6}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Write a message to your mentee…"
+                className="w-full px-3.5 py-3 rounded-xl text-sm outline-none resize-none"
+                style={{ border: `1.5px solid ${C.border}`, color: C.text, backgroundColor: "#fff" }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = C.primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px rgba(91,78,191,0.12)`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              />
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setMessageTarget(null); setMessageText(""); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!messageText.trim()}
+                  onClick={() => {
+                    onToast("success", `Message sent to ${messageTarget.name}.`);
+                    setMessageTarget(null);
+                    setMessageText("");
+                  }}
+                >
+                  Send Message
+                </Button>
+              </div>
+              <p className="text-xs mt-3" style={{ color: C.textSec }}>
+                Demo mode: this opens a working placeholder message composer. Backend messaging can be connected later.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7163,6 +7625,10 @@ function AdminScreen({
 }) {
   const [section, setSection] = useState<AdminSection>(initialSection);
 
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
+
   function handleNav(s: AdminSection) {
     setSection(s);
     const map: Record<AdminSection, Screen> = {
@@ -7697,6 +8163,7 @@ function MentorProfileScreen({
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.successLight, color: C.success }}>
                   Verified Mentor
                 </span>
+                <MentorTierBadge points={MENTOR.points} />
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.borderLight, color: C.textSec }}>
                   Member since {profile.memberSince}
                 </span>
@@ -7727,6 +8194,52 @@ function MentorProfileScreen({
             </div>
           ))}
         </div>
+
+        {/* Mentor Rewards */}
+        {(() => {
+          const tier = getMentorTier(MENTOR.points);
+          return (
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold" style={{ color: C.text }}>Mentor Rewards</h3>
+                <button
+                  onClick={() => onNavigate("leaderboard")}
+                  className="text-xs font-semibold"
+                  style={{ color: C.primary }}
+                >
+                  View Leaderboard →
+                </button>
+              </div>
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                  style={{ backgroundColor: tier.bg }}
+                >
+                  {tier.emoji}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="stat-numeral" style={{ color: tier.color }}>{MENTOR.points}</span>
+                    <span className="text-xs font-medium" style={{ color: C.textSec }}>points · {tier.label}</span>
+                  </div>
+                  {tier.next && (
+                    <>
+                      <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${tier.progress}%`, backgroundColor: tier.color, transition: "width 0.4s ease" }}
+                        />
+                      </div>
+                      <p className="text-xs mt-1" style={{ color: C.textSec }}>
+                        {tier.next.min - MENTOR.points} points to {tier.next.emoji} {tier.next.label}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* Availability indicator */}
         <Card className="p-5">
@@ -7785,6 +8298,80 @@ function MentorProfileScreen({
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+// ─── LEADERBOARD ─────────────────────────────────────────────────────────────
+
+function LeaderboardScreen({
+  onBack,
+  role,
+}: {
+  onBack: () => void;
+  role: Role;
+}) {
+  const backLabel = role === "mentor" ? "Dashboard" : "Dashboard";
+  const backTarget = () => onBack();
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+      <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <button
+            onClick={backTarget}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0"
+            style={{ color: C.textSec, backgroundColor: C.borderLight }}
+          >
+            <Icons.ArrowLeft />
+            <span className="hidden sm:inline">{backLabel}</span>
+          </button>
+          <Logo size="sm" />
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 fade-in">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold mb-1" style={{ color: C.text }}>🏆 Top Mentors</h1>
+          <p className="text-sm" style={{ color: C.textSec }}>
+            Ranked by reward points — earned for answering, helpful votes, and fast responses.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          {LEADERBOARD_MENTORS.map((m, idx) => {
+            const tier = getMentorTier(m.points);
+            const rank = idx + 1;
+            const isTop3 = rank <= 3;
+            const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+            return (
+              <Card
+                key={m.id}
+                className="p-4 flex items-center gap-3"
+                style={isTop3 ? { border: `1.5px solid ${tier.color}55`, backgroundColor: tier.bg } : undefined}
+              >
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm"
+                  style={{ backgroundColor: isTop3 ? "transparent" : C.borderLight, color: C.textSec }}
+                >
+                  {medal ?? rank}
+                </div>
+                <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm truncate" style={{ color: C.text }}>{m.name}</div>
+                  <div className="text-xs" style={{ color: C.textSec }}>{m.specialty}</div>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className="stat-numeral" style={{ color: tier.color, fontSize: "1.2rem" }}>
+                    {m.points}
+                  </span>
+                  <MentorTierBadge points={m.points} />
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </main>
     </div>
   );
 }
@@ -7960,8 +8547,15 @@ export default function App() {
   }
 
   function handleRoleSelect(r: Role) {
+    if (!r) return;
     setRole(r);
-    setScreen(r === "mentee" ? "onboarding-mentee" : r === "mentor" ? "onboarding-mentor" : "dashboard");
+    setScreen(
+      r === "mentee"
+        ? "onboarding-mentee"
+        : r === "mentor"
+          ? "onboarding-mentor"
+          : "admin-dashboard",
+    );
   }
 
   function openQuestion(id: number) {
@@ -7988,7 +8582,12 @@ export default function App() {
     onMarkAllRead: markAllNotifsRead,
   };
 
-  const showMobileNav = screen !== "login" && screen !== "verify" && !screen.startsWith("onboarding") && !screen.startsWith("admin");
+  const showMobileNav =
+    role !== "admin" &&
+    screen !== "login" &&
+    screen !== "verify" &&
+    !screen.startsWith("onboarding") &&
+    !screen.startsWith("admin");
 
   return (
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
@@ -7996,6 +8595,20 @@ export default function App() {
         <LoginScreen
           onNext={() => {
             setScreen("verify");
+          }}
+          onDemoLogin={(demoRole) => {
+            setRole(demoRole);
+            setScreen(
+              demoRole === "mentee"
+                ? "dashboard"
+                : demoRole === "mentor"
+                  ? "mentor-dashboard"
+                  : "admin-dashboard",
+            );
+            addToast(
+              "info",
+              `Demo mode: signed in as ${demoRole === "mentee" ? "student" : demoRole} with placeholder data.`,
+            );
           }}
         />
       )}
@@ -8022,7 +8635,7 @@ export default function App() {
         <OnboardingMentorScreen
           onNext={() => {
             addToast("success", "Mentor profile submitted for review!");
-            setScreen("dashboard");
+            setScreen("mentor-dashboard");
           }}
         />
       )}
@@ -8036,6 +8649,30 @@ export default function App() {
       )}
       {screen === "ask-question" && (
         <AskQuestionScreen
+          onBack={() => setScreen("dashboard")}
+          onNavigate={setScreen}
+          onToast={addToast}
+        />
+      )}
+      {screen === "ask-my-mentor" && (
+        <AskQuestionScreen
+          initialStep="my-mentor"
+          onBack={() => setScreen("dashboard")}
+          onNavigate={setScreen}
+          onToast={addToast}
+        />
+      )}
+      {screen === "ask-any-mentor" && (
+        <AskQuestionScreen
+          initialStep="any-mentor"
+          onBack={() => setScreen("dashboard")}
+          onNavigate={setScreen}
+          onToast={addToast}
+        />
+      )}
+      {screen === "ask-anonymous" && (
+        <AskQuestionScreen
+          initialStep="anonymous"
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
           onToast={addToast}
@@ -8100,6 +8737,12 @@ export default function App() {
       {screen === "mentor-profile" && (
         <MentorProfileScreen onNavigate={setScreen} onToast={addToast} />
       )}
+      {screen === "leaderboard" && (
+        <LeaderboardScreen
+          role={role}
+          onBack={() => setScreen(role === "mentor" ? "mentor-dashboard" : "dashboard")}
+        />
+      )}
 
       {/* Mobile bottom nav */}
       {screen !== "login" && screen !== "verify" && !screen.startsWith("onboarding") && !screen.startsWith("admin") && (
@@ -8109,46 +8752,6 @@ export default function App() {
           onNavigate={setScreen}
           notifCount={ALL_NOTIFICATIONS.filter(n => !n.read && !notifReadIds.includes(n.id)).length}
         />
-      )}
-
-      {/* Dev navigation strip */}
-      {screen !== "login" && (
-        <div
-          className="dev-nav-strip fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-3 py-2 rounded-2xl card-shadow-lg"
-          style={{ backgroundColor: "#1A1D23", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          {(
-            [
-              { s: "login", label: "Login" },
-              { s: "verify", label: "Verify" },
-              { s: "onboarding-role", label: "Role" },
-              { s: "onboarding-mentee", label: "Mentee OB" },
-              { s: "onboarding-mentor", label: "Mentor OB" },
-              { s: "dashboard", label: "Dashboard" },
-              { s: "ask-question", label: "Ask Q" },
-              { s: "feed", label: "Feed" },
-              { s: "question-detail", label: "Detail" },
-              { s: "notifications-page", label: "Notifs" },
-              { s: "mentor-dashboard", label: "Mentor DB" },
-              { s: "mentor-answer" as Screen, label: "M. Answer", onClick: () => { setQuestionToAnswer(MENTOR_WAITING_QUESTIONS[0]); setScreen("mentor-answer"); } },
-              { s: "admin-dashboard" as Screen, label: "Admin" },
-              { s: "mentee-profile" as Screen, label: "Mentee ↗" },
-              { s: "mentor-profile" as Screen, label: "Mentor ↗" },
-            ] as { s: Screen; label: string; onClick?: () => void }[]
-          ).map(({ s, label, onClick }) => (
-            <button
-              key={s}
-              onClick={onClick ?? (() => setScreen(s))}
-              className="px-3 py-1 rounded-xl text-xs font-medium transition-all"
-              style={{
-                backgroundColor: screen === s ? C.primary : "transparent",
-                color: screen === s ? "#fff" : "rgba(255,255,255,0.5)",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       )}
 
       {/* Toast container */}
