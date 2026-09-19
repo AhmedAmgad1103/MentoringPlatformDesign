@@ -141,3 +141,37 @@ export function sendMessage(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
+  const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", {
+    method: "GET",
+  });
+
+  const body = new URLSearchParams({
+    csrfToken: csrf.csrfToken,
+    email,
+    role,
+    callbackUrl: "/",
+    json: "true",
+  });
+
+  const response = await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body,
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to sign in");
+  }
+
+  return { ok: true };
+}
+
+export function logout() {
+  return request<void>("/api/auth/signout", { method: "POST" });
+}
