@@ -3720,7 +3720,7 @@ function QuestionDetailScreen({
                 <button
                   type="button"
                   onClick={() => void toggleBoost()}
-                  disabled={Boolean(liveQuestion) && !liveQuestion?.isMine === false}
+                  disabled={Boolean(liveQuestion?.isMine)}
                   className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
                   style={{
                     backgroundColor: boosted ? C.primary : C.primaryLight,
@@ -5772,7 +5772,7 @@ function ModerationReviewPanel({
                   className="px-4 py-3 rounded-xl text-sm leading-relaxed"
                   style={{ backgroundColor: C.bg, border: `1px solid ${C.border}`, color: C.text }}
                 >
-                  {item.questionText}
+                  {item.questionTitle ?? item.questionText}
                 </div>
               </div>
 
@@ -6179,6 +6179,7 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
             ? item.visibility === "PUBLIC" ? "anon-question" : "private-question"
             : item.visibility === "PUBLIC" ? "any-mentor-question" : "private-question",
           questionText: item.content,
+          questionTitle: item.title,
           category: item.category.replaceAll("_", " "),
           submittedDate: new Date(item.createdAt).toLocaleDateString(),
           visibility: item.visibility.toLowerCase() as "public" | "private",
@@ -6339,6 +6340,9 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
               <Badge variant="pending">Pending approval</Badge>
             </div>
             <p className="text-base font-bold mb-2" style={{ color: C.text }}>
+              {reviewItem.questionTitle ?? "Question"}
+            </p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.textSec }}>
               {reviewItem.questionText}
             </p>
           </div>
