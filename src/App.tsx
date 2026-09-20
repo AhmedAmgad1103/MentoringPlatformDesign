@@ -867,6 +867,8 @@ interface FeedQuestion {
   boosted: number;
   tags: string[];
   createdAtMs?: number;
+  reportedByMe?: boolean;
+  isMine?: boolean;
 }
 
 const FEED_QUESTIONS: FeedQuestion[] = [
@@ -2905,105 +2907,100 @@ function FeedQuestionCard({
   isBoosted: boolean;
   onToggleBoost: (id: string | number) => void;
 }) {
-  return (
-    <Card
-      className="p-5 cursor-pointer"
-      onClick={onClick}
-      style={{ transition: "box-shadow 0.2s, transform 0.2s" }}
-    >
-      <div
-        onMouseEnter={(e) => {
-          (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow =
-            "0 8px 24px rgba(0,0,0,0.1)";
-          (e.currentTarget.parentElement as HTMLDivElement).style.transform =
-            "translateY(-2px)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow = "";
-          (e.currentTarget.parentElement as HTMLDivElement).style.transform = "";
-        }}
-      >
-        {/* Author row */}
-        <div className="flex items-center gap-2.5 mb-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: C.borderLight }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="4.5" r="2.5" stroke={C.textSec} strokeWidth="1.2" />
-              <path d="M1.5 13c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke={C.textSec} strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold" style={{ color: C.text }}>
-              Anonymous Mentee
-            </div>
-            <div className="text-xs" style={{ color: C.textSec }}>
-              {question.date}
-            </div>
-          </div>
-          <CategoryBadge category={question.category} />
-        </div>
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(Boolean(question.reportedByMe));
 
-        {/* Question */}
-        <h3
-          className="font-semibold text-sm leading-snug mb-1.5"
-          style={{ color: C.text }}
-        >
-          {question.title}
-        </h3>
-        <p
-          className="text-xs leading-relaxed mb-3 overflow-hidden"
-          style={{
-            color: C.textSec,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
+  return (
+    <>
+      <Card
+        className="p-5 cursor-pointer"
+        onClick={onClick}
+        style={{ transition: "box-shadow 0.2s, transform 0.2s" }}
+      >
+        <div
+          onMouseEnter={(e) => {
+            (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow =
+              "0 8px 24px rgba(0,0,0,0.1)";
+            (e.currentTarget.parentElement as HTMLDivElement).style.transform =
+              "translateY(-2px)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow = "";
+            (e.currentTarget.parentElement as HTMLDivElement).style.transform = "";
           }}
         >
-          {question.preview}
-        </p>
-
-        {/* Tags */}
-        {question.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {question.tags.slice(0, 3).map((t) => (
-              <span
-                key={t}
-                className="text-xs px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: C.borderLight, color: C.textSec }}
-              >
-                {t}
-              </span>
-            ))}
+          {/* Author row */}
+          <div className="flex items-center gap-2.5 mb-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: C.borderLight }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="4.5" r="2.5" stroke={C.textSec} strokeWidth="1.2" />
+                <path d="M1.5 13c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke={C.textSec} strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold" style={{ color: C.text }}>
+                {question.isAnonymous === false ? "Student" : "Anonymous Mentee"}
+              </div>
+              <div className="text-xs" style={{ color: C.textSec }}>
+                {question.date}
+              </div>
+            </div>
+            <CategoryBadge category={question.category} />
           </div>
-        )}
 
-        {/* Stats footer */}
-        <div
-          className="flex items-center gap-4 pt-3"
-          style={{ borderTop: `1px solid ${C.borderLight}` }}
-        >
-          <span
-            className="flex items-center gap-1 text-xs"
-            style={{ color: C.textSec }}
+          {/* Question */}
+          <h3
+            className="font-semibold text-sm leading-snug mb-1.5"
+            style={{ color: C.text }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z" stroke="currentColor" strokeWidth="1.1" />
-            </svg>
-            <strong style={{ color: C.text }}>{question.responses}</strong> mentor{" "}
-            {question.responses === 1 ? "answer" : "answers"}
-          </span>
-          <span
-            className="flex items-center gap-1 text-xs"
-            style={{ color: C.textSec }}
+            {question.title}
+          </h3>
+          <p
+            className="text-xs leading-relaxed mb-3 overflow-hidden"
+            style={{
+              color: C.textSec,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+            }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2.5 5.5L2 10h6l1.5-4.5H7V3a1 1 0 00-2 0v2.5H2.5z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-            </svg>
-            <strong style={{ color: C.text }}>{question.helpful}</strong> helpful
-          </span>
-              <button
+            {question.preview}
+          </p>
+
+          {/* Tags */}
+          {question.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {question.tags.slice(0, 3).map((t) => (
+                <span
+                  key={t}
+                  className="text-xs px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: C.borderLight, color: C.textSec }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Stats footer */}
+          <div
+            className="flex items-center gap-3 pt-3"
+            style={{ borderTop: `1px solid ${C.borderLight}` }}
+          >
+            <span
+              className="flex items-center gap-1 text-xs"
+              style={{ color: C.textSec }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z" stroke="currentColor" strokeWidth="1.1" />
+              </svg>
+              <strong style={{ color: C.text }}>{question.responses}</strong> mentor{" "}
+              {question.responses === 1 ? "answer" : "answers"}
+            </span>
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleBoost(question.id);
@@ -3019,16 +3016,51 @@ function FeedQuestionCard({
               </svg>
               {question.boosted + (isBoosted ? 1 : 0)}
             </button>
-        <span
-            className="ml-auto flex items-center gap-1 text-xs font-semibold"
-            style={{ color: C.primary }}
-          >
-            Read answers
-            <Icons.ChevronRight />
-          </span>
+
+            {!question.isMine && typeof question.id === "string" && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!reported) setReportOpen(true);
+                  }}
+                  className="text-xs font-medium px-2 py-1 rounded-full transition-colors"
+                  style={{
+                    backgroundColor: reported ? C.successLight : C.borderLight,
+                    color: reported ? C.success : C.textSec,
+                  }}
+                >
+                  {reported ? "Reported" : "Report"}
+                </button>
+                {reportOpen && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ReportQuestionModal
+                      questionId={question.id}
+                      questionTitle={question.title}
+                      onClose={() => setReportOpen(false)}
+                      onReported={() => setReported(true)}
+                      onToast={(type, message) => {
+                        // The feed card does not own the global toast container; use a browser-safe fallback.
+                        if (type === "error") window.alert(message);
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <span
+              className="ml-auto flex items-center gap-1 text-xs font-semibold"
+              style={{ color: C.primary }}
+            >
+              Read answers
+              <Icons.ChevronRight />
+            </span>
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </>
   );
 }
 
