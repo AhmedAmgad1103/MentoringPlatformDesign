@@ -2124,9 +2124,9 @@ function DashboardScreen({
   onToast: (t: ToastType, msg: string) => void;
   onNavigate: (s: Screen) => void;
   onOpenQuestion: (id: number) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"questions" | "notifications">("questions");
   const [searchQuery, setSearchQuery] = useState("");
@@ -2135,7 +2135,10 @@ function DashboardScreen({
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+  const readIds = notifReadIds ?? [];
+  const markRead = onMarkRead ?? (() => {});
+  const markAllRead = onMarkAllRead ?? (() => {});
+  const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !readIds.includes(n.id)).length;
   const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
 
   useEffect(() => {
@@ -2272,9 +2275,9 @@ function DashboardScreen({
               {notifDropdownOpen && (
                 <NotificationDropdown
                   notifications={ALL_NOTIFICATIONS}
-                  readIds={notifReadIds}
-                  onMarkRead={onMarkRead}
-                  onMarkAllRead={onMarkAllRead}
+                  readIds={readIds}
+                  onMarkRead={markRead}
+                  onMarkAllRead={markAllRead}
                   onViewAll={() => {
                     setNotifDropdownOpen(false);
                     onNavigate("notifications-page");
