@@ -5930,9 +5930,18 @@ function MentorDashboardScreen({
       (q) => q.type === "anon-public" || q.type === "anon-private"
     ) ?? MENTOR_ANON_QUESTIONS;
 
-  function selectMenteeForMessage(target: (typeof MENTOR_MENTEES_DATA)[number]) {
-    const live = liveMentees?.find((m) => m.name === target.name);
-    setMessageTarget(live ? { ...target, id: live.id } : target);
+  const displayMentees = liveMentees
+    ? liveMentees.map((m, index) => ({
+        ...(MENTOR_MENTEES_DATA[index % MENTOR_MENTEES_DATA.length]),
+        id: m.id,
+        name: m.name ?? "Mentee",
+        email: m.email,
+        totalQuestions: m.questionCount,
+      }))
+    : MENTOR_MENTEES_DATA;
+
+  function selectMenteeForMessage(target: MessageTarget) {
+    setMessageTarget(target);
     setMessageText("");
   }
 
@@ -5971,7 +5980,7 @@ function MentorDashboardScreen({
   const STATS = [
     {
       label: "Assigned Mentees",
-      value: MENTOR_MENTEES_DATA.length,
+      value: displayMentees.length,
       bg: C.successLight,
       color: C.success,
       icon: (
@@ -6216,7 +6225,7 @@ function MentorDashboardScreen({
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {MENTOR_MENTEES_DATA.map((m) => (
+              {displayMentees.map((m) => (
                 <Card key={m.id} className="p-4">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="relative flex-shrink-0">
@@ -6393,7 +6402,7 @@ function MentorDashboardScreen({
               <div>
                 <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
                 <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                  {displayMentees.length} assigned mentees
                 </p>
               </div>
               <button
@@ -6406,7 +6415,7 @@ function MentorDashboardScreen({
               </button>
             </div>
             <div className="p-5 overflow-y-auto flex flex-col gap-3">
-              {MENTOR_MENTEES_DATA.map((m) => (
+              {displayMentees.map((m) => (
                 <div
                   key={m.id}
                   className="flex items-center gap-3 p-3 rounded-xl"
@@ -8545,7 +8554,7 @@ function MentorProfileScreen({
         <Card className="p-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Current Mentees</h3>
           <div className="flex flex-col gap-2">
-            {MENTOR_MENTEES_DATA.map(m => (
+            {displayMentees.map(m => (
               <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
                 <div className="relative">
                   <img src={m.photo} alt={m.name} className="w-9 h-9 rounded-full object-cover" />
