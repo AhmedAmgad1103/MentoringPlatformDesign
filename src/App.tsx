@@ -861,7 +861,7 @@ const SAMPLE_RESPONSES = [
 // ─── FEED & NOTIFICATION DATA ─────────────────────────────────────────────────
 
 interface FeedQuestion {
-  id: number;
+  id: string | number;
   title: string;
   preview: string;
   full: string;
@@ -1091,7 +1091,7 @@ const MENTOR_MENTEES_DATA = [
 ];
 
 interface MentorQuestion {
-  id: number;
+  id: string | number;
   type: "private" | "any-mentor" | "anon-public" | "anon-private";
   question: string;
   category: string;
@@ -5440,7 +5440,7 @@ const ADMIN_USERS: AdminUser[] = [
 type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
 
 interface ModerationItem {
-  id: number;
+  id: string | number;
   type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
   questionText: string;
   category: string;
