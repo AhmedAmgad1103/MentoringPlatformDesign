@@ -6,6 +6,7 @@ import {
   getFeedQuestions,
   getMentorQueue,
   getMentorMentees,
+  getModerationQueue,
   getQuestionDetails,
   getQuestions,
   sendMessage,
@@ -5293,7 +5294,7 @@ const ADMIN_USERS: AdminUser[] = [
 type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
 
 interface ModerationItem {
-  id: number;
+  id: string | number;
   type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
   questionText: string;
   category: string;
@@ -6890,8 +6891,8 @@ function ModerationReviewPanel({
 }: {
   item: ModerationItem;
   onClose: () => void;
-  onApprove: (id: number) => void;
-  onReject: (id: number, reason: string) => void;
+  onApprove: (id: string | number) => void;
+  onReject: (id: string | number, reason: string) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [modal, setModal] = useState<"approve" | "reject" | null>(null);
@@ -7457,23 +7458,75 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
   const [items, setItems] = useState(MODERATION_ITEMS.filter(m => m.type === "anon-question" || m.type === "suspicious"));
   const [filterStatus, setFilterStatus] = useState<ModerationStatus | "all">("pending");
   const [reviewItem, setReviewItem] = useState<ModerationItem | null>(null);
+  const [liveItems, setLiveItems] = useState<ModerationItem[] | null>(null);
 
-  function handleApprove(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
-    setReviewItem(null);
+  useEffect(() => {
+    let active = true;
+    getModerationQueue({ limit: 50 })
+      .then((response) => {
+        if (!active) return;
+        setLiveItems(
+          response.items.map((item) => ({
+            id: item.id,
+            type: "anon-question",
+            questionText: item.content,
+            category: item.category.replaceAll("_", " "),
+            submittedDate: new Date(item.createdAt).toLocaleDateString(),
+            visibility: item.visibility.toLowerCase() as "public" | "private",
+            status: "pending",
+          }))
+        );
+      })
+      .catch(() => {
+        if (active) setLiveItems(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleApprove(id: string | number) {
+    try {
+      if (typeof id === "string") {
+        await approveQuestion(id);
+        setLiveItems((prev) => prev?.filter((m) => m.id !== id) ?? prev);
+      } else {
+        setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
+      }
+      setReviewItem(null);
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to approve question."
+      );
+    }
   }
 
-  function handleReject(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-    setReviewItem(null);
+  async function handleReject(id: string | number, _reason?: string) {
+    try {
+      if (typeof id === "string") {
+        await rejectQuestion(id);
+        setLiveItems((prev) => prev?.filter((m) => m.id !== id) ?? prev);
+      } else {
+        setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
+      }
+      setReviewItem(null);
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to reject question."
+      );
+    }
   }
 
-  const filtered = items.filter(m => filterStatus === "all" || m.status === filterStatus);
+  const itemsToShow = liveItems ?? items;
+  const filtered = itemsToShow.filter(m => filterStatus === "all" || m.status === filterStatus);
 
   const STATUS_TABS: { v: ModerationStatus | "all"; label: string }[] = [
-    { v: "pending", label: `Pending (${items.filter(m => m.status === "pending").length})` },
-    { v: "approved", label: `Approved (${items.filter(m => m.status === "approved").length})` },
-    { v: "rejected", label: `Rejected (${items.filter(m => m.status === "rejected").length})` },
+    { v: "pending", label: `Pending (${itemsToShow.filter(m => m.status === "pending").length})` },
+    { v: "approved", label: `Approved (${itemsToShow.filter(m => m.status === "approved").length})` },
+    { v: "rejected", label: `Rejected (${itemsToShow.filter(m => m.status === "rejected").length})` },
     { v: "all", label: "All" },
   ];
 
