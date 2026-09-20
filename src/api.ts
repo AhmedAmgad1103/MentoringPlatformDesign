@@ -6,6 +6,7 @@ import {
   getAnswers as getAnswersApi,
   getMentorProfile,
   getMentors as getMentorsApi,
+  getMentorMentees as getMentorMenteesApi,
   getMessages as getMessagesApi,
   getQuestion as getQuestionApi,
   getQuestions as getQuestionsApi,
@@ -281,3 +282,7 @@ export async function getMentorProfileById(id: string) {
 }
 
 export type { ApiAnswer };
+
+export async function getMentorMentees() {
+  return getMentorMenteesApi();
+}
