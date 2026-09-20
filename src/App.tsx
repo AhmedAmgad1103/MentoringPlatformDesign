@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   boostQuestion,
   createAnswer,
+  updateAnswer,
   createQuestion,
   getFeedQuestions,
   getMentorQueue,
@@ -106,6 +107,13 @@ const C = {
 };
 
 const DEMO_MODE = false;
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 // ─── COMPONENT LIBRARY ───────────────────────────────────────────────────────
 
@@ -904,6 +912,7 @@ interface FeedQuestion {
   reportedByMe?: boolean;
   isMine?: boolean;
   isAnonymous?: boolean;
+  moderationStatus?: "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED";
 }
 
 const FEED_QUESTIONS: FeedQuestion[] = [
@@ -2371,18 +2380,22 @@ function DashboardScreen({
                         </p>
                         <Badge
                           variant={
-                            q.status === "ANSWERED"
-                              ? "success"
-                              : q.status === "CLOSED"
-                                ? "neutral"
-                                : "pending"
+                            q.moderationStatus === "PENDING"
+                              ? "info"
+                              : q.status === "ANSWERED"
+                                ? "success"
+                                : q.status === "CLOSED"
+                                  ? "neutral"
+                                  : "pending"
                           }
                         >
-                          {q.status === "ANSWERED"
-                            ? "Answered"
-                            : q.status === "CLOSED"
-                              ? "Closed"
-                              : "Awaiting Response"}
+                          {q.moderationStatus === "PENDING"
+                            ? "Awaiting Approval"
+                            : q.status === "ANSWERED"
+                              ? "Answered"
+                              : q.status === "CLOSED"
+                                ? "Closed"
+                                : "Awaiting Response"}
                         </Badge>
                       </div>
 
@@ -2415,8 +2428,13 @@ function DashboardScreen({
                               : "🌐 Public"}
                         </span>
                         <span className="text-xs" style={{ color: C.textSec }}>
-                          {new Date(q.createdAt).toLocaleDateString()}
+                          {formatDateTime(q.createdAt)}
                         </span>
+                        {q.moderationStatus === "PENDING" && (
+                          <span className="text-xs font-medium" style={{ color: C.primary }}>
+                            Awaiting admin approval
+                          </span>
+                        )}
                         {q.responses > 0 && (
                           <span className="text-xs flex items-center gap-1" style={{ color: C.textSec }}>
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -3521,7 +3539,7 @@ function QuestionDetailScreen({
         preview: liveQuestion.content,
         full: liveQuestion.content,
         category: liveQuestion.category.replaceAll("_", " "),
-        date: new Date(liveQuestion.createdAt).toLocaleDateString(),
+        date: formatDateTime(liveQuestion.createdAt),
         responses: liveQuestion.answerCount,
         helpful: 0,
         boosted: liveQuestion.boostCount,
@@ -5066,12 +5084,14 @@ const ADMIN_USERS: AdminUser[] = [
 type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
 
 interface ModerationItem {
-  id: number;
+  id: string | number;
   type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
   questionText: string;
+  questionTitle?: string;
   category: string;
   submittedDate: string;
   visibility: "public" | "private";
+  submittedBy?: { name: string | null; email: string };
   status: ModerationStatus;
   internalNote?: string;
   reportReason?: string;
@@ -7227,7 +7247,7 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
                   </p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <CategoryBadge category={item.category} />
-                    <span className="text-xs" style={{ color: C.textSec }}>{new Date(item.createdAt).toLocaleDateString()}</span>
+                    <span className="text-xs" style={{ color: C.textSec }}>{formatDateTime(item.createdAt)}</span>
                   </div>
                 </div>
                 <button className="text-xs font-semibold flex-shrink-0" style={{ color: C.primary }} onClick={() => onNavigate("admin-moderation")}>
@@ -7479,7 +7499,7 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
           questionText: item.content,
           questionTitle: item.title,
           category: item.category.replaceAll("_", " "),
-          submittedDate: new Date(item.createdAt).toLocaleDateString(),
+          submittedDate: formatDateTime(item.createdAt),
           visibility: item.visibility.toLowerCase() as "public" | "private",
           status: "pending",
         }))
@@ -7883,7 +7903,7 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
           question: q.title,
           content: q.content,
           category: q.category.replaceAll("_", " "),
-          date: new Date(q.createdAt).toLocaleDateString(),
+          date: formatDateTime(q.createdAt),
           type: q.isAnonymous
             ? q.visibility === "PUBLIC" ? "anon-public" : "anon-private"
             : q.visibility === "PUBLIC" ? "any-mentor" : "private",
