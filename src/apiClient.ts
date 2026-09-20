@@ -470,6 +470,11 @@ export async function getAdminReports(
     page: number
     limit: number
     total: number
+    counts: {
+      PENDING: number
+      DISMISSED: number
+      ACTION_TAKEN: number
+    }
   }>(`/api/admin/reports${query ? `?${query}` : ""}`)
 }
 
