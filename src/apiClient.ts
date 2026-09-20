@@ -247,6 +247,20 @@ export async function getAdminMentors() {
   }>("/api/admin/mentors")
 }
 
+export type AdminStats = {
+  totalStudents: number
+  totalMentors: number
+  pendingMentors: number
+  totalQuestions: number
+  questionsAnswered: number
+  pendingModeration: number
+  reportedContent: number
+}
+
+export async function getAdminStats() {
+  return request<AdminStats>("/api/admin/stats")
+}
+
 export async function getAdminUsers(
   options: {
     role?: "STUDENT" | "MENTOR" | "ADMIN"
