@@ -248,34 +248,6 @@ export async function rejectQuestion(questionId: string) {
   })
 }
 
-export async function getModerationQueue(
-  options: { page?: number; limit?: number } = {}
-) {
-  const params = new URLSearchParams()
-  if (options.page !== undefined) params.set("page", String(options.page))
-  if (options.limit !== undefined) params.set("limit", String(options.limit))
-
-  const query = params.toString()
-  return request<{
-    items: Array<{
-      id: string
-      title: string
-      content: string
-      category: QuestionCategory
-      visibility: QuestionVisibility
-      isAnonymous: boolean
-      status: QuestionStatus
-      moderationStatus: ModerationStatus
-      createdAt: string
-      updatedAt: string
-      student: { id: string; name: string | null; email: string }
-    }>
-    page: number
-    limit: number
-    total: number
-  }>(`/api/admin/moderation${query ? `?${query}` : ""}`)
-}
-
 export async function getMentors() {
   return request<
     Array<{
