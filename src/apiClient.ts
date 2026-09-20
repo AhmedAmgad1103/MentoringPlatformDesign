@@ -21,6 +21,17 @@ export type ModerationStatus =
   | "APPROVED"
   | "REJECTED"
 
+export type ReportReason =
+  | "SPAM"
+  | "HARASSMENT"
+  | "INAPPROPRIATE_CONTENT"
+  | "MISINFORMATION"
+  | "PRIVACY"
+  | "OFF_TOPIC"
+  | "OTHER"
+
+export type ReportStatus = "PENDING" | "DISMISSED" | "ACTION_TAKEN"
+
 export type ApiQuestion = {
   id: string
   title: string
@@ -38,6 +49,8 @@ export type ApiQuestion = {
   boostCount: number
   answerCount: number
   boostedByMe: boolean
+  reportedByMe: boolean
+  reportCount?: number
 }
 
 export type ApiAnswer = {
@@ -393,6 +406,88 @@ export async function unboostQuestion(questionId: string) {
     boostedByMe: false
   }>(`/api/questions/${encodeURIComponent(questionId)}/boost`, {
     method: "DELETE",
+  })
+}
+
+export async function reportQuestion(
+  questionId: string,
+  input: { reason: ReportReason; details?: string }
+) {
+  return request<{
+    item: {
+      id: string
+      status: ReportStatus
+      reason: ReportReason
+      createdAt: string
+    }
+  }>(`/api/questions/${encodeURIComponent(questionId)}/reports`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export async function getAdminReports(
+  options: { status?: ReportStatus | "all"; page?: number; limit?: number } = {}
+) {
+  const params = new URLSearchParams()
+  if (options.status) params.set("status", options.status)
+  if (options.page !== undefined) params.set("page", String(options.page))
+  if (options.limit !== undefined) params.set("limit", String(options.limit))
+  const query = params.toString()
+
+  return request<{
+    items: Array<{
+      id: string
+      reason: ReportReason
+      details: string | null
+      status: ReportStatus
+      createdAt: string
+      reviewedAt: string | null
+      question: {
+        id: string
+        title: string
+        content: string
+        category: QuestionCategory
+        visibility: QuestionVisibility
+        isAnonymous: boolean
+        moderationStatus: ModerationStatus
+        createdAt: string
+        student: { id: string; name: string | null; email: string }
+        _count: { reports: number }
+      }
+      reporter: {
+        id: string
+        name: string | null
+        email: string
+        role: "STUDENT" | "MENTOR" | "ADMIN"
+      }
+      reviewedBy: {
+        id: string
+        name: string | null
+        email: string
+      } | null
+    }>
+    page: number
+    limit: number
+    total: number
+  }>(`/api/admin/reports${query ? `?${query}` : ""}`)
+}
+
+export async function updateAdminReport(
+  reportId: string,
+  action: "DISMISS" | "REMOVE_POST"
+) {
+  return request<{
+    item: {
+      id: string
+      status?: ReportStatus
+      reviewedAt?: string
+      moderationStatus?: ModerationStatus
+      questionStatus?: QuestionStatus
+    }
+  }>(`/api/admin/reports/${encodeURIComponent(reportId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action }),
   })
 }
 
