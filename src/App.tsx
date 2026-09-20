@@ -1506,37 +1506,6 @@ function LoginScreen({
               {isSigningIn ? "Signing In…" : "Sign In"}
             </Button>
 
-            <div
-              className="rounded-2xl p-4 mt-2"
-              style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}
-            >
-              <div className="flex items-center justify-between gap-3 mb-1">
-                <p className="text-sm font-semibold" style={{ color: C.text }}>
-                  Local Test Accounts
-                </p>
-                <span
-                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
-                  style={{ backgroundColor: "#fff", color: C.primary }}
-                >
-                  Role auto-detected
-                </span>
-              </div>
-              <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
-                Sign in with one of these accounts. The backend detects the role from the account automatically.
-              </p>
-              <div className="flex flex-col gap-1.5 text-xs" style={{ color: C.text }}>
-                <div><strong>Student:</strong> student@gmail.com / student@123</div>
-                <div><strong>Mentor:</strong> mentor@gmail.com / mentor@123</div>
-                <div><strong>Admin:</strong> admin@gmail.com / admin@123</div>
-              </div>
-            </div>
-
-            <p className="text-center text-sm" style={{ color: C.textSec }}>
-              Don't have an account?{" "}
-              <span className="font-medium" style={{ color: C.textSec }}>
-                Local testing branch — seeded accounts are ready.
-              </span>
-            </p>
           </form>
         </div>
       </div>
