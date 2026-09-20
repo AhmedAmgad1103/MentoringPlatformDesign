@@ -52,7 +52,7 @@ const backendProcess = spawn(
 console.log("[local-dev] Starting frontend on http://127.0.0.1:8443")
 const frontendProcess = spawn(
   npm,
-  ["run", "dev", "--", "--host", "127.0.0.1", "--port", "8443"],
+  ["exec", "vite", "--", "--host", "127.0.0.1", "--port", "8443"],
   { cwd: root, stdio: "inherit", shell }
 )
 
