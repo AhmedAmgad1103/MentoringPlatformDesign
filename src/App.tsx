@@ -5811,10 +5811,14 @@ function MentorAnswerScreen({
 function MentorQuestionCard({
   q,
   onAnswer,
+  onReport,
+  reported,
   compact = false,
 }: {
   q: MentorQuestion;
   onAnswer: (q: MentorQuestion) => void;
+  onReport: (q: MentorQuestion) => void;
+  reported: boolean;
   compact?: boolean;
 }) {
   const isAnon = q.asker === null;
@@ -5890,14 +5894,29 @@ function MentorQuestionCard({
 
       {/* Footer */}
       <div
-        className="flex items-center justify-between pt-3"
+        className="flex items-center justify-between gap-2 pt-3"
         style={{ borderTop: `1px solid ${C.borderLight}` }}
       >
         <CategoryBadge category={q.category} />
-        <Button variant="primary" size="sm" onClick={() => onAnswer(q)}>
-          Answer
-          <Icons.ChevronRight />
-        </Button>
+        <div className="flex items-center gap-2">
+          {typeof q.id === "string" && (
+            <button
+              type="button"
+              onClick={() => onReport(q)}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-xl transition-colors"
+              style={{
+                backgroundColor: reported ? C.successLight : C.borderLight,
+                color: reported ? C.success : C.textSec,
+              }}
+            >
+              {reported ? "Reported" : "Report"}
+            </button>
+          )}
+          <Button variant="primary" size="sm" onClick={() => onAnswer(q)}>
+            Answer
+            <Icons.ChevronRight />
+          </Button>
+        </div>
       </div>
     </Card>
   );
@@ -5922,6 +5941,8 @@ function MentorDashboardScreen({
   const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
   const [showAllMentees, setShowAllMentees] = useState(false);
+  const [reportingQuestion, setReportingQuestion] = useState<MentorQuestion | null>(null);
+  const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<string | number>>(new Set());
   const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
   const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
 
@@ -5929,7 +5950,12 @@ function MentorDashboardScreen({
     let active = true;
     getMentorQueue()
       .then((items) => {
-        if (active) setLiveMentorQuestions(items as MentorQuestion[]);
+        if (!active) return;
+        const typed = items as MentorQuestion[];
+        setLiveMentorQuestions(typed);
+        setReportedQuestionIds(
+          new Set(typed.filter((q) => q.reportedByMe).map((q) => q.id))
+        );
       })
       .catch(() => {
         if (active) setLiveMentorQuestions(null);
@@ -6335,7 +6361,15 @@ function MentorDashboardScreen({
             </div>
             <div className="flex flex-col gap-3">
               {waitingQuestions.map((q) => (
-                <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} />
+                <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                />
               ))}
             </div>
           </section>
@@ -6364,7 +6398,16 @@ function MentorDashboardScreen({
               </div>
               <div className="flex flex-col gap-3">
                 {anyQuestions.map((q) => (
-                  <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} compact />
+                  <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                  compact
+                />
                 ))}
                 <p className="text-xs px-1" style={{ color: C.textSec }}>
                   These questions were submitted to all mentors at the school. Your response will be visible to the student and their peers.
@@ -6394,7 +6437,16 @@ function MentorDashboardScreen({
               </div>
               <div className="flex flex-col gap-3">
                 {anonQuestions.map((q) => (
-                  <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} compact />
+                  <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                  compact
+                />
                 ))}
                 {/* Privacy reminder */}
                 <div
@@ -6411,6 +6463,18 @@ function MentorDashboardScreen({
           )}
         </div>
       </main>
+
+      {reportingQuestion && typeof reportingQuestion.id === "string" && (
+        <ReportQuestionModal
+          questionId={reportingQuestion.id}
+          questionTitle={reportingQuestion.question}
+          onClose={() => setReportingQuestion(null)}
+          onReported={() => {
+            setReportedQuestionIds((prev) => new Set(prev).add(reportingQuestion.id as string));
+          }}
+          onToast={onToast}
+        />
+      )}
 
       {showAllMentees && (
         <div
