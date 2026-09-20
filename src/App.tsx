@@ -5813,7 +5813,7 @@ function MentorDashboardScreen({
   onAnswerQuestion: (q: MentorQuestion) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
-  const [activeSection, setActiveSection] = useState<"all" | "waiting" | "any" | "anon">("all");
+  const [activeSection, setActiveSection] = useState<"all" | "mentees" | "waiting" | "any" | "anon">("all");
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
@@ -6094,53 +6094,46 @@ function MentorDashboardScreen({
           );
         })()}
 
-        {/* Stats row */}
+        {/* Dashboard filters */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
-          {STATS.map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl p-4 flex flex-col"
-              style={{ backgroundColor: s.bg, border: `1px solid ${s.color}22` }}
-            >
-              <div className="flex items-start justify-between mb-1">
-                <div style={{ color: s.color }}>{s.icon}</div>
-                <span className="stat-numeral" style={{ color: s.color }}>
-                  {s.value}
-                </span>
-              </div>
-              <div className="stat-label" style={{ color: s.color }}>
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
+          {STATS.map((s) => {
+            const section =
+              s.label === "Assigned Mentees"
+                ? "mentees"
+                : s.label === "Awaiting Response"
+                  ? "waiting"
+                  : s.label === "Ask Any Mentor"
+                    ? "any"
+                    : s.label === "Anonymous"
+                      ? "anon"
+                      : "all";
+            const active = activeSection === section;
 
-        {/* Section nav */}
-        <div
-          className="flex items-center gap-1 mb-6 p-1 rounded-xl w-fit"
-          style={{ backgroundColor: C.borderLight }}
-        >
-          {(
-            [
-              { v: "all",     label: "All Sections"  },
-              { v: "waiting", label: `Waiting (${waitingQuestions.length})` },
-              { v: "any",     label: `Ask Any Mentor (${anyQuestions.length})` },
-              { v: "anon",    label: `Anonymous (${anonQuestions.length})` },
-            ] as const
-          ).map(({ v, label }) => (
-            <button
-              key={v}
-              onClick={() => setActiveSection(v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{
-                backgroundColor: activeSection === v ? "#fff" : "transparent",
-                color: activeSection === v ? C.text : C.textSec,
-                boxShadow: activeSection === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}
-            >
-              {label}
-            </button>
-          ))}
+            return (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setActiveSection(section)}
+                className="rounded-xl p-4 flex flex-col text-left transition-all duration-150 cursor-pointer hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: s.bg,
+                  border: `1px solid ${s.color}22`,
+                  boxShadow: active ? `0 0 0 2px ${s.color}33, 0 4px 12px rgba(30,27,58,0.08)` : "none",
+                  transform: active ? "translateY(-1px)" : undefined,
+                }}
+              >
+                <div className="flex items-start justify-between mb-1">
+                  <div style={{ color: s.color }}>{s.icon}</div>
+                  <span className="stat-numeral" style={{ color: s.color }}>
+                    {s.value}
+                  </span>
+                </div>
+                <div className="stat-label" style={{ color: s.color }}>
+                  {s.label}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* MY MENTEES */}
