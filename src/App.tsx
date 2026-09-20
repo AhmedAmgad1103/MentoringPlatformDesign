@@ -7594,6 +7594,207 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
   );
 }
 
+function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
+  type ReportItem = Awaited<ReturnType<typeof getAdminReports>>["items"][number];
+
+  const [items, setItems] = useState<ReportItem[]>([]);
+  const [counts, setCounts] = useState({ PENDING: 0, DISMISSED: 0, ACTION_TAKEN: 0 });
+  const [filterStatus, setFilterStatus] = useState<ReportStatusValue>("PENDING");
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<ReportItem | null>(null);
+  const [acting, setActing] = useState<"DISMISS" | "REMOVE_POST" | null>(null);
+
+  async function loadReports(status: ReportStatusValue = filterStatus) {
+    setLoading(true);
+    try {
+      const response = await getAdminReports({ status, page: 1, limit: 50 });
+      setItems(response.items);
+      setCounts(response.counts);
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to load reports.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadReports(filterStatus);
+  }, [filterStatus]);
+
+  async function handleAction(action: "DISMISS" | "REMOVE_POST") {
+    if (!selected || acting) return;
+    setActing(action);
+    try {
+      await updateAdminReport(selected.id, action);
+      setSelected(null);
+      await loadReports(filterStatus);
+      onToast("success", action === "DISMISS" ? "Report dismissed." : "Post removed and related pending reports were actioned.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to update report.");
+    } finally {
+      setActing(null);
+    }
+  }
+
+  const tabs: Array<{ value: ReportStatusValue; label: string }> = [
+    { value: "PENDING", label: `Pending (${counts.PENDING})` },
+    { value: "DISMISSED", label: `Dismissed (${counts.DISMISSED})` },
+    { value: "ACTION_TAKEN", label: `Action taken (${counts.ACTION_TAKEN})` },
+  ];
+
+  const reasonLabel: Record<ReportReasonValue, string> = {
+    SPAM: "Spam",
+    HARASSMENT: "Harassment",
+    INAPPROPRIATE_CONTENT: "Inappropriate content",
+    MISINFORMATION: "Misinformation",
+    PRIVACY: "Privacy",
+    OFF_TOPIC: "Off-topic",
+    OTHER: "Other",
+  };
+
+  const statusMeta: Record<ReportStatusValue, { label: string; bg: string; color: string }> = {
+    PENDING: { label: "Pending", bg: C.pendingLight, color: C.pending },
+    DISMISSED: { label: "Dismissed", bg: C.borderLight, color: C.textSec },
+    ACTION_TAKEN: { label: "Action taken", bg: C.successLight, color: C.success },
+  };
+
+  return (
+    <div className="fade-in flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-medium" style={{ color: C.text }}>Reported posts</p>
+          <p className="text-xs mt-1" style={{ color: C.textSec }}>
+            Review reports submitted by students and mentors.
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => void loadReports(filterStatus)} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ backgroundColor: C.borderLight }}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => setFilterStatus(tab.value)}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{
+              backgroundColor: filterStatus === tab.value ? "#fff" : "transparent",
+              color: filterStatus === tab.value ? C.text : C.textSec,
+              boxShadow: filterStatus === tab.value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+        <div
+          className="grid text-xs font-semibold px-5 py-3 gap-3"
+          style={{
+            gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1fr auto",
+            backgroundColor: C.bg,
+            borderBottom: `1px solid ${C.border}`,
+            color: C.textSec,
+          }}
+        >
+          <div>POST</div><div>REASON</div><div>REPORTER</div><div>REPORTS</div><div>STATUS</div><div>ACTION</div>
+        </div>
+
+        {loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading reports…</div>
+        )}
+        {!loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No reports in this tab.</div>
+        )}
+
+        {items.map((item, i) => {
+          const status = statusMeta[item.status];
+          return (
+            <div
+              key={item.id}
+              className="grid items-center px-5 py-3.5 gap-3"
+              style={{
+                gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1fr auto",
+                borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
+              }}
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-medium leading-snug overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  {item.question.title}
+                </p>
+                <p className="text-xs mt-1 truncate" style={{ color: C.textSec }}>
+                  {item.question.isAnonymous ? "Anonymous student" : item.question.student.name ?? item.question.student.email}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <Badge variant="error">{reasonLabel[item.reason as ReportReasonValue] ?? item.reason}</Badge>
+                {item.details && <p className="text-xs mt-1 truncate" style={{ color: C.textSec }}>{item.details}</p>}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs truncate" style={{ color: C.text }}>{item.reporter.name ?? item.reporter.email}</p>
+                <p className="text-xs mt-0.5 capitalize" style={{ color: C.textSec }}>{item.reporter.role.toLowerCase()}</p>
+              </div>
+              <div className="text-xs font-semibold" style={{ color: C.text }}>{item.question._count.reports}</div>
+              <span className="text-xs px-2 py-1 rounded-full font-medium w-fit" style={{ backgroundColor: status.bg, color: status.color }}>{status.label}</span>
+              <button type="button" onClick={() => setSelected(item)} className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80" style={{ backgroundColor: C.primaryLight, color: C.primary }}>Review</button>
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <Modal title="Review report" onClose={() => !acting && setSelected(null)} width={650}>
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl p-4" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <Badge variant="info">{selected.question.category.replaceAll("_", " ")}</Badge>
+                <Badge variant={selected.question.isAnonymous ? "pending" : "neutral"}>{selected.question.isAnonymous ? "Anonymous" : "Identified student"}</Badge>
+                <Badge variant="error">{reasonLabel[selected.reason as ReportReasonValue] ?? selected.reason}</Badge>
+              </div>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: C.text }}>{selected.question.title}</h3>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: C.text }}>{selected.question.content}</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-xl p-3" style={{ border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.textSec }}>Reporter</div>
+                <div className="text-sm" style={{ color: C.text }}>{selected.reporter.name ?? "Unnamed"}</div>
+                <div className="text-xs mt-0.5" style={{ color: C.textSec }}>{selected.reporter.email} · {selected.reporter.role.toLowerCase()}</div>
+              </div>
+              <div className="rounded-xl p-3" style={{ border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.textSec }}>Report</div>
+                <div className="text-sm" style={{ color: C.text }}>{reasonLabel[selected.reason as ReportReasonValue] ?? selected.reason}</div>
+                <div className="text-xs mt-0.5" style={{ color: C.textSec }}>{new Date(selected.createdAt).toLocaleString()}</div>
+              </div>
+            </div>
+            {selected.details && (
+              <div className="rounded-xl p-3" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.textSec }}>Reporter details</div>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: C.text }}>{selected.details}</p>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button variant="secondary" size="sm" onClick={() => setSelected(null)} disabled={!!acting}>Close</Button>
+              {selected.status === "PENDING" && (
+                <>
+                  <Button variant="secondary" size="sm" onClick={() => void handleAction("DISMISS")} disabled={!!acting}>
+                    {acting === "DISMISS" ? "Dismissing…" : "Dismiss report"}
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => void handleAction("REMOVE_POST")} disabled={!!acting}>
+                    {acting === "REMOVE_POST" ? "Removing…" : "Remove post"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── ADMIN QUESTIONS VIEW ──────────────────────────────────────────────────────
 
 function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
