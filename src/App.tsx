@@ -24,6 +24,7 @@ import {
   updateMe,
   getAdminUsers,
   getAdminMentors,
+  getAdminStats,
   assignMentor,
   unassignMentor,
 } from "./api";
@@ -6422,6 +6423,25 @@ function AdminShell({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [adminStats, setAdminStats] = useState<Awaited<ReturnType<typeof getAdminStats>> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const stats = await getAdminStats();
+        if (active) setAdminStats(stats);
+      } catch {
+        if (active) setAdminStats(null);
+      }
+    };
+    void load();
+    const interval = window.setInterval(load, 10000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const sectionToScreen: Record<AdminSection, Screen> = {
     dashboard: "admin-dashboard",
@@ -6478,6 +6498,14 @@ function AdminShell({
         <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5">
           {ADMIN_NAV.map(({ id, label, icon, badge }) => {
             const active = section === id || (id === "mentors" && section === "users");
+            const liveBadge =
+              adminStats == null
+                ? 0
+                : id === "moderation"
+                  ? adminStats.pendingModeration
+                  : id === "reports"
+                    ? adminStats.reportedContent
+                    : badge ?? 0;
             return (
               <button
                 key={id}
@@ -6491,15 +6519,15 @@ function AdminShell({
               >
                 <span className="flex-shrink-0">{icon}</span>
                 {sidebarOpen && <span className="text-xs font-medium flex-1">{label}</span>}
-                {sidebarOpen && badge != null && badge > 0 && (
+                {sidebarOpen && liveBadge > 0 && (
                   <span
                     className="text-xs font-bold px-1.5 py-0.5 rounded-full"
                     style={{ backgroundColor: C.error, color: "#fff", fontSize: "10px" }}
                   >
-                    {badge}
+                    {liveBadge}
                   </span>
                 )}
-                {!sidebarOpen && badge != null && badge > 0 && (
+                {!sidebarOpen && liveBadge > 0 && (
                   <span
                     className="absolute left-7 top-1 w-2 h-2 rounded-full"
                     style={{ backgroundColor: C.error }}
@@ -6507,7 +6535,7 @@ function AdminShell({
                 )}
               </button>
             );
-          })}
+          })}}
         </nav>
 
         {/* Bottom: switch role */}
@@ -7070,45 +7098,79 @@ function ModerationReviewPanel({
 
 
 function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const [liveStats, setLiveStats] = useState<Awaited<ReturnType<typeof getAdminStats>> | null>(null);
   const [livePending, setLivePending] = useState<Array<{
     id: string;
     content: string;
     category: string;
     createdAt: string;
   }>>([]);
+  const [liveReports, setLiveReports] = useState<Array<{
+    id: string;
+    questionText: string;
+    reportCount: number;
+    reportReason: string;
+  }>>([]);
 
   useEffect(() => {
-    getModerationQueue({ limit: 50 })
-      .then((response) => {
-        setLivePending(response.items.map((item) => ({
+    let active = true;
+
+    const load = async () => {
+      try {
+        const [stats, moderation, reports] = await Promise.all([
+          getAdminStats(),
+          getModerationQueue({ limit: 50 }),
+          getAdminReports({ status: "PENDING", limit: 5 }),
+        ]);
+
+        if (!active) return;
+
+        setLiveStats(stats);
+        setLivePending(moderation.items.map((item) => ({
           id: item.id,
           content: item.content,
           category: item.category.replaceAll("_", " "),
           createdAt: item.createdAt,
         })));
-      })
-      .catch(() => {});
+        setLiveReports(reports.items.map((report) => ({
+          id: report.id,
+          questionText: report.question.title || report.question.content,
+          reportCount: report.question._count.reports,
+          reportReason: report.reason.replaceAll("_", " "),
+        })));
+      } catch {
+        // Keep the dashboard usable while the data is loading or unavailable.
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(load, 10000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const STATS = [
-    { label: "Total Students", value: ADMIN_USERS.filter(u => u.role === "mentee").length, color: C.primary, bg: C.primaryLight,
+    { label: "Total Students", value: liveStats?.totalStudents ?? "—", color: C.primary, bg: C.primaryLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="8" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M2 18c0-3.5 2.686-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M14 11v6M11 14h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
-    { label: "Total Mentors", value: ADMIN_USERS.filter(u => u.role === "mentor").length, color: C.success, bg: C.successLight,
+    { label: "Total Mentors", value: liveStats?.totalMentors ?? "—", color: C.success, bg: C.successLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M3 18c0-3.5 3.134-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M7 6.5l2 2 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: "Pending Mentors", value: ADMIN_USERS.filter(u => u.role === "pending-mentor").length, color: C.pending, bg: C.pendingLight,
-      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M3 18c0-3.5 3.134-6 7-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M15 12v3.5M15 17.5h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
-    { label: "Questions Submitted", value: 47, color: "#7C3AED", bg: "#EDE9FE",
+    { label: "Pending Mentors", value: liveStats?.pendingMentors ?? "—", color: C.pending, bg: C.pendingLight,
+      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M3 18c0-3.5 3.134-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M15 12v3.5M15 17.5h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
+    { label: "Questions Submitted", value: liveStats?.totalQuestions ?? "—", color: "#7C3AED", bg: "#EDE9FE",
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
-    { label: "Questions Answered", value: 31, color: C.success, bg: C.successLight,
-      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M7 10l2 2.5 4-4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: "Pending Moderation", value: livePending.length, color: C.error, bg: C.errorLight,
+    { label: "Questions Answered", value: liveStats?.questionsAnswered ?? "—", color: C.success, bg: C.successLight,
+      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3.5 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M7 10l2 2.5 4-4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+    { label: "Pending Moderation", value: liveStats?.pendingModeration ?? "—", color: C.error, bg: C.errorLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2l2.3 4.67 5.14.748-3.72 3.624.879 5.118L10 13.75l-4.599 2.41.879-5.118L2.56 7.418l5.14-.748L10 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
-    { label: "Reported Content", value: MODERATION_ITEMS.filter(m => m.status === "reported").length, color: "#DC2626", bg: "#FEE2E2",
+    { label: "Reported Content", value: liveStats?.reportedContent ?? "—", color: "#DC2626", bg: "#FEE2E2",
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3v7M10 13.5h.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M3.5 17.5l5.768-12.5a.8.8 0 011.464 0l5.768 12.5a.8.8 0 01-.732 1.13H4.232a.8.8 0 01-.732-1.13z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
   ];
 
   const pendingModerationItems = livePending;
-  const reportedItems = MODERATION_ITEMS.filter(m => m.status === "reported");
+  const reportedItems = liveReports;
   const statDestinations: Record<string, Screen> = {
     "Total Students": "admin-users",
     "Total Mentors": "admin-users",
@@ -7201,7 +7263,7 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
                     {item.questionText}
                   </p>
                   <div className="text-xs mt-0.5" style={{ color: C.error }}>
-                    {item.flagCount} report{item.flagCount !== 1 ? "s" : ""} · {item.reportReason}
+                    {item.reportCount} report{item.reportCount !== 1 ? "s" : ""} · {item.reportReason}
                   </div>
                 </div>
                 <button className="text-xs font-semibold flex-shrink-0" style={{ color: C.primary }} onClick={() => onNavigate("admin-reports")}>
