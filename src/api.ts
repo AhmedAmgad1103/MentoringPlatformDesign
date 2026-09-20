@@ -6,6 +6,9 @@ import {
   getAnswers as getAnswersApi,
   getMentorProfile,
   getMentors as getMentorsApi,
+  getModerationQueue as getModerationQueueApi,
+  approveQuestion as approveQuestionApi,
+  rejectQuestion as rejectQuestionApi,
   getMentorMentees as getMentorMenteesApi,
   getMessages as getMessagesApi,
   getQuestion as getQuestionApi,
@@ -284,4 +287,16 @@ export type { ApiAnswer };
 
 export async function getMentorMentees() {
   return getMentorMenteesApi();
+}
+
+export async function getModerationQueue(options: { page?: number; limit?: number } = {}) {
+  return getModerationQueueApi(options);
+}
+
+export async function approveQuestion(questionId: string) {
+  return approveQuestionApi(questionId);
+}
+
+export async function rejectQuestion(questionId: string) {
+  return rejectQuestionApi(questionId);
 }
