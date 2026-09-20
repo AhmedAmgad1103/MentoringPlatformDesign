@@ -7972,7 +7972,7 @@ function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) =>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm" style={{ color: C.textSec }}>
-            Students and mentors can report approved public posts. Reviewers can dismiss a report or remove the reported post from mentor/public views.
+            Students and mentors can report posts they can view. Reviewers can dismiss a report or remove the reported post from mentor/public views.
           </p>
           <p className="text-xs mt-1" style={{ color: C.textSec }}>
             Removing a post resolves all pending reports for that post.
