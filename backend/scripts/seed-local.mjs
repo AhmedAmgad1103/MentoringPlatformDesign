@@ -12,13 +12,13 @@ function hashPassword(password) {
 const accounts = [
   {
     email: "student@gmail.com",
-    name: "Local Student",
+    name: "Alex Johnson",
     role: Role.STUDENT,
     password: "student@123",
   },
   {
     email: "mentor@gmail.com",
-    name: "Dr. Local Mentor",
+    name: "Dr. Mariam Khaled",
     role: Role.MENTOR,
     password: "mentor@123",
   },
