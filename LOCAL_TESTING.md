@@ -69,3 +69,7 @@ Delete `backend/data/mentoring.db` and run `npm run dev` again. The setup script
 ## Post reports
 
 Students and mentors can report approved public posts, including posts already approved by an admin. Each user can report a given post once and may optionally add details. Admins can review pending reports, dismiss them, or remove the reported post. Removing a post changes its moderation state to rejected and resolves all pending reports for that post.
+
+## Mentor reward points
+
+Reward points are monthly. The demo reward cycle uses the machine's current calendar month; when a new month is detected, mentor points and leaderboard points reset to 0 for the new cycle. The current-cycle marker is stored in browser local storage under `medmentor_reward_month` so the reset survives closing and reopening the browser.
