@@ -1,3 +1,5 @@
+process.env.DATABASE_URL ??= "file:./data/mentoring.db"
+
 import { createHash } from "node:crypto"
 import { PrismaClient, QuestionCategory, QuestionStatus, QuestionVisibility, ModerationStatus, Role } from "@prisma/client"
 
