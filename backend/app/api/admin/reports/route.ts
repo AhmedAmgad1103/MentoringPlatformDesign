@@ -80,7 +80,7 @@ export async function GET(request: Request) {
     Math.max(1, parseInt(params.get("limit") ?? "20", 10) || 20)
   )
 
-  const [items, total] = await Promise.all([
+  const [items, total, pendingCount, dismissedCount, actionTakenCount] = await Promise.all([
     prisma.questionReport.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -89,7 +89,20 @@ export async function GET(request: Request) {
       select: reportSelect,
     }),
     prisma.questionReport.count({ where }),
+    prisma.questionReport.count({ where: { status: ReportStatus.PENDING } }),
+    prisma.questionReport.count({ where: { status: ReportStatus.DISMISSED } }),
+    prisma.questionReport.count({ where: { status: ReportStatus.ACTION_TAKEN } }),
   ])
 
-  return Response.json({ items, page, limit, total })
+  return Response.json({
+    items,
+    page,
+    limit,
+    total,
+    counts: {
+      PENDING: pendingCount,
+      DISMISSED: dismissedCount,
+      ACTION_TAKEN: actionTakenCount,
+    },
+  })
 }
