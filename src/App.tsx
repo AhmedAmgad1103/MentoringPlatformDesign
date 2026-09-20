@@ -7594,6 +7594,7 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
           category: item.category.replaceAll("_", " "),
           submittedDate: formatDateTime(item.createdAt),
           visibility: item.visibility.toLowerCase() as "public" | "private",
+           submittedBy: item.student,
           status: "pending",
         }))
       );
@@ -7677,18 +7678,19 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
         <div
           className="grid text-xs font-semibold px-5 py-3"
           style={{
-            gridTemplateColumns: "3fr 1fr 1fr 1fr 1fr auto",
+            gridTemplateColumns: "2.3fr 1.2fr 1fr 1.15fr 1fr 1fr auto",
             backgroundColor: C.bg,
             borderBottom: `1px solid ${C.border}`,
             color: C.textSec,
           }}
         >
           <div>QUESTION</div>
-          <div>CATEGORY</div>
-          <div>DATE</div>
-          <div>VISIBILITY</div>
-          <div>TYPE</div>
-          <div>ACTION</div>
+          <div>POSTED BY</div>
+           <div>CATEGORY</div>
+           <div>DATE</div>
+           <div>VISIBILITY</div>
+           <div>TYPE</div>
+           <div>ACTION</div>
         </div>
         {loading && items.length === 0 && (
           <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading moderation queue…</div>
@@ -7708,7 +7710,7 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
               key={item.id}
               className="grid items-center px-5 py-3.5 gap-3"
               style={{
-                gridTemplateColumns: "3fr 1fr 1fr 1fr 1fr auto",
+                gridTemplateColumns: "2.3fr 1.2fr 1fr 1.15fr 1fr 1fr auto",
                 borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
               }}
             >
@@ -7719,7 +7721,15 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
                 >
                   {item.questionText}
                 </p>
-              </div>
+              </div>               <div className="min-w-0">
+                 <div className="text-xs font-semibold truncate" style={{ color: C.text }}>
+                   {item.submittedBy?.name ?? "Unnamed student"}
+                 </div>
+                 <div className="text-xs truncate" style={{ color: C.textSec }}>
+                   {item.submittedBy?.email ?? ""}
+                 </div>
+               </div>
+
               <CategoryBadge category={item.category} />
               <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
               <div>{item.visibility === "public" ? <PrivacyBadge type="public" /> : <PrivacyBadge type="private" />}</div>
@@ -7757,6 +7767,23 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
               {reviewItem.questionText}
             </p>
           </div>
+
+           {reviewItem.submittedBy && (
+             <div
+               className="rounded-xl p-3 mb-4"
+               style={{ backgroundColor: C.primaryLight, border: "1px solid " + C.border }}
+             >
+               <div className="text-xs font-semibold mb-1" style={{ color: C.primary }}>
+                 Submitted by
+               </div>
+               <div className="text-sm font-semibold" style={{ color: C.text }}>
+                 {reviewItem.submittedBy.name ?? "Unnamed student"}
+               </div>
+               <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                 {reviewItem.submittedBy.email}
+               </div>
+             </div>
+           )}
 
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={() => setReviewItem(null)}>Cancel</Button>
@@ -8000,7 +8027,9 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
           type: q.isAnonymous
             ? q.visibility === "PUBLIC" ? "anon-public" : "anon-private"
             : q.visibility === "PUBLIC" ? "any-mentor" : "private",
-          asker: q.student ? { name: q.student.name ?? "Student" } : null,
+          asker: q.student
+             ? { name: q.student.name ?? "Student", email: q.student.email }
+             : null,
           moderationStatus: q.moderationStatus,
         }))
       );
@@ -8080,6 +8109,11 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
                 <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
                   {q.asker?.name ?? "Anonymous Mentee"}
                 </div>
+                 {q.asker?.email && (
+                   <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                     {q.asker.email}
+                   </div>
+                 )}
               </div>
             </div>
             <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
