@@ -21,6 +21,12 @@ const pendingQuestionSelect = {
       email: true,
     },
   },
+  mentor: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
 } as const
 
 export async function GET(request: Request) {
