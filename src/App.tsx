@@ -733,12 +733,6 @@ const REWARD_RESET_THIS_MONTH = (() => {
   return false;
 })();
 
-const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : CURRENT_MENTOR_POINTS;
-const CURRENT_LEADERBOARD_MENTORS = CURRENT_LEADERBOARD_MENTORS.map((mentor) => ({
-  ...mentor,
-  points: REWARD_RESET_THIS_MONTH ? 0 : mentor.points,
-}));
-
 function MentorTierBadge({ points, size = "sm" }: { points: number; size?: "sm" | "md" }) {
   const tier = getMentorTier(points);
   return (
@@ -761,6 +755,12 @@ const LEADERBOARD_MENTORS = [
   { id: 5, name: "Dr. Layla Ahmed", specialty: "Pediatrics", photo: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=120&h=120&fit=crop&auto=format", points: 61 },
   { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
 ].sort((a, b) => b.points - a.points);
+
+const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : MENTOR.points;
+const CURRENT_LEADERBOARD_MENTORS = LEADERBOARD_MENTORS.map((mentor) => ({
+  ...mentor,
+  points: REWARD_RESET_THIS_MONTH ? 0 : mentor.points,
+}));
 
 const QUESTIONS = [
   {
