@@ -7304,8 +7304,8 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
   const reportedItems = liveReports;
   const statDestinations: Record<string, Screen> = {
     "Total Students": "admin-users",
-    "Total Mentors": "admin-users",
-    "Pending Mentors": "admin-users",
+    "Total Mentors": "admin-mentors",
+     "Pending Mentors": "admin-mentors",
     "Questions Submitted": "admin-questions",
     "Questions Answered": "admin-questions",
     "Pending Moderation": "admin-moderation",
@@ -8272,8 +8272,9 @@ function AdminScreen({
   return (
     <AdminShell section={section} onNavigate={setSection} onFullNavigate={onFullNavigate}>
       {section === "dashboard" && <AdminDashboardView onNavigate={onFullNavigate} />}
-      {(section === "users" || section === "mentors") && <AdminUsersView onToast={onToast} />}
-      {section === "questions" && <AdminQuestionsView onToast={onToast} />}
+      {section === "users" && <AdminUsersView section="users" onToast={onToast} />}
+       {section === "mentors" && <AdminUsersView section="mentors" onToast={onToast} />}
+       {section === "questions" && <AdminQuestionsView onToast={onToast} onOpenQuestion={onOpenQuestion} />
       {section === "moderation" && <AdminModerationView onToast={onToast} />}
       {section === "reports" && <AdminReportsView onToast={onToast} />}
       {section === "settings" && <AdminSettingsView onToast={onToast} />}
@@ -9365,13 +9366,15 @@ export default function App() {
           initialSection={
             screen === "admin-dashboard" ? "dashboard"
             : screen === "admin-users" ? "users"
-            : screen === "admin-questions" ? "questions"
+             : screen === "admin-mentors" ? "mentors"
+             : screen === "admin-questions" ? "questions"
             : screen === "admin-moderation" ? "moderation"
             : screen === "admin-reports" ? "reports"
             : "settings"
           }
           onFullNavigate={setScreen}
-          onToast={addToast}
+           onOpenQuestion={openQuestion}
+           onToast={addToast}
         />
       )}
       {screen === "mentee-profile" && (
