@@ -5886,6 +5886,30 @@ function ModerationReviewPanel({
 
 // ─── ADMIN DASHBOARD VIEW ─────────────────────────────────────────────────────
 
+interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  role: "mentee" | "mentor" | "pending-mentor";
+  year?: string;
+  track?: string;
+  school: string;
+  status: "active" | "suspended" | "pending";
+  joinDate: string;
+  photo?: string;
+}
+
+const ADMIN_USERS: AdminUser[] = [
+  { id: 1, name: "Alex Johnson", email: "alex.j@med.ucsf.edu", role: "mentee", year: "M2", track: "Preclinical", school: "UCSF School of Medicine", status: "active", joinDate: "Aug 12, 2024", photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop" },
+  { id: 2, name: "Sarah Chen", email: "s.chen@hms.harvard.edu", role: "mentee", year: "M3", track: "Clinical Rotations", school: "Harvard Medical School", status: "active", joinDate: "Sep 3, 2024", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=40&h=40&fit=crop" },
+  { id: 3, name: "Marcus Williams", email: "m.williams@med.columbia.edu", role: "mentee", year: "M1", track: "Preclinical", school: "Columbia Vagelos COM", status: "active", joinDate: "Oct 1, 2024", photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop" },
+  { id: 4, name: "Dr. Mariam Khaled", email: "m.khaled@umc.edu", role: "mentor", school: "University Medical Center", status: "active", joinDate: "Jun 5, 2024", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop" },
+  { id: 5, name: "Dr. James Patel", email: "j.patel@stanford.edu", role: "mentor", school: "Stanford Medicine", status: "active", joinDate: "Jun 18, 2024", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop" },
+  { id: 6, name: "Dr. Amara Osei", email: "a.osei@jhmi.edu", role: "pending-mentor", school: "Johns Hopkins Medicine", status: "pending", joinDate: "Nov 14, 2024", photo: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=40&h=40&fit=crop" },
+  { id: 7, name: "Jordan Kim", email: "j.kim@med.yale.edu", role: "mentee", year: "M4", track: "Clinical", school: "Yale School of Medicine", status: "suspended", joinDate: "Aug 30, 2024", photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop" },
+  { id: 8, name: "Priya Sharma", email: "p.sharma@wustl.edu", role: "mentee", year: "M2", track: "Preclinical", school: "Washington University SOM", status: "active", joinDate: "Sep 22, 2024", photo: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop" },
+];
+
 function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const [livePending, setLivePending] = useState<Array<{
     id: string;
