@@ -2910,7 +2910,7 @@ function FeedQuestionCard({
   question: FeedQuestion;
   onClick: () => void;
   isBoosted: boolean;
-  onToggleBoost: (id: number) => void;
+  onToggleBoost: (id: string | number) => void;
 }) {
   return (
     <Card
@@ -3160,7 +3160,7 @@ function FeedScreen({
     if (sort === "answered") return b.responses - a.responses;
     if (sort === "boosted")
       return (b.boosted + (boostedIds.has(b.id) ? 1 : 0)) - (a.boosted + (boostedIds.has(a.id) ? 1 : 0));
-    return b.id - a.id;
+    return String(b.id).localeCompare(String(a.id));
   });
 
   return (
@@ -3700,9 +3700,57 @@ function QuestionDetailScreen({
               </button>
             </div>
           </div>
+
+          {liveQuestion && liveQuestion.isMine && (
+            <div className="flex items-center justify-end gap-2 mt-4">
+              {liveQuestion.status === "CLOSED" ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await updateQuestionStatus(liveQuestion.id, "AWAITING_RESPONSE");
+                      setLiveQuestion((prev) =>
+                        prev ? { ...prev, status: "AWAITING_RESPONSE" } : prev
+                      );
+                      onToast("success", "Question reopened.");
+                    } catch (error) {
+                      onToast(
+                        "error",
+                        error instanceof Error ? error.message : "Unable to reopen question."
+                      );
+                    }
+                  }}
+                >
+                  Reopen Question
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await updateQuestionStatus(liveQuestion.id, "CLOSED");
+                      setLiveQuestion((prev) =>
+                        prev ? { ...prev, status: "CLOSED" } : prev
+                      );
+                      onToast("success", "Question closed.");
+                    } catch (error) {
+                      onToast(
+                        "error",
+                        error instanceof Error ? error.message : "Unable to close question."
+                      );
+                    }
+                  }}
+                >
+                  Close Question
+                </Button>
+              )}
+            </div>
+          )}
         </Card>
 
-        {/* Responses */}
+        {/* Responses */
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-base" style={{ color: C.text }}>
