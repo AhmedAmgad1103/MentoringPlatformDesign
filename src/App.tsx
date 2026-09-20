@@ -5938,7 +5938,10 @@ function MentorQuestionCard({
   };
 
   return (
-    <Card className="p-4">
+    <Card
+      className="p-4 transition-all hover:shadow-md hover:-translate-y-0.5"
+      onClick={() => onAnswer(q)}
+    >
       {/* Asker row */}
       <div className="flex items-center gap-2.5 mb-3">
         {isAnon ? (
@@ -6010,7 +6013,10 @@ function MentorQuestionCard({
           {typeof q.id === "string" && (
             <button
               type="button"
-              onClick={() => onReport(q)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReport(q);
+              }}
               className="text-xs font-medium px-2.5 py-1.5 rounded-xl transition-colors"
               style={{
                 backgroundColor: reported ? C.successLight : C.borderLight,
