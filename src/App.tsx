@@ -7,6 +7,8 @@ import {
   getMentorQueue,
   getMentorMentees,
   getModerationQueue,
+  approveQuestion,
+  rejectQuestion,
   getAdminReports,
   getQuestionDetails,
   getQuestions,
@@ -5155,6 +5157,42 @@ function MentorDashboardScreen({
 }
 
 // ─── ADMIN COMPONENTS ────────────────────────────────────────────────────────
+
+
+type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
+
+interface ModerationItem {
+  id: string | number;
+  type:
+    | "anon-question"
+    | "private-question"
+    | "any-mentor-question"
+    | "reported-question"
+    | "reported-answer"
+    | "suspicious";
+  questionText: string;
+  questionTitle?: string;
+  category: string;
+  submittedDate: string;
+  visibility: "public" | "private";
+  status: ModerationStatus;
+  internalNote?: string;
+  reportReason?: string;
+  reportedBy?: string;
+  flagCount?: number;
+}
+
+const MODERATION_ITEMS: ModerationItem[] = [];
+
+const REJECT_REASONS = [
+  "Inappropriate content",
+  "Offensive language",
+  "Not related to mentoring",
+  "Personal information",
+  "Spam",
+  "Other",
+];
+
 
 type AdminSection = "dashboard" | "users" | "mentors" | "questions" | "moderation" | "reports" | "settings";
 
