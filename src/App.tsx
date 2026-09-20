@@ -718,10 +718,28 @@ function getMentorTier(points: number) {
   return { ...tier, next, progress };
 }
 
-const CURRENT_MENTOR_POINTS = MENTOR.points;
-const CURRENT_LEADERBOARD_MENTORS = LEADERBOARD_MENTORS.map((mentor) => ({
-  ...mentor,
-}));
+function MentorTierBadge({ points, size = "sm" }: { points: number; size?: "sm" | "md" }) {
+  const tier = getMentorTier(points);
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full font-semibold ${
+        size === "sm" ? "text-xs px-2 py-0.5" : "text-sm px-3 py-1"
+      }`}
+      style={{ backgroundColor: tier.bg, color: tier.color }}
+    >
+      <span>{tier.emoji}</span> {tier.label}
+    </span>
+  );
+}
+
+const LEADERBOARD_MENTORS = [
+  { id: 1, name: "Dr. Mariam Khaled", specialty: "Internal Medicine", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=120&h=120&fit=crop&auto=format", points: 285 },
+  { id: 2, name: "Dr. Amara Osei", specialty: "Family Medicine", photo: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=120&h=120&fit=crop&auto=format", points: 340 },
+  { id: 3, name: "Dr. Priya Patel", specialty: "Neurology", photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=120&h=120&fit=crop&auto=format", points: 198 },
+  { id: 4, name: "Dr. Samuel Chen", specialty: "Surgery", photo: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=120&h=120&fit=crop&auto=format", points: 132 },
+  { id: 5, name: "Dr. Layla Ahmed", specialty: "Pediatrics", photo: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=120&h=120&fit=crop&auto=format", points: 61 },
+  { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
+].sort((a, b) => b.points - a.points);
 
 const QUESTIONS = [
   {
@@ -843,7 +861,7 @@ const SAMPLE_RESPONSES = [
 // ─── FEED & NOTIFICATION DATA ─────────────────────────────────────────────────
 
 interface FeedQuestion {
-  id: string | number;
+  id: number;
   title: string;
   preview: string;
   full: string;
@@ -1073,7 +1091,7 @@ const MENTOR_MENTEES_DATA = [
 ];
 
 interface MentorQuestion {
-  id: string | number;
+  id: number;
   type: "private" | "any-mentor" | "anon-public" | "anon-private";
   question: string;
   category: string;
@@ -2074,16 +2092,16 @@ function DashboardScreen({
   onToast,
   onNavigate,
   onOpenQuestion,
-  notifReadIds = [],
-  onMarkRead = () => {},
-  onMarkAllRead = () => {},
+  notifReadIds,
+  onMarkRead,
+  onMarkAllRead,
 }: {
   onToast: (t: ToastType, msg: string) => void;
   onNavigate: (s: Screen) => void;
   onOpenQuestion: (id: number) => void;
-  notifReadIds?: number[];
-  onMarkRead?: (id: number) => void;
-  onMarkAllRead?: () => void;
+  notifReadIds: number[];
+  onMarkRead: (id: number) => void;
+  onMarkAllRead: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"questions" | "notifications">("questions");
   const [searchQuery, setSearchQuery] = useState("");
@@ -2210,6 +2228,39 @@ function DashboardScreen({
           </div>
 
           <div className="flex items-center gap-3">
+            <div className="relative" ref={notifDropdownRef}>
+              <button
+                className="relative p-2 rounded-xl transition-colors"
+                style={{ color: C.textSec }}
+                onClick={() => setNotifDropdownOpen((o) => !o)}
+              >
+                <Icons.Bell />
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
+                    style={{ backgroundColor: C.error, fontSize: 9 }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {notifDropdownOpen && (
+                <NotificationDropdown
+                  notifications={ALL_NOTIFICATIONS}
+                  readIds={notifReadIds}
+                  onMarkRead={onMarkRead}
+                  onMarkAllRead={onMarkAllRead}
+                  onViewAll={() => {
+                    setNotifDropdownOpen(false);
+                    onNavigate("notifications-page");
+                  }}
+                  onOpenQuestion={(id) => {
+                    setNotifDropdownOpen(false);
+                    onOpenQuestion(id);
+                  }}
+                />
+              )}
+            </div>
             <button onClick={() => onNavigate("mentee-profile")} className="rounded-full hover:opacity-80 transition-opacity">
               <Avatar
                 src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop"
@@ -2232,12 +2283,12 @@ function DashboardScreen({
           </p>
           {backendQuestionCount !== null && (
             <p className="text-xs mt-2 font-medium" style={{ color: C.success }}>
-              Demo data loaded · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
+              Backend connected · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
             </p>
           )}
-          {backendQuestionCount === null && backendLoadError && (
+          {backendQuestionCount === null && backendLoadError && !DEMO_MODE && (
             <p className="text-xs mt-2 font-medium" style={{ color: C.error }}>
-              Demo data could not be loaded.
+              Backend unavailable — frontend is showing placeholder data.
             </p>
           )}
         </div>
@@ -2272,10 +2323,29 @@ function DashboardScreen({
           {/* Left: Questions + Notifications */}
           <div className="lg:col-span-2 flex flex-col gap-4">
             {/* Tabs */}
-            <div className="flex items-center gap-1" style={{ borderBottom: "1.5px solid " + C.border }}>
-              <div className="px-4 py-2.5 text-sm font-medium" style={{ color: C.primary }}>
-                Recent Questions
-              </div>
+            <div className="flex items-center gap-1" style={{ borderBottom: `1.5px solid ${C.border}` }}>
+              {(["questions", "notifications"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className="px-4 py-2.5 text-sm font-medium capitalize relative transition-colors"
+                  style={{
+                    color: activeTab === tab ? C.primary : C.textSec,
+                    borderBottom: activeTab === tab ? `2px solid ${C.primary}` : "2px solid transparent",
+                    marginBottom: -1.5,
+                  }}
+                >
+                  {tab === "notifications" ? "Notifications" : "Recent Questions"}
+                  {tab === "notifications" && unreadCount > 0 && (
+                    <span
+                      className="ml-1.5 px-1.5 py-0.5 rounded-full text-white text-xs font-bold"
+                      style={{ backgroundColor: C.error, fontSize: 10 }}
+                    >
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
 
             {activeTab === "questions" && (
@@ -2431,7 +2501,7 @@ function DashboardScreen({
                       <Badge variant={MENTOR.available ? "success" : "pending"}>
                         {MENTOR.available ? "Available" : "Busy"}
                       </Badge>
-                      <MentorTierBadge points={CURRENT_MENTOR_POINTS} />
+                      <MentorTierBadge points={MENTOR.points} />
                     </div>
                   </div>
                 </div>
@@ -2556,6 +2626,209 @@ function DashboardScreen({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── NOTIFICATION ICON ────────────────────────────────────────────────────────
+
+function NotifIcon({ type }: { type: string }) {
+  const configs: Record<string, { bg: string; color: string }> = {
+    "mentor-answered":      { bg: C.primaryLight,  color: C.primary  },
+    "any-mentor-responded": { bg: C.primaryLight,  color: C.primary  },
+    "anon-approved":        { bg: C.successLight,  color: C.success  },
+    "anon-response":        { bg: "#EDE9FE",       color: "#7C3AED"  },
+    "rejected":             { bg: C.errorLight,    color: C.error    },
+    "session":              { bg: "#EDE9FE",       color: "#7C3AED"  },
+    "helpful":              { bg: C.pendingLight,  color: C.pending  },
+  };
+  const c = configs[type] || { bg: C.borderLight, color: C.textSec };
+
+  const svgs: Record<string, React.ReactNode> = {
+    "mentor-answered": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M13.5 8.5c0 2.485-2.462 4.5-5.5 4.5a6.2 6.2 0 01-2.5-.52L2.5 13.5l.52-2.5A4.49 4.49 0 012 8.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M5.5 8.5l1.5 1.5L10 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    "any-mentor-responded": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M12 7.5c0 2.209-2.015 4-4.5 4a5 5 0 01-2-.41L3 12.5l.41-2.09A3.55 3.55 0 013 7.5c0-2.209 2.015-4 4.5-4s4.5 1.791 4.5 4z" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M10.5 3.5a3 3 0 012.5 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    ),
+    "anon-approved": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1.5L3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4L8 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M5.5 8l2 2 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    "anon-response": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M13.5 8.5c0 2.485-2.462 4.5-5.5 4.5a6.2 6.2 0 01-2.5-.52L2.5 13.5l.52-2.5A4.49 4.49 0 012 8.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <circle cx="8" cy="8.5" r="1" fill="currentColor" />
+      </svg>
+    ),
+    "rejected": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+    "session": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M5 2v2M11 2v2M2 7h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <circle cx="8" cy="10.5" r="1" fill="currentColor" />
+      </svg>
+    ),
+    "helpful": (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M3.5 7.5L2.5 13h7.5l1.5-5.5H8V4.5a1.5 1.5 0 00-3 0v3H3.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+        <path d="M12.5 7.5h1.5V13h-1.5V7.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      </svg>
+    ),
+  };
+
+  return (
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ backgroundColor: c.bg, color: c.color }}
+    >
+      {svgs[type] || svgs["anon-response"]}
+    </div>
+  );
+}
+
+// ─── NOTIFICATION DROPDOWN ────────────────────────────────────────────────────
+
+function NotificationDropdown({
+  notifications,
+  readIds,
+  onMarkRead,
+  onMarkAllRead,
+  onViewAll,
+  onOpenQuestion,
+}: {
+  notifications: NotificationItem[];
+  readIds: number[];
+  onMarkRead: (id: number) => void;
+  onMarkAllRead: () => void;
+  onViewAll: () => void;
+  onOpenQuestion: (id: number) => void;
+}) {
+  const unread = notifications.filter((n) => !n.read && !readIds.includes(n.id)).length;
+
+  return (
+    <div
+      className="absolute top-full right-0 mt-2 fade-in rounded-2xl overflow-hidden card-shadow-lg"
+      style={{
+        width: 380,
+        backgroundColor: "#fff",
+        border: `1px solid ${C.border}`,
+        zIndex: 100,
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: `1px solid ${C.border}` }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-sm" style={{ color: C.text }}>
+            Notifications
+          </span>
+          {unread > 0 && (
+            <span
+              className="px-1.5 py-0.5 rounded-full text-white font-bold"
+              style={{ backgroundColor: C.error, fontSize: 10 }}
+            >
+              {unread}
+            </span>
+          )}
+        </div>
+        {unread > 0 && (
+          <button
+            onClick={onMarkAllRead}
+            className="text-xs font-semibold"
+            style={{ color: C.primary }}
+          >
+            Mark all read
+          </button>
+        )}
+      </div>
+
+      {/* Items */}
+      <div className="max-h-[340px] overflow-y-auto">
+        {notifications.slice(0, 5).map((n) => {
+          const isRead = n.read || readIds.includes(n.id);
+          return (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => {
+                onMarkRead(n.id);
+                if (n.questionId) onOpenQuestion(n.questionId);
+              }}
+              className="w-full flex items-start gap-3 px-4 py-3 text-left transition-colors"
+              style={{
+                backgroundColor: isRead ? "#fff" : "#F5F8FF",
+                borderBottom: `1px solid ${C.borderLight}`,
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = C.borderLight)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = isRead ? "#fff" : "#F5F8FF")
+              }
+            >
+              <NotifIcon type={n.type} />
+              <div className="flex-1 min-w-0">
+                <p
+                  className="text-sm leading-snug"
+                  style={{ color: C.text, fontWeight: isRead ? 400 : 600 }}
+                >
+                  {n.message}
+                </p>
+                <p
+                  className="text-xs mt-0.5 overflow-hidden"
+                  style={{
+                    color: C.textSec,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 1,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  {n.detail}
+                </p>
+                <p className="text-xs mt-1" style={{ color: C.textSec }}>
+                  {n.time}
+                </p>
+              </div>
+              {!isRead && (
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5"
+                  style={{ backgroundColor: C.primary }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div
+        className="px-4 py-3 text-center"
+        style={{ borderTop: `1px solid ${C.border}` }}
+      >
+        <button
+          onClick={onViewAll}
+          className="text-sm font-semibold"
+          style={{ color: C.primary }}
+        >
+          View all notifications →
+        </button>
+      </div>
     </div>
   );
 }
@@ -3811,6 +4084,2640 @@ function QuestionDetailScreen({
   );
 }
 
+
+function NotificationsPage({
+  onBack,
+  notifReadIds,
+  onMarkRead,
+  onMarkAllRead,
+  onOpenQuestion,
+}: {
+  onBack: () => void;
+  notifReadIds: number[];
+  onMarkRead: (id: number) => void;
+  onMarkAllRead: () => void;
+  onOpenQuestion: (id: number) => void;
+}) {
+  const unread = ALL_NOTIFICATIONS.filter(
+    (n) => !n.read && !notifReadIds.includes(n.id)
+  ).length;
+
+  const unreadItems = ALL_NOTIFICATIONS.filter(
+    (n) => !n.read && !notifReadIds.includes(n.id)
+  );
+  const readItems = ALL_NOTIFICATIONS.filter(
+    (n) => n.read || notifReadIds.includes(n.id)
+  );
+
+  const TYPE_LABELS: Record<string, string> = {
+    "mentor-answered":      "Mentor answered",
+    "any-mentor-responded": "Mentor responded",
+    "anon-approved":        "Question approved",
+    "anon-response":        "Anonymous response",
+    "rejected":             "Question rejected",
+    "session":              "Session confirmed",
+    "helpful":              "Marked helpful",
+  };
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+      <header
+        className="sticky top-0 z-30 bg-white"
+        style={{ borderBottom: `1px solid ${C.border}` }}
+      >
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 transition-opacity"
+            style={{ color: C.textSec, backgroundColor: C.borderLight }}
+          >
+            <Icons.ArrowLeft />
+            Dashboard
+          </button>
+          <h1 className="font-bold text-base" style={{ color: C.text }}>
+            Notifications
+          </h1>
+          {unread > 0 && (
+            <span
+              className="px-2 py-0.5 rounded-full text-white text-xs font-bold"
+              style={{ backgroundColor: C.error }}
+            >
+              {unread} unread
+            </span>
+          )}
+          {unread > 0 && (
+            <button
+              onClick={onMarkAllRead}
+              className="ml-auto text-sm font-semibold"
+              style={{ color: C.primary }}
+            >
+              Mark all read
+            </button>
+          )}
+          <Logo size="sm" />
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto px-6 py-6 fade-in">
+        {/* Unread section */}
+        {unreadItems.length > 0 && (
+          <div className="mb-6">
+            <div
+              className="text-xs font-semibold uppercase tracking-wider mb-3"
+              style={{ color: C.textSec }}
+            >
+              Unread
+            </div>
+            <div className="flex flex-col gap-2">
+              {unreadItems.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => {
+                    onMarkRead(n.id);
+                    if (n.questionId) onOpenQuestion(n.questionId);
+                  }}
+                  className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-all"
+                  style={{
+                    backgroundColor: "#F5F8FF",
+                    border: `1.5px solid #C7D2FE`,
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = C.primaryLight)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#F5F8FF")
+                  }
+                >
+                  <NotifIcon type={n.type} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span
+                        className="text-xs font-semibold uppercase tracking-wide"
+                        style={{ color: C.primary }}
+                      >
+                        {TYPE_LABELS[n.type] || "Notification"}
+                      </span>
+                    </div>
+                    <p
+                      className="text-sm font-semibold leading-snug mb-0.5"
+                      style={{ color: C.text }}
+                    >
+                      {n.message}
+                    </p>
+                    <p className="text-xs leading-relaxed mb-1" style={{ color: C.textSec }}>
+                      {n.detail}
+                    </p>
+                    <p className="text-xs" style={{ color: C.textSec }}>
+                      {n.time}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: C.primary }}
+                    />
+                    {n.questionId && (
+                      <Icons.ChevronRight />
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Read section */}
+        {readItems.length > 0 && (
+          <div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wider mb-3"
+              style={{ color: C.textSec }}
+            >
+              Earlier
+            </div>
+            <div className="flex flex-col gap-2">
+              {readItems.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => {
+                    if (n.questionId) onOpenQuestion(n.questionId);
+                  }}
+                  className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-all"
+                  style={{
+                    backgroundColor: "#fff",
+                    border: `1px solid ${C.border}`,
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = C.borderLight)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#fff")
+                  }
+                >
+                  <NotifIcon type={n.type} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span
+                        className="text-xs font-medium uppercase tracking-wide"
+                        style={{ color: C.textSec }}
+                      >
+                        {TYPE_LABELS[n.type] || "Notification"}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-snug mb-0.5" style={{ color: C.text }}>
+                      {n.message}
+                    </p>
+                    <p className="text-xs leading-relaxed mb-1" style={{ color: C.textSec }}>
+                      {n.detail}
+                    </p>
+                    <p className="text-xs" style={{ color: C.textSec }}>
+                      {n.time}
+                    </p>
+                  </div>
+                  {n.questionId && (
+                    <span style={{ color: C.textSec }} className="flex-shrink-0 mt-0.5">
+                      <Icons.ChevronRight />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ALL_NOTIFICATIONS.length === 0 && (
+          <div className="flex flex-col items-center py-16 gap-4">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: C.borderLight }}
+            >
+              <Icons.Bell />
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-sm mb-1" style={{ color: C.text }}>
+                No notifications yet
+              </p>
+              <p className="text-xs" style={{ color: C.textSec }}>
+                We'll notify you when mentors respond to your questions.
+              </p>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ─── ASK QUESTION SCREEN ─────────────────────────────────────────────────────
+
+type AskStep =
+  | "select"
+  | "my-mentor"
+  | "any-mentor"
+  | "anonymous"
+  | "anon-public"
+  | "anon-private"
+  | "success-my-mentor"
+  | "success-any-mentor"
+  | "success-anon-public"
+  | "success-anon-private";
+
+function TagInput({
+  tags,
+  onChange,
+  placeholder = "Add a tag and press Enter",
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+}) {
+  const [input, setInput] = useState("");
+  const [focused, setFocused] = useState(false);
+
+  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if ((e.key === "Enter" || e.key === ",") && input.trim()) {
+      e.preventDefault();
+      if (!tags.includes(input.trim())) onChange([...tags, input.trim()]);
+      setInput("");
+    }
+    if (e.key === "Backspace" && !input && tags.length) {
+      onChange(tags.slice(0, -1));
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium" style={{ color: C.text }}>
+        Tags <span className="font-normal" style={{ color: C.textSec }}>(optional)</span>
+      </label>
+      <div
+        className="flex flex-wrap gap-1.5 rounded-xl px-3 py-2 min-h-[46px] transition-all duration-150"
+        style={{
+          border: `1.5px solid ${focused ? C.primary : C.border}`,
+          backgroundColor: "#fff",
+          boxShadow: focused ? `0 0 0 3px rgba(91,78,191,0.12)` : "none",
+        }}
+      >
+        {tags.map((t) => (
+          <span
+            key={t}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+            style={{ backgroundColor: C.primaryLight, color: C.primary }}
+          >
+            {t}
+            <button
+              type="button"
+              onClick={() => onChange(tags.filter((x) => x !== t))}
+              className="ml-0.5 hover:opacity-70"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={tags.length === 0 ? placeholder : ""}
+          className="flex-1 min-w-[120px] text-xs bg-transparent outline-none py-1 placeholder:text-gray-400"
+          style={{ color: C.text }}
+        />
+      </div>
+      <p className="text-xs" style={{ color: C.textSec }}>
+        Press Enter or comma to add a tag
+      </p>
+    </div>
+  );
+}
+
+function AttachmentZone({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium" style={{ color: C.text }}>
+        Attachment <span className="font-normal" style={{ color: C.textSec }}>(optional)</span>
+      </label>
+      {file ? (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ backgroundColor: C.primaryLight, border: `1.5px solid #C7D2FE` }}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="2" y="1" width="11" height="16" rx="2" stroke={C.primary} strokeWidth="1.4" />
+            <path d="M5 6h5M5 9h5M5 12h3" stroke={C.primary} strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          <span className="text-sm font-medium flex-1 truncate" style={{ color: C.primary }}>
+            {file.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-xs font-medium px-2 py-1 rounded-lg hover:opacity-80"
+            style={{ color: C.error, backgroundColor: C.errorLight }}
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <label
+          className="flex flex-col items-center gap-2 px-4 py-6 rounded-xl cursor-pointer transition-all duration-150 hover:border-blue-400"
+          style={{ border: `2px dashed ${C.border}`, backgroundColor: C.bg }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 4v12M7 9l5-5 5 5" stroke={C.textSec} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M4 20h16" stroke={C.textSec} strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="text-sm" style={{ color: C.textSec }}>
+            <span className="font-semibold" style={{ color: C.primary }}>Upload a file</span> or drag and drop
+          </span>
+          <span className="text-xs" style={{ color: C.textSec }}>PDF, PNG, JPG up to 10MB</span>
+          <input
+            type="file"
+            className="hidden"
+            accept=".pdf,.png,.jpg,.jpeg"
+            onChange={(e) => e.target.files?.[0] && onChange(e.target.files[0])}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function AskPageHeader({
+  onBack,
+  title,
+  subtitle,
+}: {
+  onBack: () => void;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div
+      className="sticky top-0 z-20 bg-white"
+      style={{ borderBottom: `1px solid ${C.border}` }}
+    >
+      <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-80"
+          style={{ color: C.textSec, backgroundColor: C.borderLight }}
+        >
+          <Icons.ArrowLeft />
+          Dashboard
+        </button>
+        <div>
+          <h1 className="text-base font-bold leading-tight" style={{ color: C.text }}>
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-xs" style={{ color: C.textSec }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        <div className="ml-auto">
+          <Logo size="sm" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuestionForm({
+  title: formTitle,
+  question,
+  category,
+  tags,
+  attachment,
+  onTitle,
+  onQuestion,
+  onCategory,
+  onTags,
+  onAttachment,
+  showTags = false,
+  privacyNotice,
+  onSubmit,
+  submitLabel = "Submit Question",
+  disabled,
+}: {
+  title: string;
+  question: string;
+  category: string;
+  tags: string[];
+  attachment: File | null;
+  onTitle: (v: string) => void;
+  onQuestion: (v: string) => void;
+  onCategory: (v: string) => void;
+  onTags: (v: string[]) => void;
+  onAttachment: (f: File | null) => void;
+  showTags?: boolean;
+  privacyNotice?: React.ReactNode;
+  onSubmit: () => void;
+  submitLabel?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-5">
+      <InputField
+        label="Question Title"
+        placeholder="e.g. What's the best approach to Step 1 study in a 10-week block?"
+        value={formTitle}
+        onChange={onTitle}
+      />
+      <TextAreaField
+        label="Question"
+        placeholder="Provide as much detail as you'd like. More context helps mentors give better answers."
+        value={question}
+        onChange={onQuestion}
+        rows={5}
+      />
+      <SelectField
+        label="Category"
+        value={category}
+        onChange={onCategory}
+        placeholder="Select a category"
+        options={ASK_CATEGORIES.map((c) => ({ value: c, label: c }))}
+      />
+      {showTags && <TagInput tags={tags} onChange={onTags} />}
+      <AttachmentZone file={attachment} onChange={onAttachment} />
+      {privacyNotice}
+      <Button
+        variant="primary"
+        size="lg"
+        fullWidth
+        onClick={onSubmit}
+        disabled={disabled || !formTitle || !question || !category}
+      >
+        {submitLabel}
+      </Button>
+    </div>
+  );
+}
+
+function AskQuestionScreen({
+  onBack,
+  onNavigate,
+  onToast,
+  initialStep = "select",
+}: {
+  onBack: () => void;
+  onNavigate: (s: Screen) => void;
+  onToast: (t: ToastType, msg: string) => void;
+  initialStep?: AskStep;
+}) {
+  const [step, setStep] = useState<AskStep>(initialStep);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [title, setTitle] = useState("");
+  const [question, setQuestion] = useState("");
+  const [category, setCategory] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [sort, setSort] = useState<"helpful" | "newest" | "relevant">("helpful");
+  const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
+
+  function resetForm() {
+    setTitle("");
+    setQuestion("");
+    setCategory("");
+    setTags([]);
+    setAttachment(null);
+  }
+
+  async function handleSubmit(successStep: AskStep, toastMsg: string, privacy: string) {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      onToast("success", toastMsg);
+      setStep(successStep);
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", toastMsg);
+        setStep(successStep);
+      } else {
+        onToast("error", error instanceof Error ? error.message : "Unable to submit the question.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function toggleHelpful(id: number) {
+    setHelpfulVotes((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  const sortedResponses = [...SAMPLE_RESPONSES].sort((a, b) => {
+    if (sort === "helpful") return (b.helpfulCount + (helpfulVotes.has(b.id) ? 1 : 0)) - (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0));
+    if (sort === "newest") return a.id - b.id;
+    return b.helpfulCount - a.helpfulCount;
+  });
+
+  // ── SELECT ────────────────────────────────────────────────────────────────
+  if (step === "select") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader onBack={onBack} title="Ask a Question" subtitle="Choose how you want to ask" />
+        <div className="max-w-3xl mx-auto px-6 py-10">
+          <div className="text-center mb-10 fade-in">
+            <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>
+              What would you like to ask?
+            </h2>
+            <p className="text-sm" style={{ color: C.textSec }}>
+              Choose how your question will be shared and who can respond.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4 fade-in">
+            {/* Ask My Mentor */}
+            <div
+              className="quick-action-card rounded-2xl p-6 cursor-pointer card-shadow"
+              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
+              onClick={() => { resetForm(); setStep("my-mentor"); }}
+            >
+              <div className="flex items-start gap-5">
+                <div
+                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: C.primaryLight }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <circle cx="14" cy="9" r="5" stroke={C.primary} strokeWidth="1.8" />
+                    <path d="M4 24c0-5.523 4.477-8 10-8s10 2.477 10 8" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M21 11.5l2.5 2.5-3.5 3.5" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="font-bold text-base" style={{ color: C.text }}>Ask My Mentor</h3>
+                    <PrivacyBadge type="private" />
+                  </div>
+                  <p className="text-sm leading-relaxed mb-3" style={{ color: C.textSec }}>
+                    Send a private question directly to your assigned mentor. Only you and Dr. Mariam Khaled will see this question.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <img
+                      src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
+                      alt="Dr. Khaled"
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                    <span className="text-xs font-medium" style={{ color: C.text }}>Dr. Mariam Khaled · Internal Medicine</span>
+                    <StatusDot available />
+                  </div>
+                </div>
+                <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
+              </div>
+            </div>
+
+            {/* Ask Any Mentor */}
+            <div
+              className="quick-action-card rounded-2xl p-6 cursor-pointer card-shadow"
+              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
+              onClick={() => { resetForm(); setStep("any-mentor"); }}
+            >
+              <div className="flex items-start gap-5">
+                <div
+                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: C.successLight }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <circle cx="10" cy="10" r="4" stroke={C.success} strokeWidth="1.8" />
+                    <circle cx="20" cy="10" r="3.5" stroke={C.success} strokeWidth="1.8" />
+                    <path d="M2 24c0-4.418 3.582-7 8-7 2 0 3.8.6 5.2 1.6" stroke={C.success} strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M16 22c0-2.5 1.8-4 5-4 3 0 5 1.5 5 4" stroke={C.success} strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="font-bold text-base" style={{ color: C.text }}>Ask Any Mentor</h3>
+                    <PrivacyBadge type="public" />
+                    <PrivacyBadge type="mentors" />
+                  </div>
+                  <p className="text-sm leading-relaxed mb-3" style={{ color: C.textSec }}>
+                    Ask the school's physician mentors for guidance. Your name, year of study, and profile picture will be visible on the question. Receive perspectives from people with different training paths.
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex -space-x-1.5">
+                      {[
+                        "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop",
+                        "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop",
+                        "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=40&h=40&fit=crop",
+                      ].map((src, i) => (
+                        <img key={i} src={src} alt="" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
+                      ))}
+                    </div>
+                    <span className="text-xs" style={{ color: C.textSec }}>2,400+ mentors available to answer</span>
+                  </div>
+                </div>
+                <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
+              </div>
+            </div>
+
+            {/* Ask Anonymously */}
+            <div
+              className="quick-action-card rounded-2xl p-6 cursor-pointer card-shadow"
+              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
+              onClick={() => { resetForm(); setStep("anonymous"); }}
+            >
+              <div className="flex items-start gap-5">
+                <div
+                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: "#FEF3C7" }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <circle cx="14" cy="11" r="5" stroke={C.pending} strokeWidth="1.8" />
+                    <path d="M4 25c0-5.523 4.477-8 10-8s10 2.477 10 8" stroke={C.pending} strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M14 4L14 2M9.2 5.8L7.8 4.4M18.8 5.8L20.2 4.4" stroke={C.pending} strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="font-bold text-base" style={{ color: C.text }}>Ask Anonymously</h3>
+                    <PrivacyBadge type="hidden" />
+                  </div>
+                  <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
+                    Ask questions without revealing your identity. Choose between a public question that others can learn from, or a completely private question only mentors can access.
+                  </p>
+                </div>
+                <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ASK MY MENTOR ─────────────────────────────────────────────────────────
+  if (step === "my-mentor") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader
+          onBack={onBack}
+          title="Ask My Mentor"
+          subtitle="Private question to Dr. Mariam Khaled"
+        />
+        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+          {/* Mentor preview */}
+          <Card className="p-4 mb-6 flex items-center gap-3">
+            <div className="relative">
+              <img
+                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=80&h=80&fit=crop"
+                alt="Dr. Khaled"
+                className="w-12 h-12 rounded-full object-cover"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available /></span>
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-sm" style={{ color: C.text }}>Dr. Mariam Khaled</div>
+              <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · Available now</div>
+            </div>
+            <PrivacyBadge type="private" />
+          </Card>
+
+          <QuestionForm
+            title={title}
+            question={question}
+            category={category}
+            tags={tags}
+            attachment={attachment}
+            onTitle={setTitle}
+            onQuestion={setQuestion}
+            onCategory={setCategory}
+            onTags={setTags}
+            onAttachment={setAttachment}
+            showTags={false}
+            privacyNotice={
+              <div
+                className="flex items-start gap-3 px-4 py-3 rounded-xl"
+                style={{ backgroundColor: C.borderLight, border: `1px solid ${C.border}` }}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 mt-0.5">
+                  <rect x="5" y="8" width="8" height="7" rx="1.5" stroke={C.textSec} strokeWidth="1.3" />
+                  <path d="M6.5 8V6a3.5 3.5 0 017 0v2" stroke={C.textSec} strokeWidth="1.3" strokeLinecap="round" />
+                  <circle cx="9" cy="11.5" r="1" fill={C.textSec} />
+                </svg>
+                <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
+                  <strong style={{ color: C.text }}>Privacy notice:</strong> Only you and your assigned mentor, Dr. Mariam Khaled, will be able to see this question and any responses. It will never appear in the public feed.
+                </p>
+              </div>
+            }
+            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private")}
+            submitLabel="Send to Dr. Khaled"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── SUCCESS: MY MENTOR ────────────────────────────────────────────────────
+  if (step === "success-my-mentor") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
+        <div className="w-full max-w-md text-center fade-in">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: `linear-gradient(135deg, ${C.successLight} 0%, #A7F3D0 100%)` }}
+          >
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <path d="M10 20l7 7.5L30 12" stroke={C.success} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your question has been sent.</h2>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
+            Dr. Mariam Khaled will receive a notification and typically responds within 24–48 hours. You'll be notified by email when she replies.
+          </p>
+          <Card className="p-5 mb-6 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <PrivacyBadge type="private" />
+              <span className="text-xs" style={{ color: C.textSec }}>Sent just now</span>
+            </div>
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "What's the best approach to Step 1 study in a 10-week block?"}</p>
+            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
+          </Card>
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("my-mentor")}>
+              View Question
+            </Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ASK ANY MENTOR ────────────────────────────────────────────────────────
+  if (step === "any-mentor") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader
+          onBack={onBack}
+          title="Ask Any Mentor"
+          subtitle="Visible to all physician mentors at the school"
+        />
+        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+          {/* Identity preview */}
+          <Card className="p-4 mb-6">
+            <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: C.textSec }}>
+              Your question will appear as:
+            </div>
+            <div className="flex items-center gap-3">
+              <img
+                src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop"
+                alt="Alex Johnson"
+                className="w-10 h-10 rounded-full object-cover"
+              />
+              <div>
+                <div className="font-semibold text-sm" style={{ color: C.text }}>Alex Johnson</div>
+                <div className="text-xs" style={{ color: C.textSec }}>M2 · Clinical Rotations</div>
+              </div>
+              <div className="ml-auto flex gap-2">
+                <PrivacyBadge type="public" />
+                <PrivacyBadge type="mentors" />
+              </div>
+            </div>
+          </Card>
+
+          <QuestionForm
+            title={title}
+            question={question}
+            category={category}
+            tags={tags}
+            attachment={attachment}
+            onTitle={setTitle}
+            onQuestion={setQuestion}
+            onCategory={setCategory}
+            onTags={setTags}
+            onAttachment={setAttachment}
+            showTags
+            privacyNotice={
+              <div
+                className="flex items-start gap-3 px-4 py-3 rounded-xl"
+                style={{ backgroundColor: C.successLight, border: `1px solid #A7F3D0` }}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 mt-0.5">
+                  <circle cx="9" cy="9" r="8" stroke={C.success} strokeWidth="1.3" />
+                  <path d="M6 9l2 2 4-4" stroke={C.success} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <p className="text-xs leading-relaxed" style={{ color: "#065F46" }}>
+                  Your name, profile picture, year, and track are visible to mentors and other students. All physician mentors can respond, and other students can read the answers.
+                </p>
+              </div>
+            }
+            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!", "any-mentor")}
+            submitLabel="Share with Mentors"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── SUCCESS: ANY MENTOR (with responses) ──────────────────────────────────
+  if (step === "success-any-mentor") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader onBack={onBack} title="Question Shared" subtitle="Your question is live" />
+        <div className="max-w-3xl mx-auto px-6 py-8 fade-in">
+          {/* Success banner */}
+          <div
+            className="rounded-2xl p-5 mb-6 flex items-start gap-4"
+            style={{ background: `linear-gradient(135deg, ${C.primaryLight} 0%, #C7D2FE 100%)`, border: `1px solid #A5B4FC` }}
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: C.primary }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M5 10l3.5 3.5L15 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm mb-0.5" style={{ color: C.primary }}>Your question has been shared with all mentors.</div>
+              <p className="text-xs leading-relaxed" style={{ color: "#3730A3" }}>
+                {title || "What's the best approach to Step 1 study in a 10-week block?"}
+              </p>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            {[
+              { label: "Mentors Viewed", value: "34" },
+              { label: "Responses", value: "3" },
+              { label: "Helpful Votes", value: String(30 + helpfulVotes.size) },
+            ].map((s) => (
+              <Card key={s.label} className="p-4 text-center">
+                <div className="text-2xl font-bold mb-0.5" style={{ color: C.primary }}>{s.value}</div>
+                <div className="text-xs" style={{ color: C.textSec }}>{s.label}</div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold" style={{ color: C.text }}>
+              {SAMPLE_RESPONSES.length} Responses
+            </h3>
+            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: C.borderLight }}>
+              {(["helpful", "newest", "relevant"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
+                  style={{
+                    backgroundColor: sort === s ? "#fff" : "transparent",
+                    color: sort === s ? C.text : C.textSec,
+                    boxShadow: sort === s ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  }}
+                >
+                  {s === "helpful" ? "Most Helpful" : s === "newest" ? "Newest" : "Most Relevant"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Responses */}
+          <div className="flex flex-col gap-4">
+            {sortedResponses.map((r, idx) => {
+              const voted = helpfulVotes.has(r.id);
+              const count = r.helpfulCount + (voted ? 1 : 0);
+              return (
+                <Card key={r.id} className="p-5">
+                  <div className="flex items-start gap-3 mb-3">
+                    <img
+                      src={r.mentor.photo}
+                      alt={r.mentor.name}
+                      className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm" style={{ color: C.text }}>{r.mentor.name}</span>
+                        {idx === 0 && (
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                            style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+                          >
+                            ⭐ Top Answer
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                        {r.mentor.specialty} · {r.timestamp}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {r.mentor.expertise.map((e) => (
+                          <span
+                            key={e}
+                            className="text-xs px-2 py-0.5 rounded-full"
+                            style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                          >
+                            {e}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-relaxed mb-4" style={{ color: C.text }}>
+                    {r.answer}
+                  </p>
+                  <div className="flex items-center justify-between pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
+                    <button
+                      onClick={() => toggleHelpful(r.id)}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+                      style={{
+                        backgroundColor: voted ? C.successLight : C.borderLight,
+                        color: voted ? C.success : C.textSec,
+                        border: `1px solid ${voted ? "#A7F3D0" : C.border}`,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill={voted ? C.success : "none"}>
+                        <path d="M2.5 6.5L1 12.5h9l1.5-6H8V3a1.5 1.5 0 00-3 0v3.5H2.5z" stroke={voted ? C.success : C.textSec} strokeWidth="1.2" strokeLinejoin="round" />
+                      </svg>
+                      Helpful · {count}
+                    </button>
+                    <button className="text-xs" style={{ color: C.textSec }}>
+                      Reply to {r.mentor.name.split(" ")[1]}
+                    </button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-6">
+            <Button variant="secondary" size="md" fullWidth onClick={onBack}>
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ASK ANONYMOUSLY — LANDING ─────────────────────────────────────────────
+  if (step === "anonymous") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader
+          onBack={onBack}
+          title="Ask Anonymously"
+          subtitle="Your identity is fully protected"
+        />
+        <div className="max-w-3xl mx-auto px-6 py-8 fade-in">
+          {/* Privacy explanation panel */}
+          <div
+            className="rounded-2xl p-5 mb-8 flex items-start gap-4"
+            style={{ background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)", border: `1px solid #FCD34D` }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: "rgba(255,255,255,0.6)" }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <rect x="5" y="10" width="12" height="9" rx="2" stroke={C.pending} strokeWidth="1.5" />
+                <path d="M8 10V7.5a4 4 0 018 0V10" stroke={C.pending} strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="11" cy="14.5" r="1.5" fill={C.pending} />
+              </svg>
+            </div>
+            <div>
+              <div className="font-bold text-sm mb-1.5" style={{ color: "#92400E" }}>Your identity is protected</div>
+              <div className="flex flex-col gap-1">
+                {[
+                  "Your name, email address, and profile picture are never shown to mentors or other students.",
+                  'You will appear as "Anonymous Mentee" on all anonymous questions.',
+                  "MedMentor's moderation team can see your identity only to prevent misuse — it is never shared with mentors.",
+                ].map((t) => (
+                  <div key={t} className="flex items-start gap-2 text-xs" style={{ color: "#78350F" }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0 mt-0.5">
+                      <circle cx="6" cy="6" r="5" fill={C.pending} fillOpacity="0.3" />
+                      <path d="M3.5 6l2 2 3-3" stroke={C.pending} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {t}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <h3 className="text-sm font-bold mb-4" style={{ color: C.text }}>Choose your anonymous question type</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Public anonymous */}
+            <div
+              className="quick-action-card rounded-2xl p-6 cursor-pointer flex flex-col gap-4 card-shadow"
+              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
+              onClick={() => { resetForm(); setStep("anon-public"); }}
+            >
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: C.primaryLight }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="9" stroke={C.primary} strokeWidth="1.6" />
+                  <path d="M3 12h18M12 3c-2.5 3-2.5 13 0 18M12 3c2.5 3 2.5 13 0 18" stroke={C.primary} strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <h4 className="font-bold text-sm" style={{ color: C.text }}>Public Anonymous</h4>
+                  <PrivacyBadge type="hidden" />
+                </div>
+                <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
+                  Share your question anonymously so other students can learn from the answers. Your question requires moderator approval before publication.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {[
+                    { icon: "🌐", text: "Visible to all students once approved" },
+                    { icon: "🩺", text: "Any mentor can respond" },
+                    { icon: "✓",  text: "Requires moderator approval" },
+                    { icon: "🔒", text: "Name & photo never shown" },
+                  ].map((f) => (
+                    <div key={f.text} className="flex items-center gap-1.5 text-xs" style={{ color: C.textSec }}>
+                      <span>{f.icon}</span> {f.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-auto">
+                <Button variant="secondary" size="sm" fullWidth onClick={() => { resetForm(); setStep("anon-public"); }}>
+                  Ask Publicly (Anonymous)
+                </Button>
+              </div>
+            </div>
+
+            {/* Private anonymous */}
+            <div
+              className="quick-action-card rounded-2xl p-6 cursor-pointer flex flex-col gap-4 card-shadow"
+              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
+              onClick={() => { resetForm(); setStep("anon-private"); }}
+            >
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#FEF3C7" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <rect x="5" y="11" width="14" height="10" rx="2" stroke={C.pending} strokeWidth="1.6" />
+                  <path d="M8 11V7.5a4 4 0 018 0V11" stroke={C.pending} strokeWidth="1.6" strokeLinecap="round" />
+                  <circle cx="12" cy="16" r="1.5" fill={C.pending} />
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <h4 className="font-bold text-sm" style={{ color: C.text }}>Private Anonymous</h4>
+                  <PrivacyBadge type="mentors" />
+                  <PrivacyBadge type="hidden" />
+                </div>
+                <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
+                  Keep your question completely private. Only mentors can access it, and only you can see the responses. Never appears in the public feed.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {[
+                    { icon: "🔒", text: "Never in the public feed" },
+                    { icon: "🩺", text: "Mentors only — no students" },
+                    { icon: "👤", text: "Only you see responses" },
+                    { icon: "✓",  text: "No approval required" },
+                  ].map((f) => (
+                    <div key={f.text} className="flex items-center gap-1.5 text-xs" style={{ color: C.textSec }}>
+                      <span>{f.icon}</span> {f.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-auto">
+                <Button variant="secondary" size="sm" fullWidth onClick={() => { resetForm(); setStep("anon-private"); }}>
+                  Ask Privately (Anonymous)
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ANON PUBLIC FORM ──────────────────────────────────────────────────────
+  if (step === "anon-public") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader
+          onBack={() => setStep("anonymous")}
+          title="Public Anonymous Question"
+          subtitle="Visible to all students after moderator approval"
+        />
+        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+          <Card className="p-4 mb-6 flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: C.borderLight }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="7" r="4" stroke={C.textSec} strokeWidth="1.4" />
+                <path d="M3 18c0-3.866 3.134-6 7-6s7 2.134 7 6" stroke={C.textSec} strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-sm" style={{ color: C.text }}>Anonymous Mentee</div>
+              <div className="text-xs" style={{ color: C.textSec }}>Your name will appear exactly like this</div>
+            </div>
+            <PrivacyBadge type="hidden" />
+          </Card>
+
+          <QuestionForm
+            title={title}
+            question={question}
+            category={category}
+            tags={tags}
+            attachment={attachment}
+            onTitle={setTitle}
+            onQuestion={setQuestion}
+            onCategory={setCategory}
+            onTags={setTags}
+            onAttachment={setAttachment}
+            showTags
+            privacyNotice={
+              <div
+                className="flex flex-col gap-2 px-4 py-4 rounded-xl"
+                style={{ backgroundColor: C.borderLight, border: `1px solid ${C.border}` }}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <PrivacyBadge type="hidden" />
+                  <PrivacyBadge type="pending-approval" />
+                  <PrivacyBadge type="public" />
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
+                  <strong style={{ color: C.text }}>Your question will appear as Anonymous Mentee.</strong> It requires moderator review before publication (typically under 4 hours). Once approved, all mentors can answer and all students can read the responses.
+                </p>
+              </div>
+            }
+            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!", "anon-public")}
+            submitLabel="Submit for Approval"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── ANON PRIVATE FORM ─────────────────────────────────────────────────────
+  if (step === "anon-private") {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <AskPageHeader
+          onBack={() => setStep("anonymous")}
+          title="Private Anonymous Question"
+          subtitle="Visible only to mentors — your identity is hidden"
+        />
+        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+          <Card className="p-4 mb-6 flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: "#FEF3C7" }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="5" y="9.5" width="10" height="8" rx="1.5" stroke={C.pending} strokeWidth="1.4" />
+                <path d="M7 9.5V7a3.5 3.5 0 017 0v2.5" stroke={C.pending} strokeWidth="1.4" strokeLinecap="round" />
+                <circle cx="10" cy="13.5" r="1" fill={C.pending} />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-sm" style={{ color: C.text }}>Anonymous Mentee</div>
+              <div className="text-xs" style={{ color: C.textSec }}>Your name will appear exactly like this</div>
+            </div>
+            <div className="flex gap-2">
+              <PrivacyBadge type="mentors" />
+              <PrivacyBadge type="hidden" />
+            </div>
+          </Card>
+
+          <QuestionForm
+            title={title}
+            question={question}
+            category={category}
+            tags={tags}
+            attachment={attachment}
+            onTitle={setTitle}
+            onQuestion={setQuestion}
+            onCategory={setCategory}
+            onTags={setTags}
+            onAttachment={setAttachment}
+            showTags
+            privacyNotice={
+              <div
+                className="flex flex-col gap-2 px-4 py-4 rounded-xl"
+                style={{ backgroundColor: "#FEF3C7", border: `1px solid #FCD34D` }}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <PrivacyBadge type="mentors" />
+                  <PrivacyBadge type="hidden" />
+                  <PrivacyBadge type="private" />
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: "#78350F" }}>
+                  <strong>Your identity will remain hidden.</strong> Only mentors can see and respond to this question. You are the only one who can see their responses. This question will never appear in the student feed or public question archive.
+                </p>
+              </div>
+            }
+            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!", "anon-private")}
+            submitLabel="Submit Privately"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── SUCCESS: ANON PUBLIC ──────────────────────────────────────────────────
+  if (step === "success-anon-public") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
+        <div className="w-full max-w-md text-center fade-in">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: `linear-gradient(135deg, ${C.primaryLight} 0%, #C7D2FE 100%)` }}
+          >
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <path d="M10 20l7 7.5L30 12" stroke={C.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <PrivacyBadge type="hidden" />
+            <PrivacyBadge type="pending-approval" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Question submitted!</h2>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
+            Your question will appear as <strong style={{ color: C.text }}>Anonymous Mentee</strong>. A moderator will review it within 4 hours. You'll receive an email notification once it's approved and mentors begin answering.
+          </p>
+          <Card className="p-4 mb-6 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <PrivacyBadge type="hidden" />
+              <span className="text-xs" style={{ color: C.textSec }}>Awaiting approval</span>
+            </div>
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "How do I approach the neurology shelf exam with limited time?"}</p>
+            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
+          </Card>
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
+              Ask Another Question
+            </Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SUCCESS: ANON PRIVATE ─────────────────────────────────────────────────
+  if (step === "success-anon-private") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
+        <div className="w-full max-w-md text-center fade-in">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)" }}
+          >
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <rect x="12" y="18" width="16" height="14" rx="3" stroke={C.pending} strokeWidth="2" />
+              <path d="M16 18V14a6 6 0 0112 0v4" stroke={C.pending} strokeWidth="2" strokeLinecap="round" />
+              <circle cx="20" cy="25" r="2" fill={C.pending} />
+            </svg>
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <PrivacyBadge type="hidden" />
+            <PrivacyBadge type="mentors" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your identity will remain hidden.</h2>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
+            Your question has been privately sent to all physician mentors. You'll be notified when a mentor responds. Only you can see their answers — they will never appear in the student feed.
+          </p>
+          <Card className="p-4 mb-6 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <PrivacyBadge type="hidden" />
+              <PrivacyBadge type="mentors" />
+            </div>
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "I'm struggling with burnout during rotations — how do I manage this without it affecting my evaluations?"}</p>
+            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Wellness & Burnout"}</p>
+          </Card>
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
+              Ask Another Question
+            </Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ─── ADMIN DATA ───────────────────────────────────────────────────────────────
+
+interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  role: "mentee" | "mentor" | "pending-mentor";
+  year?: string;
+  track?: string;
+  school: string;
+  status: "active" | "suspended" | "pending";
+  joinDate: string;
+  photo?: string;
+}
+
+const ADMIN_USERS: AdminUser[] = [
+  { id: 1, name: "Alex Johnson", email: "alex.j@med.ucsf.edu", role: "mentee", year: "M2", track: "Preclinical", school: "UCSF School of Medicine", status: "active", joinDate: "Aug 12, 2024", photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop" },
+  { id: 2, name: "Sarah Chen", email: "s.chen@hms.harvard.edu", role: "mentee", year: "M3", track: "Clinical Rotations", school: "Harvard Medical School", status: "active", joinDate: "Sep 3, 2024", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=40&h=40&fit=crop" },
+  { id: 3, name: "Marcus Williams", email: "m.williams@med.columbia.edu", role: "mentee", year: "M1", track: "Preclinical", school: "Columbia Vagelos COM", status: "active", joinDate: "Oct 1, 2024", photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop" },
+  { id: 4, name: "Dr. Mariam Khaled", email: "m.khaled@umc.edu", role: "mentor", school: "University Medical Center", status: "active", joinDate: "Jun 5, 2024", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop" },
+  { id: 5, name: "Dr. James Patel", email: "j.patel@stanford.edu", role: "mentor", school: "Stanford Medicine", status: "active", joinDate: "Jun 18, 2024", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop" },
+  { id: 6, name: "Dr. Amara Osei", email: "a.osei@jhmi.edu", role: "pending-mentor", school: "Johns Hopkins Medicine", status: "pending", joinDate: "Nov 14, 2024", photo: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=40&h=40&fit=crop" },
+  { id: 7, name: "Jordan Kim", email: "j.kim@med.yale.edu", role: "mentee", year: "M4", track: "Clinical", school: "Yale School of Medicine", status: "suspended", joinDate: "Aug 30, 2024", photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop" },
+  { id: 8, name: "Priya Sharma", email: "p.sharma@wustl.edu", role: "mentee", year: "M2", track: "Preclinical", school: "Washington University SOM", status: "active", joinDate: "Sep 22, 2024", photo: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop" },
+];
+
+type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
+
+interface ModerationItem {
+  id: number;
+  type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
+  questionText: string;
+  category: string;
+  submittedDate: string;
+  visibility: "public" | "private";
+  status: ModerationStatus;
+  internalNote?: string;
+  reportReason?: string;
+  reportedBy?: string;
+  flagCount?: number;
+}
+
+const MODERATION_ITEMS: ModerationItem[] = [
+  { id: 101, type: "anon-question", questionText: "I've been struggling with severe anxiety and imposter syndrome to the point where I'm questioning whether medicine is right for me. Has anyone else felt this way in M2?", category: "Mental Health", submittedDate: "Nov 28, 2024", visibility: "private", status: "pending", internalNote: "Submitted via anonymous private channel. No identifying metadata. IP hash: a7f3..." },
+  { id: 102, type: "anon-question", questionText: "What is the best way to approach a faculty member about a grade dispute without damaging the relationship?", category: "Academic", submittedDate: "Nov 27, 2024", visibility: "public", status: "pending", internalNote: "Submitted via anonymous public channel. No identifying metadata. IP hash: b2c9..." },
+  { id: 103, type: "anon-question", questionText: "How do I handle a situation where a senior resident asked me to document something I didn't actually observe?", category: "Ethics", submittedDate: "Nov 26, 2024", visibility: "public", status: "pending", internalNote: "Flagged by auto-moderator for ethics keyword. No identifying metadata." },
+  { id: 104, type: "reported-question", questionText: "Looking for study partners at [specific dorm building] on Thursday nights — bring snacks!", category: "Study Tips", submittedDate: "Nov 25, 2024", visibility: "public", status: "reported", reportReason: "Personal information", reportedBy: "3 users", flagCount: 3 },
+  { id: 105, type: "reported-answer", questionText: 'Response by Dr. Chen to "How do I survive shelf exams?" — contains alleged misinformation about Step 1 scoring.', category: "Board Prep", submittedDate: "Nov 24, 2024", visibility: "public", status: "reported", reportReason: "Misinformation", reportedBy: "2 users", flagCount: 2 },
+  { id: 106, type: "anon-question", questionText: "Is it normal to feel completely burned out after first year? I haven't been able to study in weeks.", category: "Mental Health", submittedDate: "Nov 23, 2024", visibility: "private", status: "approved" },
+  { id: 107, type: "anon-question", questionText: "How do I ask for a letter of recommendation from someone I barely know?", category: "Career", submittedDate: "Nov 22, 2024", visibility: "public", status: "rejected", internalNote: "Rejected: not related to mentoring program scope." },
+  { id: 108, type: "suspicious", questionText: "Account created 3 minutes ago. Posted 12 questions in rapid succession with identical structure. Possible bot activity.", category: "System", submittedDate: "Nov 28, 2024", visibility: "public", status: "pending", internalNote: "Auto-flagged: unusual posting frequency. User ID: #4471. Review recommended." },
+];
+
+const REJECT_REASONS = [
+  "Inappropriate content",
+  "Offensive language",
+  "Not related to mentoring",
+  "Personal information",
+  "Spam",
+  "Other",
+];
+
+// ─── MENTOR ANSWER SCREEN ─────────────────────────────────────────────────────
+
+function FormatBtn({
+  label,
+  title,
+  onClick,
+}: {
+  label: React.ReactNode;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+      style={{ backgroundColor: C.borderLight, color: C.text }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MentorAnswerScreen({
+  question,
+  onBack,
+  onToast,
+}: {
+  question: MentorQuestion;
+  onBack: () => void;
+  onToast: (t: ToastType, msg: string) => void;
+}) {
+  const [step, setStep] = useState<"form" | "success">("form");
+  const [answer, setAnswer] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const isAnon = question.type === "anon-public" || question.type === "anon-private";
+
+  function saveDraft() {
+    if (!answer.trim()) return;
+    setIsSavingDraft(true);
+    setTimeout(() => {
+      setIsSavingDraft(false);
+      const now = new Date();
+      setDraftSavedAt(`${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`);
+    }, 600);
+  }
+
+  const TYPE_META: Record<
+    MentorQuestion["type"],
+    { label: string; badge: React.ReactNode; notice: string; successNote: string }
+  > = {
+    private: {
+      label: "Private Question",
+      badge: <PrivacyBadge type="private" />,
+      notice: `Your response will be sent privately to ${question.asker?.name ?? "the student"}. Only they can see it — it will never appear in the public feed or to other students.`,
+      successNote: `${question.asker?.name ?? "The student"} will receive a notification and can view your response in their private thread.`,
+    },
+    "any-mentor": {
+      label: "Ask Any Mentor",
+      badge: <PrivacyBadge type="public" />,
+      notice: `Your response will be visible to ${question.asker?.name ?? "the student"} and all physician mentors who have access to this question. Other students can also read the answers.`,
+      successNote: "Your answer is now live on the question thread and visible to the student and their peers.",
+    },
+    "anon-public": {
+      label: "Anonymous · Public",
+      badge: (
+        <span className="flex gap-1.5">
+          <PrivacyBadge type="hidden" />
+          <PrivacyBadge type="public" />
+        </span>
+      ),
+      notice: "Your response will be visible publicly on the student question feed. Your name, photo, and specialty will be attributed to the answer. The student's identity is and will remain hidden from you.",
+      successNote: "Your public response is now visible on the anonymous question page. Your name and specialty are shown as the responding physician.",
+    },
+    "anon-private": {
+      label: "Anonymous · Private",
+      badge: (
+        <span className="flex gap-1.5">
+          <PrivacyBadge type="hidden" />
+          <PrivacyBadge type="mentors" />
+        </span>
+      ),
+      notice: "Your response is visible only to the anonymous student. Their identity is completely hidden from you — you will never learn who they are. The student can continue the conversation and follow up while remaining anonymous.",
+      successNote: 'The student will receive a notification: "Your anonymous question has received a response." Their identity remains hidden throughout.',
+    },
+  };
+
+  const meta = TYPE_META[question.type];
+
+  function applyFormat(fmt: "bold" | "italic" | "heading" | "list" | "quote") {
+    const el = textareaRef.current;
+    if (!el) return;
+    const s = el.selectionStart;
+    const e = el.selectionEnd;
+    const sel = el.value.slice(s, e);
+    const before = el.value.slice(0, s);
+    const after = el.value.slice(e);
+    const map: Record<string, string> = {
+      bold:    `**${sel || "bold text"}**`,
+      italic:  `*${sel || "italic text"}*`,
+      heading: `## ${sel || "Heading"}`,
+      list:    `\n- ${sel || "List item"}`,
+      quote:   `\n> ${sel || "Quoted text"}`,
+    };
+    const repl = map[fmt];
+    const newVal = `${before}${repl}${after}`;
+    setAnswer(newVal);
+    setTimeout(() => {
+      el.focus();
+      const pos = s + repl.length;
+      el.setSelectionRange(pos, pos);
+    }, 0);
+  }
+
+  async function handleSubmit() {
+    if (answer.trim().length < 10) return;
+    try {
+      await createAnswer(String(question.id), answer.trim());
+      onToast("success", "Response sent successfully!");
+      setStep("success");
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to submit response."
+      );
+    }
+  }
+
+  if (step === "success") {
+    const isAnonPrivate = question.type === "anon-private";
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+        <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+          <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+            <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
+              <Icons.ArrowLeft /> Dashboard
+            </button>
+            <Logo size="sm" />
+          </div>
+        </header>
+        <div className="max-w-lg mx-auto px-6 py-16 text-center fade-in">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: `linear-gradient(135deg, ${C.successLight} 0%, #A7F3D0 100%)` }}
+          >
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <path d="M10 20l7 7.5L30 12" stroke={C.success} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mb-4">{meta.badge}</div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>
+            Your response has been sent.
+          </h2>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: C.textSec }}>
+            {meta.successNote}
+          </p>
+
+          {/* Preview of what was sent */}
+          <Card className="p-4 mb-4 text-left">
+            <div className="flex items-center gap-2 mb-3">
+              <img
+                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
+                alt="Dr. Khaled"
+                className="w-8 h-8 rounded-full object-cover"
+              />
+              <div>
+                <div className="text-xs font-semibold" style={{ color: C.text }}>Dr. Mariam Khaled</div>
+                <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · Just now</div>
+              </div>
+              <div className="ml-auto">{meta.badge}</div>
+            </div>
+            <p className="text-sm leading-relaxed" style={{ color: C.text }}>
+              {answer.slice(0, 160)}{answer.length > 160 ? "…" : ""}
+            </p>
+          </Card>
+
+          {isAnonPrivate && (
+            <div
+              className="flex items-start gap-3 px-4 py-3 rounded-xl mb-6 text-left"
+              style={{ backgroundColor: "#FEF3C7", border: `1px solid #FCD34D` }}
+            >
+              <span className="text-lg flex-shrink-0">🔒</span>
+              <div>
+                <p className="text-xs font-semibold mb-0.5" style={{ color: "#92400E" }}>
+                  Student notification (anonymous)
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: "#78350F" }}>
+                  The student received: <em>"Your anonymous question has received a response."</em> — Their identity remains completely hidden from you.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("form")}>
+              View Response
+            </Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0"
+            style={{ color: C.textSec, backgroundColor: C.borderLight }}
+          >
+            <Icons.ArrowLeft />
+            Dashboard
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold truncate" style={{ color: C.text }}>
+              Answer Question
+            </p>
+            <p className="text-xs" style={{ color: C.textSec }}>
+              {meta.label}
+            </p>
+          </div>
+          <Logo size="sm" />
+        </div>
+      </header>
+
+      <main className="max-w-3xl mx-auto px-6 py-8 fade-in">
+        {/* Question card */}
+        <Card className="p-5 mb-5">
+          {/* Asker */}
+          <div className="flex items-start gap-3 mb-4">
+            {isAnon ? (
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: C.borderLight }}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="7" r="4" stroke={C.textSec} strokeWidth="1.4" />
+                  <path d="M3 19c0-3.866 3.134-6 7-6s7 2.134 7 6" stroke={C.textSec} strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </div>
+            ) : (
+              <img
+                src={question.asker!.photo}
+                alt={question.asker!.name}
+                className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+              />
+            )}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-sm" style={{ color: C.text }}>
+                  {isAnon ? "Anonymous Mentee" : question.asker!.name}
+                </span>
+                {!isAnon && question.asker?.year && (
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: C.borderLight, color: C.textSec }}>
+                    {question.asker.year} · {question.asker.track}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {meta.badge}
+                <CategoryBadge category={question.category} />
+                <span className="text-xs" style={{ color: C.textSec }}>{question.date}</span>
+                {question.priority === "high" && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: C.errorLight, color: C.error }}>
+                    High Priority
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <p className="text-sm leading-relaxed font-medium" style={{ color: C.text }}>
+            {question.question}
+          </p>
+        </Card>
+
+        {/* Privacy notice */}
+        <div
+          className="flex items-start gap-3 px-4 py-3 rounded-xl mb-5"
+          style={{
+            backgroundColor: isAnon ? "#FFF8ED" : C.borderLight,
+            border: `1px solid ${isAnon ? "#FCD34D" : C.border}`,
+          }}
+        >
+          <span className="text-base flex-shrink-0 mt-0.5">{isAnon ? "🔒" : "ℹ️"}</span>
+          <p className="text-xs leading-relaxed" style={{ color: isAnon ? "#78350F" : C.textSec }}>
+            <strong style={{ color: isAnon ? "#92400E" : C.text }}>Visibility: </strong>
+            {meta.notice}
+          </p>
+        </div>
+
+        {/* Response editor */}
+        <Card className="p-5 mb-5">
+          {/* Author preview */}
+          <div className="flex items-center gap-3 mb-4 pb-4" style={{ borderBottom: `1px solid ${C.border}` }}>
+            <img
+              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
+              alt="Dr. Khaled"
+              className="w-9 h-9 rounded-full object-cover"
+            />
+            <div>
+              <div className="text-sm font-semibold" style={{ color: C.text }}>Dr. Mariam Khaled</div>
+              <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · University Medical Center</div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <label className="text-sm font-semibold" style={{ color: C.text }}>
+              Write your response
+            </label>
+
+            {/* Formatting toolbar */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <FormatBtn label={<strong>B</strong>} title="Bold" onClick={() => applyFormat("bold")} />
+              <FormatBtn label={<em>I</em>} title="Italic" onClick={() => applyFormat("italic")} />
+              <FormatBtn label="H" title="Heading" onClick={() => applyFormat("heading")} />
+              <div className="w-px h-5 self-center" style={{ backgroundColor: C.border }} />
+              <FormatBtn label="• List" title="Bullet list" onClick={() => applyFormat("list")} />
+              <FormatBtn label='" Quote' title="Quote" onClick={() => applyFormat("quote")} />
+              <div className="w-px h-5 self-center" style={{ backgroundColor: C.border }} />
+              <FormatBtn
+                label={
+                  <span className="flex items-center gap-1">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6a3 3 0 003 3h2a3 3 0 000-6H5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                      <path d="M10 6a3 3 0 00-3-3H5a3 3 0 000 6h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    </svg>
+                    Link
+                  </span>
+                }
+                title="Insert link"
+                onClick={() => {
+                  const el = textareaRef.current;
+                  if (!el) return;
+                  const s = el.selectionStart;
+                  const sel = el.value.slice(s, el.selectionEnd);
+                  const repl = `[${sel || "link text"}](https://)`;
+                  setAnswer((v) => v.slice(0, s) + repl + v.slice(el.selectionEnd));
+                }}
+              />
+            </div>
+
+            {/* Textarea */}
+            <div
+              className="rounded-xl transition-all duration-150"
+              style={{ border: `1.5px solid ${C.border}`, overflow: "hidden" }}
+            >
+              <textarea
+                ref={textareaRef}
+                rows={9}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Write your answer here. Be specific, practical, and draw from your own experience where relevant. Students benefit most from concrete examples and actionable guidance."
+                className="w-full px-4 py-3 text-sm bg-white outline-none resize-none placeholder:text-gray-400"
+                style={{ color: C.text }}
+                onFocus={(e) => {
+                  (e.currentTarget.parentElement as HTMLDivElement).style.borderColor = C.primary;
+                  (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow = `0 0 0 3px rgba(91,78,191,0.12)`;
+                }}
+                onBlur={(e) => {
+                  (e.currentTarget.parentElement as HTMLDivElement).style.borderColor = C.border;
+                  (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow = "none";
+                }}
+              />
+              <div
+                className="flex items-center justify-between px-4 py-2"
+                style={{ borderTop: `1px solid ${C.borderLight}`, backgroundColor: C.bg }}
+              >
+                <span className="text-xs" style={{ color: C.textSec }}>
+                  Markdown supported — your formatting will be preserved
+                </span>
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: answer.length > 50 ? C.success : C.textSec }}
+                >
+                  {answer.length} chars
+                </span>
+              </div>
+            </div>
+
+            <AttachmentZone file={attachment} onChange={setAttachment} />
+          </div>
+        </Card>
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={saveDraft}
+            disabled={answer.trim().length < 3 || isSavingDraft}
+          >
+            {isSavingDraft ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="animate-spin" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="8 8" strokeLinecap="round"/>
+                </svg>
+                Saving…
+              </span>
+            ) : "Save Draft"}
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            onClick={handleSubmit}
+            disabled={answer.trim().length < 10}
+          >
+            Submit Answer
+            <Icons.ChevronRight />
+          </Button>
+        </div>
+
+        {draftSavedAt && !isSavingDraft && (
+          <p className="text-center text-xs mt-2 flex items-center justify-center gap-1" style={{ color: C.success }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 6l2.5 3L10 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Draft saved at {draftSavedAt}
+          </p>
+        )}
+
+        <p className="text-center text-xs mt-2" style={{ color: C.textSec }}>
+          {question.type === "anon-private"
+            ? "The student can view the response in the anonymous thread. You will not learn their identity."
+            : question.type === "anon-public"
+            ? "Your response will be attributed to you publicly."
+            : "The student can view the response in their question thread."}
+        </p>
+      </main>
+    </div>
+  );
+}
+
+// ─── MENTOR DASHBOARD ─────────────────────────────────────────────────────────
+
+function MentorQuestionCard({
+  q,
+  onAnswer,
+  onReport,
+  reported,
+  compact = false,
+}: {
+  q: MentorQuestion;
+  onAnswer: (q: MentorQuestion) => void;
+  onReport: (q: MentorQuestion) => void;
+  reported: boolean;
+  compact?: boolean;
+}) {
+  const isAnon = q.asker === null;
+  const TYPE_BADGE: Record<MentorQuestion["type"], React.ReactNode> = {
+    private:      <PrivacyBadge type="private" />,
+    "any-mentor": <PrivacyBadge type="public" />,
+    "anon-public":  <span className="flex gap-1"><PrivacyBadge type="hidden" /><PrivacyBadge type="public" /></span>,
+    "anon-private": <span className="flex gap-1"><PrivacyBadge type="hidden" /><PrivacyBadge type="mentors" /></span>,
+  };
+
+  return (
+    <Card className="p-4">
+      {/* Asker row */}
+      <div className="flex items-center gap-2.5 mb-3">
+        {isAnon ? (
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: C.borderLight }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="5.5" r="3" stroke={C.textSec} strokeWidth="1.3" />
+              <path d="M2 14.5c0-3 2.686-4.5 6-4.5s6 1.5 6 4.5" stroke={C.textSec} strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </div>
+        ) : (
+          <img
+            src={q.asker!.photo}
+            alt={q.asker!.name}
+            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-sm" style={{ color: C.text }}>
+              {isAnon ? "Anonymous Mentee" : q.asker!.name}
+            </span>
+            {!isAnon && q.asker?.year && (
+              <span className="text-xs" style={{ color: C.textSec }}>
+                {q.asker.year}
+              </span>
+            )}
+            {q.priority === "high" && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                style={{ backgroundColor: C.errorLight, color: C.error }}
+              >
+                Urgent
+              </span>
+            )}
+          </div>
+          <div className="text-xs" style={{ color: C.textSec }}>
+            {q.date}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+          {TYPE_BADGE[q.type]}
+        </div>
+      </div>
+
+      {/* Question */}
+      <p
+        className="text-sm leading-snug mb-3 overflow-hidden"
+        style={{
+          color: C.text,
+          fontWeight: 500,
+          display: "-webkit-box",
+          WebkitLineClamp: compact ? 2 : 3,
+          WebkitBoxOrient: "vertical",
+        }}
+      >
+        {q.question}
+      </p>
+
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between gap-2 pt-3"
+        style={{ borderTop: `1px solid ${C.borderLight}` }}
+      >
+        <CategoryBadge category={q.category} />
+        <div className="flex items-center gap-2">
+          {typeof q.id === "string" && (
+            <button
+              type="button"
+              onClick={() => onReport(q)}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-xl transition-colors"
+              style={{
+                backgroundColor: reported ? C.successLight : C.borderLight,
+                color: reported ? C.success : C.textSec,
+              }}
+            >
+              {reported ? "Reported" : "Report"}
+            </button>
+          )}
+          <Button variant="primary" size="sm" onClick={() => onAnswer(q)}>
+            Answer
+            <Icons.ChevronRight />
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MentorDashboardScreen({
+  onNavigate,
+  onAnswerQuestion,
+  onToast,
+}: {
+  onNavigate: (s: Screen) => void;
+  onAnswerQuestion: (q: MentorQuestion) => void;
+  onToast: (t: ToastType, msg: string) => void;
+}) {
+  const [activeSection, setActiveSection] = useState<"all" | "waiting" | "any" | "anon">("all");
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const notifReadIds: number[] = [];
+  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [showAllMentees, setShowAllMentees] = useState(false);
+  const [reportingQuestion, setReportingQuestion] = useState<MentorQuestion | null>(null);
+  const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<string | number>>(new Set());
+  const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
+  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getMentorQueue()
+      .then((items) => {
+        if (!active) return;
+        const typed = items as MentorQuestion[];
+        setLiveMentorQuestions(typed);
+        setReportedQuestionIds(new Set(typed.filter((q) => q.reportedByMe).map((q) => q.id)));
+      })
+      .catch(() => {
+        if (active) setLiveMentorQuestions(null);
+      });
+
+    getMentorMentees()
+      .then((response) => {
+        if (active) setLiveMentees(response.items);
+      })
+      .catch(() => {
+        if (active) setLiveMentees(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    function h(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node))
+        setNotifOpen(false);
+    }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [notifOpen]);
+
+  async function sendMentorMessage() {
+    if (!messageTarget || !messageText.trim()) return;
+    try {
+      await sendMessage({ recipientId: messageTarget.id, body: messageText.trim() });
+      onToast("success", "Message sent to " + messageTarget.name + ".");
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", "Message sent to " + messageTarget.name + ".");
+      } else {
+        onToast("error", error instanceof Error ? error.message : "Unable to send the message.");
+        return;
+      }
+    }
+    setMessageTarget(null);
+    setMessageText("");
+  }
+
+  const waitingQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "private") ?? MENTOR_WAITING_QUESTIONS;
+  const anyQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "any-mentor") ?? MENTOR_ANY_QUESTIONS;
+  const anonQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "anon-public" || q.type === "anon-private") ??
+    MENTOR_ANON_QUESTIONS;
+
+  const displayMentees = liveMentees
+    ? liveMentees.map((m, index) => ({
+        ...MENTOR_MENTEES_DATA[index % MENTOR_MENTEES_DATA.length],
+        id: m.id,
+        name: m.name ?? "Mentee",
+        email: m.email,
+        totalQuestions: m.questionCount,
+      }))
+    : MENTOR_MENTEES_DATA;
+
+  const totalWaiting =
+    waitingQuestions.length +
+    anyQuestions.filter((q) => q.responses === 0).length +
+    anonQuestions.filter((q) => q.responses === 0).length;
+
+  const STATS = [
+    {
+      label: "Assigned Mentees",
+      value: displayMentees.length,
+      bg: C.successLight,
+      color: C.success,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M2 16c0-3.5 3.134-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      label: "Awaiting Response",
+      value: waitingQuestions.length,
+      bg: C.errorLight,
+      color: C.error,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M15 9.5c0 3-2.686 5.5-6 5.5a5.9 5.9 0 01-3-.8L2.5 15.5l.8-3A5.49 5.49 0 012 9.5c0-3 2.686-5.5 6-5.5s7 2.5 7 5.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M9 7v2.5M9 11h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      label: "Ask Any Mentor",
+      value: anyQuestions.length,
+      bg: C.primaryLight,
+      color: C.primary,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.4" />
+          <circle cx="13" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M1.5 16c0-3 2.5-4.5 5.5-4.5 1.5 0 2.8.4 3.8 1.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M11 16c0-2 1.5-3.5 5-3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      label: "Anonymous",
+      value: anonQuestions.length,
+      bg: C.pendingLight,
+      color: C.pending,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="4" y="8.5" width="10" height="8" rx="2" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M6.5 8.5V6.5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="9" cy="12.5" r="1" fill="currentColor" />
+        </svg>
+      ),
+    },
+    {
+      label: "Activity Today",
+      value: 5,
+      bg: "#EDE9FE",
+      color: "#7C3AED",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M2 9h2.5l2-5 3 10 2-7 1.5 4H16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
+          <Logo size="sm" />
+          <span
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+            style={{ backgroundColor: C.primaryLight, color: C.primary }}
+          >
+            Mentor Portal
+          </span>
+          <div className="flex-1" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onNavigate("dashboard")}
+              className="text-xs font-medium px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+              style={{ color: C.textSec, backgroundColor: C.borderLight }}
+            >
+              Switch to Student View
+            </button>
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setNotifOpen((o) => !o)}
+                className="relative p-2 rounded-xl"
+                style={{ color: C.textSec }}
+              >
+                <Icons.Bell />
+              </button>
+              {notifOpen && (
+                <NotificationDropdown
+                  notifications={ALL_NOTIFICATIONS}
+                  readIds={notifReadIds}
+                  onMarkRead={() => {}}
+                  onMarkAllRead={() => {}}
+                  onViewAll={() => setNotifOpen(false)}
+                  onOpenQuestion={() => setNotifOpen(false)}
+                />
+              )}
+            </div>
+            <button
+              onClick={() => onNavigate("mentor-profile")}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity rounded-xl px-2 py-1"
+            >
+              <div className="relative">
+                <img
+                  src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
+                  alt="Dr. Khaled"
+                  className="w-9 h-9 rounded-full object-cover"
+                />
+                <StatusDot available />
+              </div>
+              <div className="hidden sm:block text-left">
+                <div className="text-xs font-semibold" style={{ color: C.text }}>Dr. Khaled</div>
+                <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        {/* Greeting */}
+        <div className="mb-6 fade-in">
+          <h1 className="text-2xl font-bold mb-0.5" style={{ color: C.text }}>
+            Good morning, Dr. Khaled. 👋
+          </h1>
+          <p className="text-sm" style={{ color: C.textSec }}>
+            You have <strong style={{ color: C.error }}>{totalWaiting} questions</strong> waiting for your response today.
+          </p>
+        </div>
+
+        {/* Rewards banner */}
+        {(() => {
+          const tier = getMentorTier(MENTOR.points);
+          return (
+            <Card className="p-5 mb-6 fade-in flex items-center gap-5 flex-wrap">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
+                style={{ backgroundColor: tier.bg }}
+              >
+                {tier.emoji}
+              </div>
+              <div className="flex-1 min-w-[180px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="stat-numeral" style={{ color: tier.color }}>
+                    {MENTOR.points}
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: C.textSec }}>
+                    reward points
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MentorTierBadge points={MENTOR.points} size="md" />
+                  {tier.next && (
+                    <span className="text-xs" style={{ color: C.textSec }}>
+                      {tier.next.min - MENTOR.points} points to {tier.next.label}
+                    </span>
+                  )}
+                </div>
+                {tier.next && (
+                  <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight, maxWidth: 280 }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${tier.progress}%`, backgroundColor: tier.color, transition: "width 0.4s ease" }}
+                    />
+                  </div>
+                )}
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
+                🏆 Top Mentors
+              </Button>
+            </Card>
+          );
+        })()}
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
+          {STATS.map((s) => (
+            <div
+              key={s.label}
+              className="rounded-xl p-4 flex flex-col"
+              style={{ backgroundColor: s.bg, border: `1px solid ${s.color}22` }}
+            >
+              <div className="flex items-start justify-between mb-1">
+                <div style={{ color: s.color }}>{s.icon}</div>
+                <span className="stat-numeral" style={{ color: s.color }}>
+                  {s.value}
+                </span>
+              </div>
+              <div className="stat-label" style={{ color: s.color }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Section nav */}
+        <div
+          className="flex items-center gap-1 mb-6 p-1 rounded-xl w-fit"
+          style={{ backgroundColor: C.borderLight }}
+        >
+          {(
+            [
+              { v: "all",     label: "All Sections"  },
+              { v: "waiting", label: `Waiting (${waitingQuestions.length})` },
+              { v: "any",     label: `Ask Any Mentor (${anyQuestions.length})` },
+              { v: "anon",    label: `Anonymous (${anonQuestions.length})` },
+            ] as const
+          ).map(({ v, label }) => (
+            <button
+              key={v}
+              onClick={() => setActiveSection(v)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                backgroundColor: activeSection === v ? "#fff" : "transparent",
+                color: activeSection === v ? C.text : C.textSec,
+                boxShadow: activeSection === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* MY MENTEES */}
+        {(activeSection === "all") && (
+          <section className="mb-8 fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="section-accent-bar" style={{ backgroundColor: C.success, minHeight: 24 }} />
+                <h2 className="text-sm font-bold" style={{ color: C.text }}>My Mentees</h2>
+              </div>
+              <button
+                type="button"
+                className="text-xs font-semibold flex items-center gap-1"
+                style={{ color: C.primary }}
+                onClick={() => setShowAllMentees(true)}
+              >
+                View all <Icons.ChevronRight />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {displayMentees.map((m) => (
+                <Card key={m.id} className="p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={m.photo}
+                        alt={m.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <span className="absolute -bottom-0.5 -right-0.5">
+                        <StatusDot available={m.active} />
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm" style={{ color: C.text }}>
+                        {m.name}
+                      </div>
+                      <div className="text-xs" style={{ color: C.textSec }}>
+                        {m.year} · {m.track}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
+                        {m.active ? "● Active now" : `Last active: ${m.lastActivity}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="text-xs leading-snug mb-3 px-3 py-2 rounded-lg overflow-hidden"
+                    style={{
+                      backgroundColor: C.bg,
+                      border: `1px solid ${C.border}`,
+                      color: C.textSec,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                    }}
+                  >
+                    <strong style={{ color: C.text }}>Latest: </strong>
+                    {m.lastQuestion}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => { setMessageTarget(m); setMessageText(""); }}
+                    >
+                      <Icons.MessageCircle />
+                      Message
+                    </Button>
+                    <span className="text-xs ml-auto" style={{ color: C.textSec }}>
+                      {m.totalQuestions} questions
+                    </span>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* QUESTIONS WAITING FOR RESPONSE */}
+        {(activeSection === "all" || activeSection === "waiting") && (
+          <section className="mb-8 fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="section-accent-bar" style={{ backgroundColor: C.error, minHeight: 24 }} />
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: C.text }}>
+                    Questions Waiting for Response
+                  </h2>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: C.error }}
+                  >
+                    {waitingQuestions.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              {MENTOR_WAITING_QUESTIONS.map((q) => (
+                <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ASK ANY MENTOR + ANONYMOUS — 2 columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ASK ANY MENTOR */}
+          {(activeSection === "all" || activeSection === "any") && (
+            <section className="fade-in">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="section-accent-bar" style={{ backgroundColor: C.primary, minHeight: 24 }} />
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold" style={{ color: C.text }}>
+                      Ask Any Mentor
+                    </h2>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                      style={{ backgroundColor: C.primary }}
+                    >
+                      {anyQuestions.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                {MENTOR_ANY_QUESTIONS.map((q) => (
+                  <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                  compact
+                />
+                ))}
+                <p className="text-xs px-1" style={{ color: C.textSec }}>
+                  These questions were submitted to all mentors at the school. Your response will be visible to the student and their peers.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* ANONYMOUS QUESTIONS */}
+          {(activeSection === "all" || activeSection === "anon") && (
+            <section className="fade-in">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="section-accent-bar" style={{ backgroundColor: C.pending, minHeight: 24 }} />
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold" style={{ color: C.text }}>
+                      Anonymous Questions
+                    </h2>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                      style={{ backgroundColor: C.pending }}
+                    >
+                      {anonQuestions.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                {MENTOR_ANON_QUESTIONS.map((q) => (
+                  <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                  compact
+                />
+                ))}
+                {/* Privacy reminder */}
+                <div
+                  className="flex items-start gap-2 px-3 py-3 rounded-xl text-xs"
+                  style={{ backgroundColor: "#FFF8ED", border: `1px solid #FCD34D` }}
+                >
+                  <span className="flex-shrink-0">🔒</span>
+                  <span style={{ color: "#78350F" }}>
+                    <strong>Student identities are always hidden.</strong> You will never see a student's name, email, photo, or ID on anonymous questions — not even after responding. The student can continue the conversation while remaining anonymous.
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
+
+      {reportingQuestion && typeof reportingQuestion.id === "string" && (
+        <ReportQuestionModal
+          questionId={reportingQuestion.id}
+          questionTitle={reportingQuestion.question}
+          onClose={() => setReportingQuestion(null)}
+          onReported={() => {
+            setReportedQuestionIds((prev) => new Set(prev).add(reportingQuestion.id as string));
+          }}
+          onToast={onToast}
+        />
+      )}
+
+      {showAllMentees && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAllMentees(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl card-shadow-lg w-full max-w-2xl max-h-[80vh] overflow-hidden fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: "1px solid " + C.border }}
+            >
+              <div>
+                <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
+                <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllMentees(false)}
+                className="text-lg px-2 hover:opacity-70"
+                style={{ color: C.textSec }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex flex-col gap-3">
+              {displayMentees.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{ backgroundColor: C.bg, border: "1px solid " + C.border }}
+                >
+                  <div className="relative flex-shrink-0">
+                    <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover" />
+                    <span className="absolute -bottom-0.5 -right-0.5">
+                      <StatusDot available={m.active} />
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold" style={{ color: C.text }}>{m.name}</div>
+                    <div className="text-xs" style={{ color: C.textSec }}>{m.year} · {m.track}</div>
+                    <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
+                      {m.active ? "● Active now" : "Last active: " + m.lastActivity}
+                    </div>
+                  </div>
+                  <span className="text-xs" style={{ color: C.textSec }}>
+                    {m.totalQuestions} questions
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {messageTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setMessageTarget(null);
+              setMessageText("");
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl card-shadow-lg w-full max-w-md fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-3">
+                <img src={messageTarget.photo} alt={messageTarget.name} className="w-9 h-9 rounded-full object-cover" />
+                <div>
+                  <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
+                  <div className="text-xs" style={{ color: C.textSec }}>{messageTarget.year} · {messageTarget.track}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setMessageTarget(null); setMessageText(""); }}
+                className="p-1.5 rounded-lg hover:opacity-70"
+                style={{ color: C.textSec }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5">
+              <textarea
+                autoFocus
+                rows={6}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Write a message to your mentee…"
+                className="w-full px-3.5 py-3 rounded-xl text-sm outline-none resize-none"
+                style={{ border: `1.5px solid ${C.border}`, color: C.text, backgroundColor: "#fff" }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = C.primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px rgba(91,78,191,0.12)`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              />
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setMessageTarget(null); setMessageText(""); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!messageText.trim()}
+                  onClick={() => {
+                    onToast("success", `Message sent to ${messageTarget.name}.`);
+                    setMessageTarget(null);
+                    setMessageText("");
+                  }}
+                >
+                  Send Message
+                </Button>
+              </div>
+              <p className="text-xs mt-3" style={{ color: C.textSec }}>
+                Demo mode: this opens a working placeholder message composer. Backend messaging can be connected later.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ADMIN COMPONENTS ────────────────────────────────────────────────────────
 
 type AdminSection = "dashboard" | "users" | "mentors" | "questions" | "moderation" | "reports" | "settings";
@@ -4276,6 +7183,8 @@ function ReportQuestionModal({
   );
 }
 
+
+
 // ─── MODERATION REVIEW PANEL ───────────────────────────────────────────────────
 
 function ModerationReviewPanel({
@@ -4287,8 +7196,8 @@ function ModerationReviewPanel({
 }: {
   item: ModerationItem;
   onClose: () => void;
-  onApprove: (id: string | number) => void;
-  onReject: (id: string | number, reason: string) => void;
+  onApprove: (id: number) => void;
+  onReject: (id: number, reason: string) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [modal, setModal] = useState<"approve" | "reject" | null>(null);
@@ -5520,17 +8429,10 @@ function MenteeProfileScreen({
   const availYears = ["M1", "M2", "M3", "M4", "Resident", "Fellow"];
   const availTracks = ["Preclinical", "Clinical Rotations", "Research Year", "Combined"];
 
-  async function saveEdit() {
-    try {
-      const updated = await updateMe({ name: draft.name.trim() || null });
-      const next = { ...draft, name: updated.name ?? draft.name, interests };
-      setProfile(next);
-      setDraft(next);
-      setEditMode(false);
-      onToast("success", "Profile updated successfully.");
-    } catch (error) {
-      onToast("error", error instanceof Error ? error.message : "Unable to update profile.");
-    }
+  function saveEdit() {
+    setProfile({ ...draft, interests });
+    setEditMode(false);
+    onToast("success", "Profile updated successfully.");
   }
 
   function cancelEdit() {
@@ -5774,31 +8676,11 @@ function MentorProfileScreen({
   const [profile, setProfile] = useState(MENTOR_PROFILE_DATA);
   const [draft, setDraft] = useState(profile);
   const [expertise, setExpertise] = useState(profile.expertise);
-  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; questionCount: number }>>([]);
 
-  useEffect(() => {
-    let active = true;
-    getMentorMentees()
-      .then((response) => {
-        if (active) setLiveMentees(response.items);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function saveEdit() {
-    try {
-      const updated = await updateMe({ name: draft.name.trim() || null });
-      const next = { ...draft, name: updated.name ?? draft.name, expertise };
-      setProfile(next);
-      setDraft(next);
-      setEditMode(false);
-      onToast("success", "Profile updated successfully.");
-    } catch (error) {
-      onToast("error", error instanceof Error ? error.message : "Unable to update profile.");
-    }
+  function saveEdit() {
+    setProfile({ ...draft, expertise });
+    setEditMode(false);
+    onToast("success", "Profile updated successfully.");
   }
   function cancelEdit() {
     setDraft(profile);
@@ -5964,7 +8846,7 @@ function MentorProfileScreen({
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.successLight, color: C.success }}>
                   Verified Mentor
                 </span>
-                <MentorTierBadge points={CURRENT_MENTOR_POINTS} />
+                <MentorTierBadge points={MENTOR.points} />
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.borderLight, color: C.textSec }}>
                   Member since {profile.memberSince}
                 </span>
@@ -5998,7 +8880,7 @@ function MentorProfileScreen({
 
         {/* Mentor Rewards */}
         {(() => {
-          const tier = getMentorTier(CURRENT_MENTOR_POINTS);
+          const tier = getMentorTier(MENTOR.points);
           return (
             <Card className="p-5">
               <div className="flex items-center justify-between mb-3">
@@ -6020,7 +8902,7 @@ function MentorProfileScreen({
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="stat-numeral" style={{ color: tier.color }}>{CURRENT_MENTOR_POINTS}</span>
+                    <span className="stat-numeral" style={{ color: tier.color }}>{MENTOR.points}</span>
                     <span className="text-xs font-medium" style={{ color: C.textSec }}>points · {tier.label}</span>
                   </div>
                   {tier.next && (
@@ -6032,7 +8914,7 @@ function MentorProfileScreen({
                         />
                       </div>
                       <p className="text-xs mt-1" style={{ color: C.textSec }}>
-                        {tier.next.min - CURRENT_MENTOR_POINTS} points to {tier.next.emoji} {tier.next.label}
+                        {tier.next.min - MENTOR.points} points to {tier.next.emoji} {tier.next.label}
                       </p>
                     </>
                   )}
@@ -6083,16 +8965,7 @@ function MentorProfileScreen({
         <Card className="p-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Current Mentees</h3>
           <div className="flex flex-col gap-2">
-            {(liveMentees.length > 0
-              ? liveMentees.map((m, index) => ({
-                  ...MENTOR_MENTEES_DATA[index % MENTOR_MENTEES_DATA.length],
-                  id: m.id,
-                  name: m.name ?? "Mentee",
-                  email: m.email,
-                  totalQuestions: m.questionCount,
-                }))
-              : MENTOR_MENTEES_DATA
-            ).map(m => (
+            {MENTOR_MENTEES_DATA.map(m => (
               <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
                 <div className="relative">
                   <img src={m.photo} alt={m.name} className="w-9 h-9 rounded-full object-cover" />
@@ -6149,7 +9022,7 @@ function LeaderboardScreen({
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {CURRENT_LEADERBOARD_MENTORS.map((m, idx) => {
+          {LEADERBOARD_MENTORS.map((m, idx) => {
             const tier = getMentorTier(m.points);
             const rank = idx + 1;
             const isTop3 = rank <= 3;
@@ -6192,10 +9065,12 @@ function MobileNav({
   role,
   screen,
   onNavigate,
+  notifCount,
 }: {
   role: Role;
   screen: Screen;
   onNavigate: (s: Screen) => void;
+  notifCount: number;
 }) {
   const menteeItems = [
     {
@@ -6216,6 +9091,19 @@ function MobileNav({
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
           <circle cx="11" cy="11" r="8.5" stroke="currentColor" strokeWidth="1.5" fill={active ? "currentColor" : "none"} fillOpacity={active ? 0.12 : 0}/>
           <path d="M11 7v4M11 13.5h.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+      ),
+    },
+    {
+      s: "notifications-page" as Screen,
+      label: "Alerts",
+      badge: notifCount,
+      icon: (active: boolean) => (
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 3a6 6 0 016 6v3.5l1.5 2.5H3.5L5 12.5V9a6 6 0 016-6z"
+            stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+            fill={active ? "currentColor" : "none"} fillOpacity={active ? 0.12 : 0}/>
+          <path d="M9 18a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       ),
     },
@@ -6256,6 +9144,18 @@ function MobileNav({
       ),
     },
     {
+      s: "notifications-page" as Screen,
+      label: "Questions",
+      badge: MENTOR_WAITING_QUESTIONS.length,
+      icon: (active: boolean) => (
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M19 11c0 3.5-3.582 7-8 7-.9 0-1.76-.14-2.53-.4L3 19.5l.8-3.5A7 7 0 014 11c0-3.5 3.582-7 8-7s7 3.5 7 7z"
+            stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+            fill={active ? "currentColor" : "none"} fillOpacity={active ? 0.12 : 0}/>
+        </svg>
+      ),
+    },
+    {
       s: "mentor-profile" as Screen,
       label: "Profile",
       icon: (active: boolean) => (
@@ -6274,6 +9174,7 @@ function MobileNav({
 
   const isActive = (s: Screen) => {
     if (s === screen) return true;
+    if (s === "notifications-page" && screen === "notifications-page") return true;
     return false;
   };
 
