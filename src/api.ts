@@ -189,6 +189,7 @@ export async function getMentorQueue() {
       : null,
     responses: q.answerCount,
     isAnonymous: q.isAnonymous,
+    reportedByMe: q.reportedByMe,
     status: q.status,
   }));
 }
