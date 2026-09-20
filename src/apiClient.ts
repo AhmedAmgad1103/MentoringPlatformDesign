@@ -2,6 +2,8 @@ export type QuestionCategory =
   | "BOARD_EXAMS"
   | "WELLNESS_BURNOUT"
   | "CLINICAL_ROTATIONS"
+  | "CLINICAL_SKILLS"
+  | "RESIDENCY_MATCH"
   | "ACADEMICS"
   | "CAREER"
   | "RESEARCH"
