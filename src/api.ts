@@ -7,6 +7,7 @@ import {
   getMentorProfile,
   getMentors as getMentorsApi,
   getAdminUsers as getAdminUsersApi,
+  getAdminStats as getAdminStatsApi,
   getAdminMentors as getAdminMentorsApi,
   assignMentor as assignMentorApi,
   unassignMentor as unassignMentorApi,
@@ -91,6 +92,10 @@ function categoryLabel(category: QuestionCategory) {
 export async function getQuestions(): Promise<DemoQuestion[]> {
   const response = await getQuestionsApi({ scope: "mine", limit: 50 });
   return response.items.map(mapQuestion);
+}
+
+export async function getAdminStats() {
+  return getAdminStatsApi();
 }
 
 export async function getAdminQuestions() {
