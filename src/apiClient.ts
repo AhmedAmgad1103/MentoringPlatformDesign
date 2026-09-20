@@ -48,6 +48,17 @@ export type ApiAnswer = {
   mentor: { id: string; name: string | null }
 }
 
+
+export type ApiMessage = {
+  id: string
+  content: string
+  createdAt: string
+  updatedAt: string
+  readAt: string | null
+  senderId: string
+  recipientId: string
+}
+
 export type ApiUser = {
   id: string
   email: string
@@ -341,5 +352,62 @@ export async function updateMe(input: { name: string | null }) {
   return request<ApiUser>("/api/me", {
     method: "PATCH",
     body: JSON.stringify(input),
+  })
+}
+
+export async function sendMessage(
+  recipientId: string,
+  content: string
+) {
+  return request<{ item: ApiMessage }>("/api/messages", {
+    method: "POST",
+    body: JSON.stringify({ recipientId, content }),
+  })
+}
+
+export async function getMessages(
+  withUserId: string,
+  before?: string
+) {
+  const params = new URLSearchParams({ withUserId })
+  if (before) params.set("before", before)
+  return request<{ items: ApiMessage[]; hasMore: boolean }>(
+    `/api/messages?${params.toString()}`
+  )
+}
+
+export async function boostQuestion(questionId: string) {
+  return request<{
+    boosted: true
+    boostCount: number
+    boostedByMe: true
+  }>(`/api/questions/${encodeURIComponent(questionId)}/boost`, {
+    method: "POST",
+  })
+}
+
+export async function unboostQuestion(questionId: string) {
+  return request<{
+    boosted: false
+    boostCount: number
+    boostedByMe: false
+  }>(`/api/questions/${encodeURIComponent(questionId)}/boost`, {
+    method: "DELETE",
+  })
+}
+
+export async function updateQuestionStatus(
+  questionId: string,
+  status: "CLOSED" | "AWAITING_RESPONSE"
+) {
+  return request<{
+    item: {
+      id: string
+      status: QuestionStatus
+      updatedAt: string
+    }
+  }>(`/api/questions/${encodeURIComponent(questionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   })
 }
