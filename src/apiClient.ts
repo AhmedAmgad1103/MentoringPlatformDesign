@@ -224,30 +224,6 @@ export async function deleteAnswer(questionId: string, answerId: string) {
   )
 }
 
-export async function approveQuestion(questionId: string) {
-  return request<{
-    item: {
-      id: string
-      moderationStatus: ModerationStatus
-      status: QuestionStatus
-    }
-  }>(`/api/admin/questions/${encodeURIComponent(questionId)}/approve`, {
-    method: "POST",
-  })
-}
-
-export async function rejectQuestion(questionId: string) {
-  return request<{
-    item: {
-      id: string
-      moderationStatus: ModerationStatus
-      status: QuestionStatus
-    }
-  }>(`/api/admin/questions/${encodeURIComponent(questionId)}/reject`, {
-    method: "POST",
-  })
-}
-
 export async function getMentors() {
   return request<
     Array<{
