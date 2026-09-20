@@ -202,13 +202,12 @@ export async function getMentorQueue() {
 
   return [...assigned.items, ...community.items].map((q) => ({
     id: q.id,
-    type:
-      q.mentor?.id
-        ? q.isAnonymous
-          ? q.visibility === "PRIVATE"
-            ? "anon-private"
-            : "anon-public"
-          : "private"
+    type: q.isAnonymous
+      ? q.visibility === "PRIVATE"
+        ? "anon-private"
+        : "anon-public"
+      : q.mentor?.id
+        ? "private"
         : "any-mentor",
     question: q.title,
     content: q.content,
