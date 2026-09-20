@@ -45,6 +45,20 @@ function mapQuestion(q: ApiQuestion): DemoQuestion {
   };
 }
 
+function categoryValue(category: string): QuestionCategory {
+  const values: Record<string, QuestionCategory> = {
+    "Board Exams": "BOARD_EXAMS",
+    "Wellness & Burnout": "WELLNESS_BURNOUT",
+    "Clinical Rotations": "CLINICAL_ROTATIONS",
+    Academics: "ACADEMICS",
+    Career: "CAREER",
+    Research: "RESEARCH",
+    "Study Skills": "STUDY_SKILLS",
+    Other: "OTHER",
+  };
+  return values[category] ?? (category as QuestionCategory) ?? "OTHER";
+}
+
 function categoryLabel(category: QuestionCategory) {
   const labels: Record<QuestionCategory, string> = {
     BOARD_EXAMS: "Board Exams",
@@ -91,7 +105,7 @@ export async function createQuestion(input: {
   const created = await createQuestionApi({
     title: input.title,
     body: input.body,
-    category: (input.category || "OTHER") as QuestionCategory,
+    category: categoryValue(input.category || "Other"),
     askType,
     privacy,
   });
