@@ -1120,6 +1120,7 @@ interface MentorQuestion {
   id: string | number;
   type: "private" | "any-mentor" | "anon-public" | "anon-private";
   question: string;
+  content?: string;
   category: string;
   date: string;
   priority?: "high" | "normal";
@@ -3423,89 +3424,58 @@ function QuestionDetailScreen({
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [sort, setSort] = useState<"helpful" | "newest">("helpful");
-  const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
-  const [boostedIds, setBoostedIds] = useState<Set<string | number>>(new Set());
+  const [helpfulVotes, setHelpfulVotes] = useState<Set<string | number>>(new Set());
   const [liveQuestion, setLiveQuestion] =
     useState<Awaited<ReturnType<typeof getQuestionDetails>> | null>(null);
+  const [loading, setLoading] = useState(typeof questionId === "string");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(false);
+  const [boosted, setBoosted] = useState(false);
+  const [boostCount, setBoostCount] = useState(0);
 
   useEffect(() => {
     if (typeof questionId !== "string") {
+      setLoading(false);
+      setLoadError(null);
       setLiveQuestion(null);
       return;
     }
 
     let active = true;
+    setLoading(true);
+    setLoadError(null);
+
     getQuestionDetails(questionId)
       .then((item) => {
         if (!active) return;
         setLiveQuestion(item);
         setReported(Boolean(item.reportedByMe));
-        setBoostedIds(item.boostedByMe ? new Set([item.id]) : new Set());
+        setBoosted(Boolean(item.boostedByMe));
+        setBoostCount(item.boostCount);
       })
-      .catch(() => {
-        if (active) setLiveQuestion(null);
+      .catch((error) => {
+        if (!active) return;
+        setLiveQuestion(null);
+        setLoadError(
+          error instanceof Error ? error.message : "Unable to load this question."
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
 
     return () => {
       active = false;
     };
   }, [questionId]);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
 
-  async function toggleBoost(id: string | number) {
-    if (typeof id !== "string") {
-      setBoostedIds((prev) => {
-        const next = new Set(prev);
-        next.has(id) ? next.delete(id) : next.add(id);
-        return next;
-      });
-      return;
-    }
-
-    const alreadyBoosted = boostedIds.has(id);
-    try {
-      if (alreadyBoosted) {
-        await unboostQuestion(id);
-        setBoostedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        setLiveQuestion((prev) =>
-          prev ? { ...prev, boostedByMe: false, boostCount: Math.max(0, prev.boostCount - 1) } : prev
-        );
-      } else {
-        const result = await boostQuestion(id);
-        setBoostedIds((prev) => new Set(prev).add(id));
-        setLiveQuestion((prev) =>
-          prev ? { ...prev, boostedByMe: true, boostCount: result.boostCount } : prev
-        );
-      }
-    } catch (error) {
-      onToast(
-        "error",
-        error instanceof Error ? error.message : "Unable to update boost."
-      );
-    }
-  }
-
-  const unread = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
-
-  useEffect(() => {
-    if (!notifOpen) return;
-    function h(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node))
-        setNotifOpen(false);
-    }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [notifOpen]);
+  const unread = ALL_NOTIFICATIONS.filter(
+    (n) => !n.read && !notifReadIds.includes(n.id)
+  ).length;
 
   const fallbackQuestion =
-    FEED_QUESTIONS.find((q) => q.id === questionId) || FEED_QUESTIONS[0];
+    FEED_QUESTIONS.find((q) => q.id === questionId) ?? FEED_QUESTIONS[0];
 
   const question: FeedQuestion = liveQuestion
     ? {
@@ -3521,56 +3491,81 @@ function QuestionDetailScreen({
         tags: [],
         reportedByMe: liveQuestion.reportedByMe,
         isMine: liveQuestion.isMine,
+        isAnonymous: liveQuestion.isAnonymous,
       }
     : fallbackQuestion;
 
-  const RESPONSES_EXTENDED = liveQuestion
-    ? liveQuestion.answers.map((a, i) => ({
-        id: a.id as any,
+  const questionContent = liveQuestion?.content ?? question.full;
+  const isAnonymous = liveQuestion?.isAnonymous ?? question.isAnonymous ?? true;
+  const canReport =
+    Boolean(liveQuestion) &&
+    !liveQuestion?.isMine &&
+    liveQuestion?.visibility === "PUBLIC" &&
+    (liveQuestion?.moderationStatus === "APPROVED" ||
+      liveQuestion?.moderationStatus === "NOT_REQUIRED") &&
+    typeof liveQuestion?.id === "string";
+
+  const responses = liveQuestion
+    ? (Array.isArray(liveQuestion.answers) ? liveQuestion.answers : []).map((a) => ({
+        id: a.id,
         mentor: {
-          name: a.mentor.name ?? "Mentor",
+          name: a.mentor?.name ?? "Mentor",
           specialty: "Physician Mentor",
-          photo: MENTOR.photo,
+          photo:
+            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=80&h=80&fit=crop&auto=format",
           expertise: [],
         },
         answer: a.content,
         timestamp: new Date(a.createdAt).toLocaleString(),
-        helpfulCount: Math.max(0, liveQuestion.answers.length - i),
+        helpfulCount: 0,
       }))
-    : [
-    ...SAMPLE_RESPONSES,
-    {
-      id: 4,
-      mentor: {
-        name: "Dr. Amara Osei",
-        specialty: "Family Medicine",
-        photo: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=80&h=80&fit=crop&auto=format",
-        expertise: ["Study Skills", "Wellness & Burnout"],
-      },
-      answer:
-        "One strategy that's consistently underrated: find even one study partner for daily accountability check-ins — not for content review, just for emotional grounding and keeping each other on track. The isolation of dedicated is itself a performance variable that most students don't account for. Even a 20-minute morning walk with a colleague can stabilize your output going into an afternoon block.",
-      timestamp: "3 days ago",
-      helpfulCount: 5,
-    },
-    ];
+    : [];
 
-  const sortedResponses = [...RESPONSES_EXTENDED].sort((a, b) => {
-    if (sort === "helpful")
+  const sortedResponses = [...responses].sort((a, b) => {
+    if (sort === "helpful") {
       return (
         b.helpfulCount +
         (helpfulVotes.has(b.id) ? 1 : 0) -
         (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0))
       );
-    return String(b.id).localeCompare(String(a.id));
+    }
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
-  const related = FEED_QUESTIONS.filter(
-    (q) => q.id !== questionId && q.category === question.category
-  ).slice(0, 3);
-  const fallbackRelated = FEED_QUESTIONS.filter((q) => q.id !== questionId).slice(0, 3);
+  const related = FEED_QUESTIONS
+    .filter((q) => q.id !== questionId && q.category === question.category)
+    .slice(0, 3);
+  const fallbackRelated = FEED_QUESTIONS
+    .filter((q) => q.id !== questionId)
+    .slice(0, 3);
   const relatedToShow = related.length >= 2 ? related : fallbackRelated;
 
-  function toggleHelpful(id: number) {
+  async function toggleBoost() {
+    if (typeof question.id !== "string") {
+      setBoosted((prev) => !prev);
+      setBoostCount((prev) => prev + (boosted ? -1 : 1));
+      return;
+    }
+
+    try {
+      if (boosted) {
+        const result = await unboostQuestion(question.id);
+        setBoosted(false);
+        setBoostCount(result.boostCount);
+      } else {
+        const result = await boostQuestion(question.id);
+        setBoosted(true);
+        setBoostCount(result.boostCount);
+      }
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update boost."
+      );
+    }
+  }
+
+  function toggleHelpful(id: string | number) {
     setHelpfulVotes((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -3580,7 +3575,6 @@ function QuestionDetailScreen({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      {/* Header */}
       <header
         className="sticky top-0 z-30 bg-white"
         style={{ borderBottom: `1px solid ${C.border}` }}
@@ -3595,1787 +3589,315 @@ function QuestionDetailScreen({
             Questions
           </button>
           <div className="flex-1 min-w-0">
-            <p
-              className="text-sm font-semibold truncate"
-              style={{ color: C.text }}
-            >
+            <p className="text-sm font-semibold truncate" style={{ color: C.text }}>
               {question.title}
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <button
-              onClick={() => onNavigate("mentor-profile")}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity rounded-xl px-2 py-1"
-            >
-              <div className="relative">
-                <img
-                  src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-                  alt="Dr. Khaled"
-                  className="w-9 h-9 rounded-full object-cover"
-                />
-                <StatusDot available />
-              </div>
-              <div className="hidden sm:block text-left">
-                <div className="text-xs font-semibold" style={{ color: C.text }}>Dr. Khaled</div>
-                <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine</div>
-              </div>
-            </button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                onClick={() => onNavigate("notifications-page")}
+                className="p-2 rounded-xl"
+                style={{ color: C.textSec }}
+                title={`${unread} unread notifications`}
+              >
+                <Icons.Bell />
+                {unread > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
+                    style={{ backgroundColor: C.error, fontSize: 9 }}
+                  >
+                    {unread}
+                  </span>
+                )}
+              </button>
+            </div>
+            <Logo size="sm" />
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        {/* Greeting */}
-        <div className="mb-6 fade-in">
-          <h1 className="text-2xl font-bold mb-0.5" style={{ color: C.text }}>
-            Good morning, Dr. Khaled. 👋
-          </h1>
-          <p className="text-sm" style={{ color: C.textSec }}>
-            You have <strong style={{ color: C.error }}>{totalWaiting} questions</strong> waiting for your response today.
-          </p>
-        </div>
+      <main className="max-w-4xl mx-auto px-6 py-8 fade-in">
+        {loading && (
+          <Card className="p-10 text-center mb-6">
+            <p className="text-sm" style={{ color: C.textSec }}>
+              Loading question…
+            </p>
+          </Card>
+        )}
 
-        {/* Rewards banner */}
-        {(() => {
-          const tier = getMentorTier(CURRENT_MENTOR_POINTS);
-          return (
-            <Card className="p-5 mb-6 fade-in flex items-center gap-5 flex-wrap">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
-                style={{ backgroundColor: tier.bg }}
-              >
-                {tier.emoji}
-              </div>
-              <div className="flex-1 min-w-[180px]">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="stat-numeral" style={{ color: tier.color }}>
-                    {CURRENT_MENTOR_POINTS}
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: C.textSec }}>
-                    reward points
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MentorTierBadge points={CURRENT_MENTOR_POINTS} size="md" />
-                  {tier.next && (
-                    <span className="text-xs" style={{ color: C.textSec }}>
-                      {tier.next.min - CURRENT_MENTOR_POINTS} points to {tier.next.label}
-                    </span>
-                  )}
-                </div>
-                {tier.next && (
-                  <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight, maxWidth: 280 }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${tier.progress}%`, backgroundColor: tier.color, transition: "width 0.4s ease" }}
+        {loadError && !liveQuestion && (
+          <Card className="p-6 mb-6" style={{ borderColor: C.error }}>
+            <h2 className="text-base font-bold mb-2" style={{ color: C.text }}>
+              Could not load this question
+            </h2>
+            <p className="text-sm mb-4" style={{ color: C.textSec }}>
+              {loadError}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={onBack}>Back</Button>
+              {typeof questionId === "string" && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setLoadError(null);
+                    setLoading(true);
+                    getQuestionDetails(questionId)
+                      .then((item) => {
+                        setLiveQuestion(item);
+                        setReported(Boolean(item.reportedByMe));
+                        setBoosted(Boolean(item.boostedByMe));
+                        setBoostCount(item.boostCount);
+                      })
+                      .catch((error) =>
+                        setLoadError(
+                          error instanceof Error
+                            ? error.message
+                            : "Unable to load this question."
+                        )
+                      )
+                      .finally(() => setLoading(false));
+                  }}
+                >
+                  Try again
+                </Button>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {!loading && !loadError && (
+          <>
+            <Card className="p-6 mb-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: C.borderLight }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="7" r="4" stroke={C.textSec} strokeWidth="1.4" />
+                    <path
+                      d="M3 19c0-3.866 3.134-6 7-6s7 2.134 7 6"
+                      stroke={C.textSec}
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
                     />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={{ color: C.text }}>
+                    {isAnonymous ? "Anonymous Mentee" : liveQuestion?.student?.name ?? "Student"}
+                  </div>
+                  <div className="text-xs" style={{ color: C.textSec }}>
+                    {question.date}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {isAnonymous && <PrivacyBadge type="hidden" />}
+                  <PrivacyBadge type={liveQuestion?.visibility === "PUBLIC" ? "public" : "private"} />
+                  <CategoryBadge category={question.category} />
+                </div>
+              </div>
+
+              <h1 className="text-xl font-bold mb-3 leading-snug" style={{ color: C.text }}>
+                {question.title}
+              </h1>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap mb-5" style={{ color: C.text }}>
+                {questionContent}
+              </p>
+
+              <div
+                className="flex items-center gap-3 flex-wrap pt-4"
+                style={{ borderTop: `1px solid ${C.border}` }}
+              >
+                <span className="text-xs" style={{ color: C.textSec }}>
+                  <strong style={{ color: C.text }}>
+                    {liveQuestion?.answerCount ?? question.responses}
+                  </strong>{" "}
+                  {(liveQuestion?.answerCount ?? question.responses) === 1 ? "answer" : "answers"}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => void toggleBoost()}
+                  disabled={Boolean(liveQuestion) && !liveQuestion?.isMine === false}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{
+                    backgroundColor: boosted ? C.primary : C.primaryLight,
+                    color: boosted ? "#fff" : C.primary,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
+                  </svg>
+                  {boostCount || question.boosted}
+                </button>
+
+                {canReport && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!reported) setReportOpen(true);
+                      }}
+                      className="text-xs font-medium px-2.5 py-1.5 rounded-xl"
+                      style={{
+                        backgroundColor: reported ? C.successLight : C.borderLight,
+                        color: reported ? C.success : C.textSec,
+                      }}
+                    >
+                      {reported ? "Reported" : "Report"}
+                    </button>
+                    {reported && (
+                      <span className="text-xs" style={{ color: C.success }}>
+                        This post has been reported to an admin.
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+
+            <section className="mb-8">
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <h2 className="font-bold text-base" style={{ color: C.text }}>
+                  Mentor Responses
+                  <span
+                    className="ml-2 px-2 py-0.5 rounded-full text-sm font-semibold"
+                    style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                  >
+                    {responses.length}
+                  </span>
+                </h2>
+
+                {responses.length > 0 && (
+                  <div
+                    className="flex items-center gap-1 p-1 rounded-xl"
+                    style={{ backgroundColor: C.borderLight }}
+                  >
+                    {(["helpful", "newest"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSort(s)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize"
+                        style={{
+                          backgroundColor: sort === s ? "#fff" : "transparent",
+                          color: sort === s ? C.text : C.textSec,
+                        }}
+                      >
+                        {s === "helpful" ? "Most Helpful" : "Newest"}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
-              <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
-                🏆 Top Mentors
-              </Button>
-            </Card>
-          );
-        })()}
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
-          {STATS.map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl p-4 flex flex-col"
-              style={{ backgroundColor: s.bg, border: `1px solid ${s.color}22` }}
-            >
-              <div className="flex items-start justify-between mb-1">
-                <div style={{ color: s.color }}>{s.icon}</div>
-                <span className="stat-numeral" style={{ color: s.color }}>
-                  {s.value}
-                </span>
-              </div>
-              <div className="stat-label" style={{ color: s.color }}>
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Section nav */}
-        <div
-          className="flex items-center gap-1 mb-6 p-1 rounded-xl w-fit"
-          style={{ backgroundColor: C.borderLight }}
-        >
-          {(
-            [
-              { v: "all",     label: "All Sections"  },
-              { v: "waiting", label: `Waiting (${waitingQuestions.length})` },
-              { v: "any",     label: `Ask Any Mentor (${anyQuestions.length})` },
-              { v: "anon",    label: `Anonymous (${anonQuestions.length})` },
-            ] as const
-          ).map(({ v, label }) => (
-            <button
-              key={v}
-              onClick={() => setActiveSection(v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{
-                backgroundColor: activeSection === v ? "#fff" : "transparent",
-                color: activeSection === v ? C.text : C.textSec,
-                boxShadow: activeSection === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* MY MENTEES */}
-        {(activeSection === "all") && (
-          <section className="mb-8 fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="section-accent-bar" style={{ backgroundColor: C.success, minHeight: 24 }} />
-                <h2 className="text-sm font-bold" style={{ color: C.text }}>My Mentees</h2>
-              </div>
-              <button
-                type="button"
-                className="text-xs font-semibold flex items-center gap-1"
-                style={{ color: C.primary }}
-                onClick={() => setShowAllMentees(true)}
-              >
-                View all <Icons.ChevronRight />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {displayMentees.map((m) => (
-                <Card key={m.id} className="p-4">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="relative flex-shrink-0">
-                      <img
-                        src={m.photo}
-                        alt={m.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <span className="absolute -bottom-0.5 -right-0.5">
-                        <StatusDot available={m.active} />
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm" style={{ color: C.text }}>
-                        {m.name}
-                      </div>
-                      <div className="text-xs" style={{ color: C.textSec }}>
-                        {m.year} · {m.track}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
-                        {m.active ? "● Active now" : `Last active: ${m.lastActivity}`}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className="text-xs leading-snug mb-3 px-3 py-2 rounded-lg overflow-hidden"
-                    style={{
-                      backgroundColor: C.bg,
-                      border: `1px solid ${C.border}`,
-                      color: C.textSec,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                    }}
-                  >
-                    <strong style={{ color: C.text }}>Latest: </strong>
-                    {m.lastQuestion}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => selectMenteeForMessage(m)}
-                    >
-                      <Icons.MessageCircle />
-                      Message
-                    </Button>
-                    <span className="text-xs ml-auto" style={{ color: C.textSec }}>
-                      {m.totalQuestions} questions
-                    </span>
-                  </div>
+              {responses.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <p className="text-sm font-medium mb-1" style={{ color: C.text }}>
+                    No mentor responses yet
+                  </p>
+                  <p className="text-xs" style={{ color: C.textSec }}>
+                    Your question is waiting for a mentor response.
+                  </p>
                 </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* QUESTIONS WAITING FOR RESPONSE */}
-        {(activeSection === "all" || activeSection === "waiting") && (
-          <section className="mb-8 fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="section-accent-bar" style={{ backgroundColor: C.error, minHeight: 24 }} />
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: C.text }}>
-                    Questions Waiting for Response
-                  </h2>
-                  <span
-                    className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
-                    style={{ backgroundColor: C.error }}
-                  >
-                    {waitingQuestions.length}
-                  </span>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {sortedResponses.map((r) => {
+                    const voted = helpfulVotes.has(r.id);
+                    const count = r.helpfulCount + (voted ? 1 : 0);
+                    return (
+                      <Card key={r.id} className="p-5">
+                        <div className="flex items-start gap-3 mb-3">
+                          <img
+                            src={r.mentor.photo}
+                            alt={r.mentor.name}
+                            className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm" style={{ color: C.text }}>
+                                {r.mentor.name}
+                              </span>
+                            </div>
+                            <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                              {r.mentor.specialty} · {r.timestamp}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap mb-4" style={{ color: C.text }}>
+                          {r.answer}
+                        </p>
+                        <div
+                          className="flex items-center justify-between pt-3"
+                          style={{ borderTop: `1px solid ${C.border}` }}
+                        >
+                          <button
+                            onClick={() => toggleHelpful(r.id)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium"
+                            style={{
+                              backgroundColor: voted ? C.successLight : C.borderLight,
+                              color: voted ? C.success : C.textSec,
+                              border: `1px solid ${voted ? "#A7F3D0" : C.border}`,
+                            }}
+                          >
+                            👍 Helpful · {count}
+                          </button>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              {waitingQuestions.map((q) => (
-                <MentorQuestionCard
-                  key={q.id}
-                  q={q}
-                  onAnswer={onAnswerQuestion}
-                  onReport={(question) => {
-                    if (typeof question.id === "string") setReportingQuestion(question);
-                  }}
-                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ASK ANY MENTOR + ANONYMOUS — 2 columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ASK ANY MENTOR */}
-          {(activeSection === "all" || activeSection === "any") && (
-            <section className="fade-in">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="section-accent-bar" style={{ backgroundColor: C.primary, minHeight: 24 }} />
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold" style={{ color: C.text }}>
-                      Ask Any Mentor
-                    </h2>
-                    <span
-                      className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
-                      style={{ backgroundColor: C.primary }}
-                    >
-                      {anyQuestions.length}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                {anyQuestions.map((q) => (
-                  <MentorQuestionCard
-                  key={q.id}
-                  q={q}
-                  onAnswer={onAnswerQuestion}
-                  onReport={(question) => {
-                    if (typeof question.id === "string") setReportingQuestion(question);
-                  }}
-                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
-                  compact
-                />
-                ))}
-                <p className="text-xs px-1" style={{ color: C.textSec }}>
-                  These questions were submitted to all mentors at the school. Your response will be visible to the student and their peers.
-                </p>
-              </div>
+              )}
             </section>
-          )}
 
-          {/* ANONYMOUS QUESTIONS */}
-          {(activeSection === "all" || activeSection === "anon") && (
-            <section className="fade-in">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="section-accent-bar" style={{ backgroundColor: C.pending, minHeight: 24 }} />
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold" style={{ color: C.text }}>
-                      Anonymous Questions
-                    </h2>
-                    <span
-                      className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
-                      style={{ backgroundColor: C.pending }}
+            {relatedToShow.length > 0 && !liveQuestion && (
+              <section>
+                <h2 className="font-bold text-base mb-4" style={{ color: C.text }}>
+                  Related Questions
+                </h2>
+                <div className="flex flex-col gap-3">
+                  {relatedToShow.map((q) => (
+                    <Card
+                      key={q.id}
+                      className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => onOpenQuestion(q.id)}
                     >
-                      {anonQuestions.length}
-                    </span>
-                  </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold mb-1" style={{ color: C.text }}>
+                            {q.title}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <CategoryBadge category={q.category} />
+                            <span className="text-xs" style={{ color: C.textSec }}>
+                              {q.responses} answers
+                            </span>
+                          </div>
+                        </div>
+                        <Icons.ChevronRight />
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                {anonQuestions.map((q) => (
-                  <MentorQuestionCard
-                  key={q.id}
-                  q={q}
-                  onAnswer={onAnswerQuestion}
-                  onReport={(question) => {
-                    if (typeof question.id === "string") setReportingQuestion(question);
-                  }}
-                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
-                  compact
-                />
-                ))}
-                {/* Privacy reminder */}
-                <div
-                  className="flex items-start gap-2 px-3 py-3 rounded-xl text-xs"
-                  style={{ backgroundColor: "#FFF8ED", border: `1px solid #FCD34D` }}
-                >
-                  <span className="flex-shrink-0">🔒</span>
-                  <span style={{ color: "#78350F" }}>
-                    <strong>Student identities are always hidden.</strong> You will never see a student's name, email, photo, or ID on anonymous questions — not even after responding. The student can continue the conversation while remaining anonymous.
-                  </span>
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
+              </section>
+            )}
+          </>
+        )}
       </main>
 
-      {reportingQuestion && typeof reportingQuestion.id === "string" && (
+      {reportOpen && canReport && liveQuestion && (
         <ReportQuestionModal
-          questionId={reportingQuestion.id}
-          questionTitle={reportingQuestion.question}
-          onClose={() => setReportingQuestion(null)}
-          onReported={() => {
-            setReportedQuestionIds((prev) => new Set(prev).add(reportingQuestion.id as string));
-          }}
+          questionId={liveQuestion.id}
+          questionTitle={liveQuestion.title}
+          onClose={() => setReportOpen(false)}
+          onReported={() => setReported(true)}
           onToast={onToast}
         />
       )}
-
-      {showAllMentees && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowAllMentees(false);
-          }}
-        >
-          <div
-            className="bg-white rounded-2xl card-shadow-lg w-full max-w-2xl max-h-[80vh] overflow-hidden fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="flex items-center justify-between px-5 py-4"
-              style={{ borderBottom: "1px solid " + C.border }}
-            >
-              <div>
-                <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
-                <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                  {displayMentees.length} assigned mentees
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAllMentees(false)}
-                className="text-lg px-2 hover:opacity-70"
-                style={{ color: C.textSec }}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto flex flex-col gap-3">
-              {displayMentees.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{ backgroundColor: C.bg, border: "1px solid " + C.border }}
-                >
-                  <div className="relative flex-shrink-0">
-                    <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover" />
-                    <span className="absolute -bottom-0.5 -right-0.5">
-                      <StatusDot available={m.active} />
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold" style={{ color: C.text }}>{m.name}</div>
-                    <div className="text-xs" style={{ color: C.textSec }}>{m.year} · {m.track}</div>
-                    <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
-                      {m.active ? "● Active now" : "Last active: " + m.lastActivity}
-                    </div>
-                  </div>
-                  <span className="text-xs" style={{ color: C.textSec }}>
-                    {m.totalQuestions} questions
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {messageTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setMessageTarget(null);
-              setMessageText("");
-            }
-          }}
-        >
-          <div
-            className="bg-white rounded-2xl card-shadow-lg w-full max-w-md fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
-              <div className="flex items-center gap-3">
-                <img src={messageTarget.photo} alt={messageTarget.name} className="w-9 h-9 rounded-full object-cover" />
-                <div>
-                  <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
-                  <div className="text-xs" style={{ color: C.textSec }}>{messageTarget.year} · {messageTarget.track}</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setMessageTarget(null); setMessageText(""); }}
-                className="p-1.5 rounded-lg hover:opacity-70"
-                style={{ color: C.textSec }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-5">
-              <textarea
-                autoFocus
-                rows={6}
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Write a message to your mentee…"
-                className="w-full px-3.5 py-3 rounded-xl text-sm outline-none resize-none"
-                style={{ border: `1.5px solid ${C.border}`, color: C.text, backgroundColor: "#fff" }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = C.primary;
-                  e.currentTarget.style.boxShadow = `0 0 0 3px rgba(91,78,191,0.12)`;
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = C.border;
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              />
-              <div className="flex items-center justify-end gap-2 mt-4">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => { setMessageTarget(null); setMessageText(""); }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={!messageText.trim()}
-                  onClick={sendMentorMessage}
-                >
-                  Send Message
-                </Button>
-              </div>
-              <p className="text-xs mt-3" style={{ color: C.textSec }}>
-                Messages are sent through the backend to the selected assigned mentee.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-
-function NotificationsPage({
-  onBack,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
-  onOpenQuestion,
-}: {
-  onBack: () => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
-  onOpenQuestion: (id: number) => void;
-}) {
-  const unread = ALL_NOTIFICATIONS.filter(
-    (n) => !n.read && !notifReadIds.includes(n.id)
-  ).length;
-
-  const unreadItems = ALL_NOTIFICATIONS.filter(
-    (n) => !n.read && !notifReadIds.includes(n.id)
-  );
-  const readItems = ALL_NOTIFICATIONS.filter(
-    (n) => n.read || notifReadIds.includes(n.id)
-  );
-
-  const TYPE_LABELS: Record<string, string> = {
-    "mentor-answered":      "Mentor answered",
-    "any-mentor-responded": "Mentor responded",
-    "anon-approved":        "Question approved",
-    "anon-response":        "Anonymous response",
-    "rejected":             "Question rejected",
-    "session":              "Session confirmed",
-    "helpful":              "Marked helpful",
-  };
-
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      <header
-        className="sticky top-0 z-30 bg-white"
-        style={{ borderBottom: `1px solid ${C.border}` }}
-      >
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 transition-opacity"
-            style={{ color: C.textSec, backgroundColor: C.borderLight }}
-          >
-            <Icons.ArrowLeft />
-            Dashboard
-          </button>
-          <h1 className="font-bold text-base" style={{ color: C.text }}>
-            Notifications
-          </h1>
-          {unread > 0 && (
-            <span
-              className="px-2 py-0.5 rounded-full text-white text-xs font-bold"
-              style={{ backgroundColor: C.error }}
-            >
-              {unread} unread
-            </span>
-          )}
-          {unread > 0 && (
-            <button
-              onClick={onMarkAllRead}
-              className="ml-auto text-sm font-semibold"
-              style={{ color: C.primary }}
-            >
-              Mark all read
-            </button>
-          )}
-          <Logo size="sm" />
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-6 py-6 fade-in">
-        {/* Unread section */}
-        {unreadItems.length > 0 && (
-          <div className="mb-6">
-            <div
-              className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: C.textSec }}
-            >
-              Unread
-            </div>
-            <div className="flex flex-col gap-2">
-              {unreadItems.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => {
-                    onMarkRead(n.id);
-                    if (n.questionId) onOpenQuestion(n.questionId);
-                  }}
-                  className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-all"
-                  style={{
-                    backgroundColor: "#F5F8FF",
-                    border: `1.5px solid #C7D2FE`,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = C.primaryLight)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#F5F8FF")
-                  }
-                >
-                  <NotifIcon type={n.type} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="text-xs font-semibold uppercase tracking-wide"
-                        style={{ color: C.primary }}
-                      >
-                        {TYPE_LABELS[n.type] || "Notification"}
-                      </span>
-                    </div>
-                    <p
-                      className="text-sm font-semibold leading-snug mb-0.5"
-                      style={{ color: C.text }}
-                    >
-                      {n.message}
-                    </p>
-                    <p className="text-xs leading-relaxed mb-1" style={{ color: C.textSec }}>
-                      {n.detail}
-                    </p>
-                    <p className="text-xs" style={{ color: C.textSec }}>
-                      {n.time}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: C.primary }}
-                    />
-                    {n.questionId && (
-                      <Icons.ChevronRight />
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Read section */}
-        {readItems.length > 0 && (
-          <div>
-            <div
-              className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: C.textSec }}
-            >
-              Earlier
-            </div>
-            <div className="flex flex-col gap-2">
-              {readItems.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => {
-                    if (n.questionId) onOpenQuestion(n.questionId);
-                  }}
-                  className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-all"
-                  style={{
-                    backgroundColor: "#fff",
-                    border: `1px solid ${C.border}`,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = C.borderLight)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#fff")
-                  }
-                >
-                  <NotifIcon type={n.type} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="text-xs font-medium uppercase tracking-wide"
-                        style={{ color: C.textSec }}
-                      >
-                        {TYPE_LABELS[n.type] || "Notification"}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-snug mb-0.5" style={{ color: C.text }}>
-                      {n.message}
-                    </p>
-                    <p className="text-xs leading-relaxed mb-1" style={{ color: C.textSec }}>
-                      {n.detail}
-                    </p>
-                    <p className="text-xs" style={{ color: C.textSec }}>
-                      {n.time}
-                    </p>
-                  </div>
-                  {n.questionId && (
-                    <span style={{ color: C.textSec }} className="flex-shrink-0 mt-0.5">
-                      <Icons.ChevronRight />
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {ALL_NOTIFICATIONS.length === 0 && (
-          <div className="flex flex-col items-center py-16 gap-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: C.borderLight }}
-            >
-              <Icons.Bell />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-sm mb-1" style={{ color: C.text }}>
-                No notifications yet
-              </p>
-              <p className="text-xs" style={{ color: C.textSec }}>
-                We'll notify you when mentors respond to your questions.
-              </p>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ─── ASK QUESTION SCREEN ─────────────────────────────────────────────────────
-
-type AskStep =
-  | "select"
-  | "my-mentor"
-  | "any-mentor"
-  | "anonymous"
-  | "anon-public"
-  | "anon-private"
-  | "success-my-mentor"
-  | "success-any-mentor"
-  | "success-anon-public"
-  | "success-anon-private";
-
-function TagInput({
-  tags,
-  onChange,
-  placeholder = "Add a tag and press Enter",
-}: {
-  tags: string[];
-  onChange: (tags: string[]) => void;
-  placeholder?: string;
-}) {
-  const [input, setInput] = useState("");
-  const [focused, setFocused] = useState(false);
-
-  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if ((e.key === "Enter" || e.key === ",") && input.trim()) {
-      e.preventDefault();
-      if (!tags.includes(input.trim())) onChange([...tags, input.trim()]);
-      setInput("");
-    }
-    if (e.key === "Backspace" && !input && tags.length) {
-      onChange(tags.slice(0, -1));
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium" style={{ color: C.text }}>
-        Tags <span className="font-normal" style={{ color: C.textSec }}>(optional)</span>
-      </label>
-      <div
-        className="flex flex-wrap gap-1.5 rounded-xl px-3 py-2 min-h-[46px] transition-all duration-150"
-        style={{
-          border: `1.5px solid ${focused ? C.primary : C.border}`,
-          backgroundColor: "#fff",
-          boxShadow: focused ? `0 0 0 3px rgba(91,78,191,0.12)` : "none",
-        }}
-      >
-        {tags.map((t) => (
-          <span
-            key={t}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-            style={{ backgroundColor: C.primaryLight, color: C.primary }}
-          >
-            {t}
-            <button
-              type="button"
-              onClick={() => onChange(tags.filter((x) => x !== t))}
-              className="ml-0.5 hover:opacity-70"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={tags.length === 0 ? placeholder : ""}
-          className="flex-1 min-w-[120px] text-xs bg-transparent outline-none py-1 placeholder:text-gray-400"
-          style={{ color: C.text }}
-        />
-      </div>
-      <p className="text-xs" style={{ color: C.textSec }}>
-        Press Enter or comma to add a tag
-      </p>
-    </div>
-  );
-}
-
-function AttachmentZone({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium" style={{ color: C.text }}>
-        Attachment <span className="font-normal" style={{ color: C.textSec }}>(optional)</span>
-      </label>
-      {file ? (
-        <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{ backgroundColor: C.primaryLight, border: `1.5px solid #C7D2FE` }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <rect x="2" y="1" width="11" height="16" rx="2" stroke={C.primary} strokeWidth="1.4" />
-            <path d="M5 6h5M5 9h5M5 12h3" stroke={C.primary} strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          <span className="text-sm font-medium flex-1 truncate" style={{ color: C.primary }}>
-            {file.name}
-          </span>
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="text-xs font-medium px-2 py-1 rounded-lg hover:opacity-80"
-            style={{ color: C.error, backgroundColor: C.errorLight }}
-          >
-            Remove
-          </button>
-        </div>
-      ) : (
-        <label
-          className="flex flex-col items-center gap-2 px-4 py-6 rounded-xl cursor-pointer transition-all duration-150 hover:border-blue-400"
-          style={{ border: `2px dashed ${C.border}`, backgroundColor: C.bg }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M12 4v12M7 9l5-5 5 5" stroke={C.textSec} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M4 20h16" stroke={C.textSec} strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="text-sm" style={{ color: C.textSec }}>
-            <span className="font-semibold" style={{ color: C.primary }}>Upload a file</span> or drag and drop
-          </span>
-          <span className="text-xs" style={{ color: C.textSec }}>PDF, PNG, JPG up to 10MB</span>
-          <input
-            type="file"
-            className="hidden"
-            accept=".pdf,.png,.jpg,.jpeg"
-            onChange={(e) => e.target.files?.[0] && onChange(e.target.files[0])}
-          />
-        </label>
-      )}
-    </div>
-  );
-}
-
-function AskPageHeader({
-  onBack,
-  title,
-  subtitle,
-}: {
-  onBack: () => void;
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div
-      className="sticky top-0 z-20 bg-white"
-      style={{ borderBottom: `1px solid ${C.border}` }}
-    >
-      <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-80"
-          style={{ color: C.textSec, backgroundColor: C.borderLight }}
-        >
-          <Icons.ArrowLeft />
-          Dashboard
-        </button>
-        <div>
-          <h1 className="text-base font-bold leading-tight" style={{ color: C.text }}>
-            {title}
-          </h1>
-          {subtitle && (
-            <p className="text-xs" style={{ color: C.textSec }}>
-              {subtitle}
-            </p>
-          )}
-        </div>
-        <div className="ml-auto">
-          <Logo size="sm" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QuestionForm({
-  title: formTitle,
-  question,
-  category,
-  tags,
-  attachment,
-  onTitle,
-  onQuestion,
-  onCategory,
-  onTags,
-  onAttachment,
-  showTags = false,
-  privacyNotice,
-  onSubmit,
-  submitLabel = "Submit Question",
-  disabled,
-}: {
-  title: string;
-  question: string;
-  category: string;
-  tags: string[];
-  attachment: File | null;
-  onTitle: (v: string) => void;
-  onQuestion: (v: string) => void;
-  onCategory: (v: string) => void;
-  onTags: (v: string[]) => void;
-  onAttachment: (f: File | null) => void;
-  showTags?: boolean;
-  privacyNotice?: React.ReactNode;
-  onSubmit: () => void;
-  submitLabel?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-5">
-      <InputField
-        label="Question Title"
-        placeholder="e.g. What's the best approach to Step 1 study in a 10-week block?"
-        value={formTitle}
-        onChange={onTitle}
-      />
-      <TextAreaField
-        label="Question"
-        placeholder="Provide as much detail as you'd like. More context helps mentors give better answers."
-        value={question}
-        onChange={onQuestion}
-        rows={5}
-      />
-      <SelectField
-        label="Category"
-        value={category}
-        onChange={onCategory}
-        placeholder="Select a category"
-        options={ASK_CATEGORIES.map((c) => ({ value: c, label: c }))}
-      />
-      {showTags && <TagInput tags={tags} onChange={onTags} />}
-      <AttachmentZone file={attachment} onChange={onAttachment} />
-      {privacyNotice}
-      <Button
-        variant="primary"
-        size="lg"
-        fullWidth
-        onClick={onSubmit}
-        disabled={disabled || !formTitle || !question || !category}
-      >
-        {submitLabel}
-      </Button>
-    </div>
-  );
-}
-
-function AskQuestionScreen({
-  onBack,
-  onNavigate,
-  onToast,
-  initialStep = "select",
-}: {
-  onBack: () => void;
-  onNavigate: (s: Screen) => void;
-  onToast: (t: ToastType, msg: string) => void;
-  initialStep?: AskStep;
-}) {
-  const [step, setStep] = useState<AskStep>(initialStep);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [title, setTitle] = useState("");
-  const [question, setQuestion] = useState("");
-  const [category, setCategory] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [attachment, setAttachment] = useState<File | null>(null);
-  const [sort, setSort] = useState<"helpful" | "newest" | "relevant">("helpful");
-  const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
-
-  function resetForm() {
-    setTitle("");
-    setQuestion("");
-    setCategory("");
-    setTags([]);
-    setAttachment(null);
-  }
-
-  async function handleSubmit(successStep: AskStep, toastMsg: string, privacy: string) {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
-      onToast("success", toastMsg);
-      setStep(successStep);
-    } catch (error) {
-      if (DEMO_MODE) {
-        onToast("success", toastMsg);
-        setStep(successStep);
-      } else {
-        onToast("error", error instanceof Error ? error.message : "Unable to submit the question.");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  function toggleHelpful(id: number) {
-    setHelpfulVotes((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }
-
-  const sortedResponses = [...SAMPLE_RESPONSES].sort((a, b) => {
-    if (sort === "helpful") return (b.helpfulCount + (helpfulVotes.has(b.id) ? 1 : 0)) - (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0));
-    if (sort === "newest") return a.id - b.id;
-    return b.helpfulCount - a.helpfulCount;
-  });
-
-  // ── SELECT ────────────────────────────────────────────────────────────────
-  if (step === "select") {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader onBack={onBack} title="Ask a Question" subtitle="Choose how you want to ask" />
-        <div className="max-w-3xl mx-auto px-6 py-10">
-          <div className="text-center mb-10 fade-in">
-            <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>
-              What would you like to ask?
-            </h2>
-            <p className="text-sm" style={{ color: C.textSec }}>
-              Choose how your question will be shared and who can respond.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-4 fade-in">
-            {/* Ask My Mentor */}
-            <div
-              className="quick-action-card rounded-2xl p-6 cursor-pointer card-shadow"
-              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
-              onClick={() => { resetForm(); setStep("my-mentor"); }}
-            >
-              <div className="flex items-start gap-5">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: C.primaryLight }}
-                >
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                    <circle cx="14" cy="9" r="5" stroke={C.primary} strokeWidth="1.8" />
-                    <path d="M4 24c0-5.523 4.477-8 10-8s10 2.477 10 8" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M21 11.5l2.5 2.5-3.5 3.5" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className="font-bold text-base" style={{ color: C.text }}>Ask My Mentor</h3>
-                    <PrivacyBadge type="private" />
-                  </div>
-                  <p className="text-sm leading-relaxed mb-3" style={{ color: C.textSec }}>
-                    Send a private question directly to your assigned mentor. Only you and Dr. Mariam Khaled will see this question.
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-                      alt="Dr. Khaled"
-                      className="w-7 h-7 rounded-full object-cover"
-                    />
-                    <span className="text-xs font-medium" style={{ color: C.text }}>Dr. Mariam Khaled · Internal Medicine</span>
-                    <StatusDot available />
-                  </div>
-                </div>
-                <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
-              </div>
-            </div>
-
-            {/* Ask Any Mentor */}
-            <div
-              className="quick-action-card rounded-2xl p-6 cursor-pointer card-shadow"
-              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
-              onClick={() => { resetForm(); setStep("any-mentor"); }}
-            >
-              <div className="flex items-start gap-5">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: C.successLight }}
-                >
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                    <circle cx="10" cy="10" r="4" stroke={C.success} strokeWidth="1.8" />
-                    <circle cx="20" cy="10" r="3.5" stroke={C.success} strokeWidth="1.8" />
-                    <path d="M2 24c0-4.418 3.582-7 8-7 2 0 3.8.6 5.2 1.6" stroke={C.success} strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M16 22c0-2.5 1.8-4 5-4 3 0 5 1.5 5 4" stroke={C.success} strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className="font-bold text-base" style={{ color: C.text }}>Ask Any Mentor</h3>
-                    <PrivacyBadge type="public" />
-                    <PrivacyBadge type="mentors" />
-                  </div>
-                  <p className="text-sm leading-relaxed mb-3" style={{ color: C.textSec }}>
-                    Ask the school's physician mentors for guidance. Your name, year of study, and profile picture will be visible on the question. Receive perspectives from people with different training paths.
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex -space-x-1.5">
-                      {[
-                        "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop",
-                        "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop",
-                        "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=40&h=40&fit=crop",
-                      ].map((src, i) => (
-                        <img key={i} src={src} alt="" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      ))}
-                    </div>
-                    <span className="text-xs" style={{ color: C.textSec }}>2,400+ mentors available to answer</span>
-                  </div>
-                </div>
-                <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
-              </div>
-            </div>
-
-            {/* Ask Anonymously */}
-            <div
-              className="quick-action-card rounded-2xl p-6 cursor-pointer card-shadow"
-              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
-              onClick={() => { resetForm(); setStep("anonymous"); }}
-            >
-              <div className="flex items-start gap-5">
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: "#FEF3C7" }}
-                >
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                    <circle cx="14" cy="11" r="5" stroke={C.pending} strokeWidth="1.8" />
-                    <path d="M4 25c0-5.523 4.477-8 10-8s10 2.477 10 8" stroke={C.pending} strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M14 4L14 2M9.2 5.8L7.8 4.4M18.8 5.8L20.2 4.4" stroke={C.pending} strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className="font-bold text-base" style={{ color: C.text }}>Ask Anonymously</h3>
-                    <PrivacyBadge type="hidden" />
-                  </div>
-                  <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
-                    Ask questions without revealing your identity. Choose between a public question that others can learn from, or a completely private question only mentors can access.
-                  </p>
-                </div>
-                <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ASK MY MENTOR ─────────────────────────────────────────────────────────
-  if (step === "my-mentor") {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader
-          onBack={onBack}
-          title="Ask My Mentor"
-          subtitle="Private question to Dr. Mariam Khaled"
-        />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
-          {/* Mentor preview */}
-          <Card className="p-4 mb-6 flex items-center gap-3">
-            <div className="relative">
-              <img
-                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=80&h=80&fit=crop"
-                alt="Dr. Khaled"
-                className="w-12 h-12 rounded-full object-cover"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available /></span>
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-sm" style={{ color: C.text }}>Dr. Mariam Khaled</div>
-              <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · Available now</div>
-            </div>
-            <PrivacyBadge type="private" />
-          </Card>
-
-          <QuestionForm
-            title={title}
-            question={question}
-            category={category}
-            tags={tags}
-            attachment={attachment}
-            onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
-            onAttachment={setAttachment}
-            showTags={false}
-            privacyNotice={
-              <div
-                className="flex items-start gap-3 px-4 py-3 rounded-xl"
-                style={{ backgroundColor: C.borderLight, border: `1px solid ${C.border}` }}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 mt-0.5">
-                  <rect x="5" y="8" width="8" height="7" rx="1.5" stroke={C.textSec} strokeWidth="1.3" />
-                  <path d="M6.5 8V6a3.5 3.5 0 017 0v2" stroke={C.textSec} strokeWidth="1.3" strokeLinecap="round" />
-                  <circle cx="9" cy="11.5" r="1" fill={C.textSec} />
-                </svg>
-                <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
-                  <strong style={{ color: C.text }}>Privacy notice:</strong> Only you and your assigned mentor, Dr. Mariam Khaled, will be able to see this question and any responses. It will never appear in the public feed.
-                </p>
-              </div>
-            }
-            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private")}
-            submitLabel="Send to Dr. Khaled"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ── SUCCESS: MY MENTOR ────────────────────────────────────────────────────
-  if (step === "success-my-mentor") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-        <div className="w-full max-w-md text-center fade-in">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: `linear-gradient(135deg, ${C.successLight} 0%, #A7F3D0 100%)` }}
-          >
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <path d="M10 20l7 7.5L30 12" stroke={C.success} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your question has been sent.</h2>
-          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
-            Dr. Mariam Khaled will receive a notification and typically responds within 24–48 hours. You'll be notified by email when she replies.
-          </p>
-          <Card className="p-5 mb-6 text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <PrivacyBadge type="private" />
-              <span className="text-xs" style={{ color: C.textSec }}>Sent just now</span>
-            </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "What's the best approach to Step 1 study in a 10-week block?"}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
-          </Card>
-          <div className="flex flex-col gap-2">
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("my-mentor")}>
-              View Question
-            </Button>
-            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
-              Return to Dashboard
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ASK ANY MENTOR ────────────────────────────────────────────────────────
-  if (step === "any-mentor") {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader
-          onBack={onBack}
-          title="Ask Any Mentor"
-          subtitle="Visible to all physician mentors at the school"
-        />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
-          {/* Identity preview */}
-          <Card className="p-4 mb-6">
-            <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: C.textSec }}>
-              Your question will appear as:
-            </div>
-            <div className="flex items-center gap-3">
-              <img
-                src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop"
-                alt="Alex Johnson"
-                className="w-10 h-10 rounded-full object-cover"
-              />
-              <div>
-                <div className="font-semibold text-sm" style={{ color: C.text }}>Alex Johnson</div>
-                <div className="text-xs" style={{ color: C.textSec }}>M2 · Clinical Rotations</div>
-              </div>
-              <div className="ml-auto flex gap-2">
-                <PrivacyBadge type="public" />
-                <PrivacyBadge type="mentors" />
-              </div>
-            </div>
-          </Card>
-
-          <QuestionForm
-            title={title}
-            question={question}
-            category={category}
-            tags={tags}
-            attachment={attachment}
-            onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
-            onAttachment={setAttachment}
-            showTags
-            privacyNotice={
-              <div
-                className="flex items-start gap-3 px-4 py-3 rounded-xl"
-                style={{ backgroundColor: C.successLight, border: `1px solid #A7F3D0` }}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 mt-0.5">
-                  <circle cx="9" cy="9" r="8" stroke={C.success} strokeWidth="1.3" />
-                  <path d="M6 9l2 2 4-4" stroke={C.success} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <p className="text-xs leading-relaxed" style={{ color: "#065F46" }}>
-                  Your name, profile picture, year, and track will be visible after approval. All physician mentors can respond once the question is approved, and other students can read the answers after publication.
-                </p>
-              </div>
-            }
-            onSubmit={() => handleSubmit("success-any-mentor", "Question submitted for admin approval.", "any-mentor")}
-            submitLabel="Submit for Approval"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ── SUCCESS: ANY MENTOR ────────────────────────────────────────────────────
-  if (step === "success-any-mentor") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-        <div className="w-full max-w-md text-center fade-in">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)" }}
-          >
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <circle cx="20" cy="20" r="13" stroke={C.pending} strokeWidth="2" />
-              <path d="M20 12v9l5 3" stroke={C.pending} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <PrivacyBadge type="public" />
-            <PrivacyBadge type="pending-approval" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your question is awaiting approval.</h2>
-          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
-            Your question was submitted successfully, but it is not public yet. An admin must approve it before mentors can see it or students can read the answers.
-          </p>
-          <Card className="p-4 mb-6 text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <PrivacyBadge type="public" />
-              <PrivacyBadge type="pending-approval" />
-            </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>
-              {title || "Your submitted question"}
-            </p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Other"}</p>
-          </Card>
-          <div className="flex flex-col gap-2">
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
-              Ask Another Question
-            </Button>
-            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
-              Return to Dashboard
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ASK ANONYMOUSLY — LANDING ─────────────────────────────────────────────
-  if (step === "anonymous") {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader
-          onBack={onBack}
-          title="Ask Anonymously"
-          subtitle="Your identity is fully protected"
-        />
-        <div className="max-w-3xl mx-auto px-6 py-8 fade-in">
-          {/* Privacy explanation panel */}
-          <div
-            className="rounded-2xl p-5 mb-8 flex items-start gap-4"
-            style={{ background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)", border: `1px solid #FCD34D` }}
-          >
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: "rgba(255,255,255,0.6)" }}
-            >
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                <rect x="5" y="10" width="12" height="9" rx="2" stroke={C.pending} strokeWidth="1.5" />
-                <path d="M8 10V7.5a4 4 0 018 0V10" stroke={C.pending} strokeWidth="1.5" strokeLinecap="round" />
-                <circle cx="11" cy="14.5" r="1.5" fill={C.pending} />
-              </svg>
-            </div>
-            <div>
-              <div className="font-bold text-sm mb-1.5" style={{ color: "#92400E" }}>Your identity is protected</div>
-              <div className="flex flex-col gap-1">
-                {[
-                  "Your name, email address, and profile picture are never shown to mentors or other students.",
-                  'You will appear as "Anonymous Mentee" on all anonymous questions.',
-                  "MedMentor's moderation team can see your identity only to prevent misuse — it is never shared with mentors.",
-                ].map((t) => (
-                  <div key={t} className="flex items-start gap-2 text-xs" style={{ color: "#78350F" }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0 mt-0.5">
-                      <circle cx="6" cy="6" r="5" fill={C.pending} fillOpacity="0.3" />
-                      <path d="M3.5 6l2 2 3-3" stroke={C.pending} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {t}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <h3 className="text-sm font-bold mb-4" style={{ color: C.text }}>Choose your anonymous question type</h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Public anonymous */}
-            <div
-              className="quick-action-card rounded-2xl p-6 cursor-pointer flex flex-col gap-4 card-shadow"
-              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
-              onClick={() => { resetForm(); setStep("anon-public"); }}
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: C.primaryLight }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke={C.primary} strokeWidth="1.6" />
-                  <path d="M3 12h18M12 3c-2.5 3-2.5 13 0 18M12 3c2.5 3 2.5 13 0 18" stroke={C.primary} strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <h4 className="font-bold text-sm" style={{ color: C.text }}>Public Anonymous</h4>
-                  <PrivacyBadge type="hidden" />
-                </div>
-                <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
-                  Share your question anonymously so other students can learn from the answers. Your question requires moderator approval before publication.
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {[
-                    { icon: "🌐", text: "Visible to all students once approved" },
-                    { icon: "🩺", text: "Any mentor can respond" },
-                    { icon: "✓",  text: "Requires moderator approval" },
-                    { icon: "🔒", text: "Name & photo never shown" },
-                  ].map((f) => (
-                    <div key={f.text} className="flex items-center gap-1.5 text-xs" style={{ color: C.textSec }}>
-                      <span>{f.icon}</span> {f.text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-auto">
-                <Button variant="secondary" size="sm" fullWidth onClick={() => { resetForm(); setStep("anon-public"); }}>
-                  Ask Publicly (Anonymous)
-                </Button>
-              </div>
-            </div>
-
-            {/* Private anonymous */}
-            <div
-              className="quick-action-card rounded-2xl p-6 cursor-pointer flex flex-col gap-4 card-shadow"
-              style={{ backgroundColor: "#fff", border: `2px solid ${C.border}` }}
-              onClick={() => { resetForm(); setStep("anon-private"); }}
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#FEF3C7" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <rect x="5" y="11" width="14" height="10" rx="2" stroke={C.pending} strokeWidth="1.6" />
-                  <path d="M8 11V7.5a4 4 0 018 0V11" stroke={C.pending} strokeWidth="1.6" strokeLinecap="round" />
-                  <circle cx="12" cy="16" r="1.5" fill={C.pending} />
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <h4 className="font-bold text-sm" style={{ color: C.text }}>Private Anonymous</h4>
-                  <PrivacyBadge type="mentors" />
-                  <PrivacyBadge type="hidden" />
-                </div>
-                <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
-                  Keep your question completely private. Only mentors can access it, and only you can see the responses. Never appears in the public feed.
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {[
-                    { icon: "🔒", text: "Never in the public feed" },
-                    { icon: "🩺", text: "Mentors only — no students" },
-                    { icon: "👤", text: "Only you see responses" },
-                    { icon: "✓",  text: "No approval required" },
-                  ].map((f) => (
-                    <div key={f.text} className="flex items-center gap-1.5 text-xs" style={{ color: C.textSec }}>
-                      <span>{f.icon}</span> {f.text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-auto">
-                <Button variant="secondary" size="sm" fullWidth onClick={() => { resetForm(); setStep("anon-private"); }}>
-                  Ask Privately (Anonymous)
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ANON PUBLIC FORM ──────────────────────────────────────────────────────
-  if (step === "anon-public") {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader
-          onBack={() => setStep("anonymous")}
-          title="Public Anonymous Question"
-          subtitle="Visible to all students after moderator approval"
-        />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
-          <Card className="p-4 mb-6 flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: C.borderLight }}
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <circle cx="10" cy="7" r="4" stroke={C.textSec} strokeWidth="1.4" />
-                <path d="M3 18c0-3.866 3.134-6 7-6s7 2.134 7 6" stroke={C.textSec} strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-sm" style={{ color: C.text }}>Anonymous Mentee</div>
-              <div className="text-xs" style={{ color: C.textSec }}>Your name will appear exactly like this</div>
-            </div>
-            <PrivacyBadge type="hidden" />
-          </Card>
-
-          <QuestionForm
-            title={title}
-            question={question}
-            category={category}
-            tags={tags}
-            attachment={attachment}
-            onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
-            onAttachment={setAttachment}
-            showTags
-            privacyNotice={
-              <div
-                className="flex flex-col gap-2 px-4 py-4 rounded-xl"
-                style={{ backgroundColor: C.borderLight, border: `1px solid ${C.border}` }}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <PrivacyBadge type="hidden" />
-                  <PrivacyBadge type="pending-approval" />
-                  <PrivacyBadge type="public" />
-                </div>
-                <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
-                  <strong style={{ color: C.text }}>Your question will appear as Anonymous Mentee.</strong> It requires moderator review before publication (typically under 4 hours). Once approved, all mentors can answer and all students can read the responses.
-                </p>
-              </div>
-            }
-            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!", "anon-public")}
-            submitLabel="Submit for Approval"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ── ANON PRIVATE FORM ─────────────────────────────────────────────────────
-  if (step === "anon-private") {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader
-          onBack={() => setStep("anonymous")}
-          title="Private Anonymous Question"
-          subtitle="Visible only to mentors — your identity is hidden"
-        />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
-          <Card className="p-4 mb-6 flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: "#FEF3C7" }}
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <rect x="5" y="9.5" width="10" height="8" rx="1.5" stroke={C.pending} strokeWidth="1.4" />
-                <path d="M7 9.5V7a3.5 3.5 0 017 0v2.5" stroke={C.pending} strokeWidth="1.4" strokeLinecap="round" />
-                <circle cx="10" cy="13.5" r="1" fill={C.pending} />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-sm" style={{ color: C.text }}>Anonymous Mentee</div>
-              <div className="text-xs" style={{ color: C.textSec }}>Your name will appear exactly like this</div>
-            </div>
-            <div className="flex gap-2">
-              <PrivacyBadge type="mentors" />
-              <PrivacyBadge type="hidden" />
-            </div>
-          </Card>
-
-          <QuestionForm
-            title={title}
-            question={question}
-            category={category}
-            tags={tags}
-            attachment={attachment}
-            onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
-            onAttachment={setAttachment}
-            showTags
-            privacyNotice={
-              <div
-                className="flex flex-col gap-2 px-4 py-4 rounded-xl"
-                style={{ backgroundColor: "#FEF3C7", border: `1px solid #FCD34D` }}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <PrivacyBadge type="mentors" />
-                  <PrivacyBadge type="hidden" />
-                  <PrivacyBadge type="private" />
-                </div>
-                <p className="text-xs leading-relaxed" style={{ color: "#78350F" }}>
-                  <strong>Your identity will remain hidden.</strong> Only mentors can see and respond to this question. You are the only one who can see their responses. This question will never appear in the student feed or public question archive.
-                </p>
-              </div>
-            }
-            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question submitted for admin approval.", "anon-private")}
-            submitLabel="Submit Privately"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ── SUCCESS: ANON PUBLIC ──────────────────────────────────────────────────
-  if (step === "success-anon-public") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-        <div className="w-full max-w-md text-center fade-in">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: `linear-gradient(135deg, ${C.primaryLight} 0%, #C7D2FE 100%)` }}
-          >
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <path d="M10 20l7 7.5L30 12" stroke={C.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <PrivacyBadge type="hidden" />
-            <PrivacyBadge type="pending-approval" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Question submitted!</h2>
-          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
-            Your question will appear as <strong style={{ color: C.text }}>Anonymous Mentee</strong>. A moderator will review it within 4 hours. You'll receive an email notification once it's approved and mentors begin answering.
-          </p>
-          <Card className="p-4 mb-6 text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <PrivacyBadge type="hidden" />
-              <span className="text-xs" style={{ color: C.textSec }}>Awaiting approval</span>
-            </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "How do I approach the neurology shelf exam with limited time?"}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
-          </Card>
-          <div className="flex flex-col gap-2">
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
-              Ask Another Question
-            </Button>
-            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
-              Return to Dashboard
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── SUCCESS: ANON PRIVATE ─────────────────────────────────────────────────
-  if (step === "success-anon-private") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-        <div className="w-full max-w-md text-center fade-in">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)" }}
-          >
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <rect x="12" y="18" width="16" height="14" rx="3" stroke={C.pending} strokeWidth="2" />
-              <path d="M16 18V14a6 6 0 0112 0v4" stroke={C.pending} strokeWidth="2" strokeLinecap="round" />
-              <circle cx="20" cy="25" r="2" fill={C.pending} />
-            </svg>
-          </div>
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <PrivacyBadge type="hidden" />
-            <PrivacyBadge type="mentors" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your identity will remain hidden.</h2>
-          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
-            Your question was submitted for admin approval. After approval, the selected mentors can see and respond to it. Only you can see their answers — it will never appear in the student feed.
-          </p>
-          <Card className="p-4 mb-6 text-left">
-            <div className="flex items-center gap-2 mb-2">
-              <PrivacyBadge type="hidden" />
-              <PrivacyBadge type="mentors" />
-            </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "I'm struggling with burnout during rotations — how do I manage this without it affecting my evaluations?"}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Wellness & Burnout"}</p>
-          </Card>
-          <div className="flex flex-col gap-2">
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
-              Ask Another Question
-            </Button>
-            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
-              Return to Dashboard
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-// ─── ADMIN DATA ───────────────────────────────────────────────────────────────
-
-interface AdminUser {
-  id: number;
-  name: string;
-  email: string;
-  role: "mentee" | "mentor" | "pending-mentor";
-  year?: string;
-  track?: string;
-  school: string;
-  status: "active" | "suspended" | "pending";
-  joinDate: string;
-  photo?: string;
-}
-
-const ADMIN_USERS: AdminUser[] = [
-  { id: 1, name: "Alex Johnson", email: "alex.j@med.ucsf.edu", role: "mentee", year: "M2", track: "Preclinical", school: "UCSF School of Medicine", status: "active", joinDate: "Aug 12, 2024", photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop" },
-  { id: 2, name: "Sarah Chen", email: "s.chen@hms.harvard.edu", role: "mentee", year: "M3", track: "Clinical Rotations", school: "Harvard Medical School", status: "active", joinDate: "Sep 3, 2024", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=40&h=40&fit=crop" },
-  { id: 3, name: "Marcus Williams", email: "m.williams@med.columbia.edu", role: "mentee", year: "M1", track: "Preclinical", school: "Columbia Vagelos COM", status: "active", joinDate: "Oct 1, 2024", photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop" },
-  { id: 4, name: "Dr. Mariam Khaled", email: "m.khaled@umc.edu", role: "mentor", school: "University Medical Center", status: "active", joinDate: "Jun 5, 2024", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop" },
-  { id: 5, name: "Dr. James Patel", email: "j.patel@stanford.edu", role: "mentor", school: "Stanford Medicine", status: "active", joinDate: "Jun 18, 2024", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop" },
-  { id: 6, name: "Dr. Amara Osei", email: "a.osei@jhmi.edu", role: "pending-mentor", school: "Johns Hopkins Medicine", status: "pending", joinDate: "Nov 14, 2024", photo: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=40&h=40&fit=crop" },
-  { id: 7, name: "Jordan Kim", email: "j.kim@med.yale.edu", role: "mentee", year: "M4", track: "Clinical", school: "Yale School of Medicine", status: "suspended", joinDate: "Aug 30, 2024", photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop" },
-  { id: 8, name: "Priya Sharma", email: "p.sharma@wustl.edu", role: "mentee", year: "M2", track: "Preclinical", school: "Washington University SOM", status: "active", joinDate: "Sep 22, 2024", photo: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop" },
-];
-
-type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
-
-interface ModerationItem {
-  id: string | number;
-  type: "anon-question" | "any-mentor-question" | "private-question" | "reported-question" | "reported-answer" | "suspicious";
-  questionText: string;
-  category: string;
-  submittedDate: string;
-  visibility: "public" | "private";
-  status: ModerationStatus;
-  internalNote?: string;
-  reportReason?: string;
-  reportedBy?: string;
-  flagCount?: number;
-}
-
-const MODERATION_ITEMS: ModerationItem[] = [
-  { id: 101, type: "anon-question", questionText: "I've been struggling with severe anxiety and imposter syndrome to the point where I'm questioning whether medicine is right for me. Has anyone else felt this way in M2?", category: "Mental Health", submittedDate: "Nov 28, 2024", visibility: "private", status: "pending", internalNote: "Submitted via anonymous private channel. No identifying metadata. IP hash: a7f3..." },
-  { id: 102, type: "anon-question", questionText: "What is the best way to approach a faculty member about a grade dispute without damaging the relationship?", category: "Academic", submittedDate: "Nov 27, 2024", visibility: "public", status: "pending", internalNote: "Submitted via anonymous public channel. No identifying metadata. IP hash: b2c9..." },
-  { id: 103, type: "anon-question", questionText: "How do I handle a situation where a senior resident asked me to document something I didn't actually observe?", category: "Ethics", submittedDate: "Nov 26, 2024", visibility: "public", status: "pending", internalNote: "Flagged by auto-moderator for ethics keyword. No identifying metadata." },
-  { id: 104, type: "reported-question", questionText: "Looking for study partners at [specific dorm building] on Thursday nights — bring snacks!", category: "Study Tips", submittedDate: "Nov 25, 2024", visibility: "public", status: "reported", reportReason: "Personal information", reportedBy: "3 users", flagCount: 3 },
-  { id: 105, type: "reported-answer", questionText: 'Response by Dr. Chen to "How do I survive shelf exams?" — contains alleged misinformation about Step 1 scoring.', category: "Board Prep", submittedDate: "Nov 24, 2024", visibility: "public", status: "reported", reportReason: "Misinformation", reportedBy: "2 users", flagCount: 2 },
-  { id: 106, type: "anon-question", questionText: "Is it normal to feel completely burned out after first year? I haven't been able to study in weeks.", category: "Mental Health", submittedDate: "Nov 23, 2024", visibility: "private", status: "approved" },
-  { id: 107, type: "anon-question", questionText: "How do I ask for a letter of recommendation from someone I barely know?", category: "Career", submittedDate: "Nov 22, 2024", visibility: "public", status: "rejected", internalNote: "Rejected: not related to mentoring program scope." },
-  { id: 108, type: "suspicious", questionText: "Account created 3 minutes ago. Posted 12 questions in rapid succession with identical structure. Possible bot activity.", category: "System", submittedDate: "Nov 28, 2024", visibility: "public", status: "pending", internalNote: "Auto-flagged: unusual posting frequency. User ID: #4471. Review recommended." },
-];
-
-const REJECT_REASONS = [
-  "Inappropriate content",
-  "Offensive language",
-  "Not related to mentoring",
-  "Personal information",
-  "Spam",
-  "Other",
-];
 
 // ─── MENTOR ANSWER SCREEN ─────────────────────────────────────────────────────
 
@@ -5659,8 +4181,11 @@ function MentorAnswerScreen({
               </div>
             </div>
           </div>
-          <p className="text-sm leading-relaxed font-medium" style={{ color: C.text }}>
+          <h2 className="text-base font-bold leading-snug mb-2" style={{ color: C.text }}>
             {question.question}
+          </h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.textSec }}>
+            {question.content?.trim() || question.question}
           </p>
         </Card>
 
@@ -7800,31 +6325,30 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
       </div>
 
       {reviewItem && (
-        <ModalOverlay onClose={() => setReviewItem(null)}>
-          <div className="w-full max-w-xl bg-white rounded-2xl p-6 card-shadow-md">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <h3 className="text-lg font-bold" style={{ color: C.text }}>Review question</h3>
-                <p className="text-xs mt-1" style={{ color: C.textSec }}>
-                  This question is currently pending approval and is not visible to mentors or other students.
-                </p>
-              </div>
-              <button onClick={() => setReviewItem(null)} className="text-lg" style={{ color: C.textSec }}>×</button>
+        <Modal title="Review question" onClose={() => setReviewItem(null)} width={620}>
+          <p className="text-xs mb-4" style={{ color: C.textSec }}>
+            This question is currently pending approval and is not visible to mentors or other students.
+          </p>
+
+          <div
+            className="rounded-xl p-4 mb-4"
+            style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}
+          >
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <PrivacyBadge type={reviewItem.visibility === "public" ? "public" : "private"} />
+              <Badge variant="pending">Pending approval</Badge>
             </div>
-            <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
-              <p className="text-sm font-semibold mb-2" style={{ color: C.text }}>{reviewItem.questionText}</p>
-              <div className="flex items-center gap-2">
-                <PrivacyBadge type={reviewItem.visibility === "public" ? "public" : "private"} />
-                <Badge variant="pending">Pending approval</Badge>
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="secondary" onClick={() => setReviewItem(null)}>Cancel</Button>
-              <Button variant="danger" onClick={() => void handleReject(reviewItem.id)}>Reject</Button>
-              <Button variant="primary" onClick={() => void handleApprove(reviewItem.id)}>Approve & Publish</Button>
-            </div>
+            <p className="text-base font-bold mb-2" style={{ color: C.text }}>
+              {reviewItem.questionText}
+            </p>
           </div>
-        </ModalOverlay>
+
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => setReviewItem(null)}>Cancel</Button>
+            <Button variant="danger" onClick={() => void handleReject(reviewItem.id)}>Reject</Button>
+            <Button variant="primary" onClick={() => void handleApprove(reviewItem.id)}>Approve & Publish</Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
