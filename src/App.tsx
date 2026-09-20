@@ -2047,16 +2047,16 @@ function DashboardScreen({
   onToast,
   onNavigate,
   onOpenQuestion,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
+  notifReadIds = [],
+  onMarkRead = () => {},
+  onMarkAllRead = () => {},
 }: {
   onToast: (t: ToastType, msg: string) => void;
   onNavigate: (s: Screen) => void;
   onOpenQuestion: (id: number) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"questions" | "notifications">("questions");
   const [searchQuery, setSearchQuery] = useState("");
@@ -3005,17 +3005,17 @@ function FeedScreen({
   onBack,
   onOpenQuestion,
   onNavigate,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
+  notifReadIds = [],
+  onMarkRead = () => {},
+  onMarkAllRead = () => {},
   onToast,
 }: {
   onBack: () => void;
   onOpenQuestion: (id: string | number) => void;
   onNavigate: (s: Screen) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -3313,18 +3313,18 @@ function QuestionDetailScreen({
   onBack,
   onOpenQuestion,
   onNavigate,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
+  notifReadIds = [],
+  onMarkRead = () => {},
+  onMarkAllRead = () => {},
   onToast,
 }: {
   questionId: string | number;
   onBack: () => void;
   onOpenQuestion: (id: string | number) => void;
   onNavigate: (s: Screen) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [sort, setSort] = useState<"helpful" | "newest">("helpful");
@@ -6372,7 +6372,6 @@ function MobileNav({
   role: Role;
   screen: Screen;
   onNavigate: (s: Screen) => void;
-  notifCount: number;
 }) {
   const menteeItems = [
     {
