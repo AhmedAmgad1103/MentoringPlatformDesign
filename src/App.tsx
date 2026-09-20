@@ -5890,6 +5890,48 @@ function MentorDashboardScreen({
   const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
   const [messageText, setMessageText] = useState("");
   const [showAllMentees, setShowAllMentees] = useState(false);
+  const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
+  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getMentorQueue()
+      .then((items) => {
+        if (active) setLiveMentorQuestions(items as MentorQuestion[]);
+      })
+      .catch(() => {
+        if (active) setLiveMentorQuestions(null);
+      });
+
+    getMentorMentees()
+      .then((response) => {
+        if (active) setLiveMentees(response.items);
+      })
+      .catch(() => {
+        if (active) setLiveMentees(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const waitingQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "private") ??
+    MENTOR_WAITING_QUESTIONS;
+  const anyQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "any-mentor") ??
+    MENTOR_ANY_QUESTIONS;
+  const anonQuestions =
+    liveMentorQuestions?.filter(
+      (q) => q.type === "anon-public" || q.type === "anon-private"
+    ) ?? MENTOR_ANON_QUESTIONS;
+
+  function selectMenteeForMessage(target: (typeof MENTOR_MENTEES_DATA)[number]) {
+    const live = liveMentees?.find((m) => m.name === target.name);
+    setMessageTarget(live ? { ...target, id: live.id } : target);
+    setMessageText("");
+  }
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5919,9 +5961,9 @@ function MentorDashboardScreen({
   }
 
   const totalWaiting =
-    MENTOR_WAITING_QUESTIONS.length +
-    MENTOR_ANY_QUESTIONS.filter((q) => q.responses === 0).length +
-    MENTOR_ANON_QUESTIONS.filter((q) => q.responses === 0).length;
+    waitingQuestions.length +
+    anyQuestions.filter((q) => q.responses === 0).length +
+    anonQuestions.filter((q) => q.responses === 0).length;
 
   const STATS = [
     {
@@ -5938,7 +5980,7 @@ function MentorDashboardScreen({
     },
     {
       label: "Awaiting Response",
-      value: MENTOR_WAITING_QUESTIONS.length,
+      value: waitingQuestions.length,
       bg: C.errorLight,
       color: C.error,
       icon: (
@@ -5950,7 +5992,7 @@ function MentorDashboardScreen({
     },
     {
       label: "Ask Any Mentor",
-      value: MENTOR_ANY_QUESTIONS.length,
+      value: anyQuestions.length,
       bg: C.primaryLight,
       color: C.primary,
       icon: (
@@ -5964,7 +6006,7 @@ function MentorDashboardScreen({
     },
     {
       label: "Anonymous",
-      value: MENTOR_ANON_QUESTIONS.length,
+      value: anonQuestions.length,
       bg: C.pendingLight,
       color: C.pending,
       icon: (
@@ -6133,9 +6175,9 @@ function MentorDashboardScreen({
           {(
             [
               { v: "all",     label: "All Sections"  },
-              { v: "waiting", label: `Waiting (${MENTOR_WAITING_QUESTIONS.length})` },
-              { v: "any",     label: `Ask Any Mentor (${MENTOR_ANY_QUESTIONS.length})` },
-              { v: "anon",    label: `Anonymous (${MENTOR_ANON_QUESTIONS.length})` },
+              { v: "waiting", label: `Waiting (${waitingQuestions.length})` },
+              { v: "any",     label: `Ask Any Mentor (${anyQuestions.length})` },
+              { v: "anon",    label: `Anonymous (${anonQuestions.length})` },
             ] as const
           ).map(({ v, label }) => (
             <button
@@ -6216,7 +6258,7 @@ function MentorDashboardScreen({
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => { setMessageTarget(m); setMessageText(""); }}
+                      onClick={() => selectMenteeForMessage(m)}
                     >
                       <Icons.MessageCircle />
                       Message
@@ -6245,13 +6287,13 @@ function MentorDashboardScreen({
                     className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
                     style={{ backgroundColor: C.error }}
                   >
-                    {MENTOR_WAITING_QUESTIONS.length}
+                    {waitingQuestions.length}
                   </span>
                 </div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              {MENTOR_WAITING_QUESTIONS.map((q) => (
+              {waitingQuestions.map((q) => (
                 <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} />
               ))}
             </div>
@@ -6274,13 +6316,13 @@ function MentorDashboardScreen({
                       className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
                       style={{ backgroundColor: C.primary }}
                     >
-                      {MENTOR_ANY_QUESTIONS.length}
+                      {anyQuestions.length}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {MENTOR_ANY_QUESTIONS.map((q) => (
+                {anyQuestions.map((q) => (
                   <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} compact />
                 ))}
                 <p className="text-xs px-1" style={{ color: C.textSec }}>
@@ -6304,13 +6346,13 @@ function MentorDashboardScreen({
                       className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
                       style={{ backgroundColor: C.pending }}
                     >
-                      {MENTOR_ANON_QUESTIONS.length}
+                      {anonQuestions.length}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {MENTOR_ANON_QUESTIONS.map((q) => (
+                {anonQuestions.map((q) => (
                   <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} compact />
                 ))}
                 {/* Privacy reminder */}
@@ -6453,17 +6495,13 @@ function MentorDashboardScreen({
                   variant="primary"
                   size="sm"
                   disabled={!messageText.trim()}
-                  onClick={() => {
-                    onToast("success", `Message sent to ${messageTarget.name}.`);
-                    setMessageTarget(null);
-                    setMessageText("");
-                  }}
+                  onClick={sendMentorMessage}
                 >
                   Send Message
                 </Button>
               </div>
               <p className="text-xs mt-3" style={{ color: C.textSec }}>
-                Demo mode: this opens a working placeholder message composer. Backend messaging can be connected later.
+                Messages are sent through the backend to the selected assigned mentee.
               </p>
             </div>
           </div>
