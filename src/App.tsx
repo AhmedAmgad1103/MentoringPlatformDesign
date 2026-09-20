@@ -869,6 +869,7 @@ interface FeedQuestion {
   createdAtMs?: number;
   reportedByMe?: boolean;
   isMine?: boolean;
+  isAnonymous?: boolean;
 }
 
 const FEED_QUESTIONS: FeedQuestion[] = [
