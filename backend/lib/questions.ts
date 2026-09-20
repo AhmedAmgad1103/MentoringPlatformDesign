@@ -20,9 +20,14 @@ export function visibleWhere(user: CurrentUser): Prisma.QuestionWhereInput {
   if (user.role === Role.MENTOR) {
     return {
       OR: [
-        { mentorId: user.id },
+        {
+          mentorId: user.id,
+          OR: [
+            { moderationStatus: ModerationStatus.NOT_REQUIRED },
+            { moderationStatus: ModerationStatus.APPROVED },
+          ],
+        },
         publicAndApproved,
-        mentorCommunityWhere,
       ],
     }
   }
@@ -36,9 +41,7 @@ export function visibleWhere(user: CurrentUser): Prisma.QuestionWhereInput {
 }
 
 export const publicFeedWhere = publicAndApproved
-export const mentorCommunityFeedWhere = {
-  OR: [mentorCommunityWhere, publicAndApproved],
-} satisfies Prisma.QuestionWhereInput
+export const mentorCommunityFeedWhere = publicAndApproved
 
 const baseSelect = {
   id: true,
