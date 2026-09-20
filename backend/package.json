@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "setup": "prisma generate && prisma db push",
+    "setup": "prisma generate && prisma db push && npm run seed",
     "seed": "node scripts/seed-local.mjs"
   },
   "dependencies": {
