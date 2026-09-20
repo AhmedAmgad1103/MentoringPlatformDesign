@@ -849,6 +849,7 @@ interface FeedQuestion {
   helpful: number;
   boosted: number;
   tags: string[];
+  createdAtMs?: number;
 }
 
 const FEED_QUESTIONS: FeedQuestion[] = [
@@ -3161,7 +3162,11 @@ function FeedScreen({
     if (sort === "answered") return b.responses - a.responses;
     if (sort === "boosted")
       return (b.boosted + (boostedIds.has(b.id) ? 1 : 0)) - (a.boosted + (boostedIds.has(a.id) ? 1 : 0));
-    return String(b.id).localeCompare(String(a.id));
+    if (b.createdAtMs !== undefined && a.createdAtMs !== undefined)
+      return b.createdAtMs - a.createdAtMs;
+    if (typeof b.id === "number" && typeof a.id === "number")
+      return b.id - a.id;
+    return 0;
   });
 
   return (
