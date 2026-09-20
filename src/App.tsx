@@ -1,5 +1,17 @@
 import { useState, useRef, useEffect } from "react";
-import { getQuestions, createQuestion, sendMessage } from "./api";
+import {
+  boostQuestion,
+  createAnswer,
+  createQuestion,
+  getFeedQuestions,
+  getMentorQueue,
+  getMentorMentees,
+  getQuestionDetails,
+  getQuestions,
+  sendMessage,
+  unboostQuestion,
+  updateQuestionStatus,
+} from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -826,7 +838,7 @@ const SAMPLE_RESPONSES = [
 // ─── FEED & NOTIFICATION DATA ─────────────────────────────────────────────────
 
 interface FeedQuestion {
-  id: number;
+  id: string | number;
   title: string;
   preview: string;
   full: string;
@@ -1052,7 +1064,7 @@ const MENTOR_MENTEES_DATA = [
 ];
 
 interface MentorQuestion {
-  id: number;
+  id: string | number;
   type: "private" | "any-mentor" | "anon-public" | "anon-private";
   question: string;
   category: string;
@@ -3036,26 +3048,78 @@ function FeedScreen({
   notifReadIds,
   onMarkRead,
   onMarkAllRead,
+  onToast,
 }: {
   onBack: () => void;
-  onOpenQuestion: (id: number) => void;
+  onOpenQuestion: (id: string | number) => void;
   onNavigate: (s: Screen) => void;
   notifReadIds: number[];
   onMarkRead: (id: number) => void;
   onMarkAllRead: () => void;
+  onToast: (t: ToastType, msg: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<"recent" | "helpful" | "answered" | "boosted">("recent");
-  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
+  const [boostedIds, setBoostedIds] = useState<Set<string | number>>(new Set());
+  const [liveQuestions, setLiveQuestions] = useState<FeedQuestion[] | null>(null);
 
-  const toggleBoost = (id: number) => {
-    setBoostedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  useEffect(() => {
+    let active = true;
+    getFeedQuestions()
+      .then((items) => {
+        if (active) {
+          setLiveQuestions(items);
+          setBoostedIds(
+            new Set(items.filter((q) => q.boostedByMe).map((q) => q.id))
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setLiveQuestions(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function toggleBoost(id: string | number) {
+    if (typeof id !== "string") {
+      setBoostedIds((prev) => {
+        const next = new Set(prev);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+      });
+      return;
+    }
+
+    const alreadyBoosted = boostedIds.has(id);
+    try {
+      const result = alreadyBoosted
+        ? await unboostQuestion(id)
+        : await boostQuestion(id);
+
+      setBoostedIds((prev) => {
+        const next = new Set(prev);
+        if (result.boosted) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+
+      setLiveQuestions((prev) =>
+        prev
+          ? prev.map((q) =>
+              q.id === id ? { ...q, boosted: result.boostCount } : q
+            )
+          : prev
+      );
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update boost."
+      );
+    }
+  }
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -3082,7 +3146,9 @@ function FeedScreen({
     "Other",
   ];
 
-  const filtered = FEED_QUESTIONS.filter((q) => {
+  const sourceQuestions = liveQuestions ?? FEED_QUESTIONS;
+
+  const filtered = sourceQuestions.filter((q) => {
     const matchSearch =
       !search ||
       q.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -3320,9 +3386,9 @@ function QuestionDetailScreen({
   onMarkAllRead,
   onToast,
 }: {
-  questionId: number;
+  questionId: string | number;
   onBack: () => void;
-  onOpenQuestion: (id: number) => void;
+  onOpenQuestion: (id: string | number) => void;
   onNavigate: (s: Screen) => void;
   notifReadIds: number[];
   onMarkRead: (id: number) => void;
@@ -3335,13 +3401,42 @@ function QuestionDetailScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const toggleBoost = (id: number) => {
-    setBoostedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  async function toggleBoost(id: string | number) {
+    if (typeof id !== "string") {
+      setBoostedIds((prev) => {
+        const next = new Set(prev);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+      });
+      return;
+    }
+
+    const alreadyBoosted = boostedIds.has(id);
+    try {
+      if (alreadyBoosted) {
+        await unboostQuestion(id);
+        setBoostedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setLiveQuestion((prev) =>
+          prev ? { ...prev, boostedByMe: false, boostCount: Math.max(0, prev.boostCount - 1) } : prev
+        );
+      } else {
+        const result = await boostQuestion(id);
+        setBoostedIds((prev) => new Set(prev).add(id));
+        setLiveQuestion((prev) =>
+          prev ? { ...prev, boostedByMe: true, boostCount: result.boostCount } : prev
+        );
+      }
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update boost."
+      );
+    }
+  }
 
   const unread = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
 
@@ -3355,9 +3450,38 @@ function QuestionDetailScreen({
     return () => document.removeEventListener("mousedown", h);
   }, [notifOpen]);
 
-  const question = FEED_QUESTIONS.find((q) => q.id === questionId) || FEED_QUESTIONS[0];
+  const fallbackQuestion =
+    FEED_QUESTIONS.find((q) => q.id === questionId) || FEED_QUESTIONS[0];
 
-  const RESPONSES_EXTENDED = [
+  const question: FeedQuestion = liveQuestion
+    ? {
+        id: liveQuestion.id,
+        title: liveQuestion.title,
+        preview: liveQuestion.content,
+        full: liveQuestion.content,
+        category: liveQuestion.category.replaceAll("_", " "),
+        date: new Date(liveQuestion.createdAt).toLocaleDateString(),
+        responses: liveQuestion.answerCount,
+        helpful: 0,
+        boosted: liveQuestion.boostCount,
+        tags: [],
+      }
+    : fallbackQuestion;
+
+  const RESPONSES_EXTENDED = liveQuestion
+    ? liveQuestion.answers.map((a, i) => ({
+        id: a.id as any,
+        mentor: {
+          name: a.mentor.name ?? "Mentor",
+          specialty: "Physician Mentor",
+          photo: MENTOR.photo,
+          expertise: [],
+        },
+        answer: a.content,
+        timestamp: new Date(a.createdAt).toLocaleString(),
+        helpfulCount: Math.max(0, liveQuestion.answers.length - i),
+      }))
+    : [
     ...SAMPLE_RESPONSES,
     {
       id: 4,
@@ -3372,7 +3496,7 @@ function QuestionDetailScreen({
       timestamp: "3 days ago",
       helpfulCount: 5,
     },
-  ];
+    ];
 
   const sortedResponses = [...RESPONSES_EXTENDED].sort((a, b) => {
     if (sort === "helpful")
@@ -4233,11 +4357,22 @@ function AskQuestionScreen({
     setAttachment(null);
   }
 
-  async function handleSubmit(successStep: AskStep, toastMsg: string, privacy: string) {
+  async function handleSubmit(
+    successStep: AskStep,
+    toastMsg: string,
+    privacy: string,
+    askType: "MY_MENTOR" | "ANY_MENTOR" | "ANONYMOUS"
+  ) {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      await createQuestion({
+        title: title.trim(),
+        category,
+        body: question.trim(),
+        privacy,
+        askType,
+      });
       onToast("success", toastMsg);
       setStep(successStep);
     } catch (error) {
@@ -4454,7 +4589,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private")}
+            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private", "MY_MENTOR")}
             submitLabel="Send to Dr. Khaled"
           />
         </div>
@@ -4558,7 +4693,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!", "any-mentor")}
+            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!", "any-mentor", "ANY_MENTOR")}
             submitLabel="Share with Mentors"
           />
         </div>
@@ -4894,7 +5029,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!", "anon-public")}
+            onSubmit={() => handleSubmit("success-anon-public", "Anonymous question submitted for review!", "anon-public", "ANONYMOUS")}
             submitLabel="Submit for Approval"
           />
         </div>
@@ -4960,7 +5095,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!", "anon-private")}
+            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!", "anon-private", "ANONYMOUS")}
             submitLabel="Submit Privately"
           />
         </div>
@@ -5238,10 +5373,25 @@ function MentorAnswerScreen({
     }, 0);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!answer.trim()) return;
-    onToast("success", "Response sent successfully!");
-    setStep("success");
+    try {
+      if (typeof question.id === "string") {
+        await createAnswer(question.id, answer.trim());
+      }
+      onToast("success", "Response sent successfully!");
+      setStep("success");
+    } catch (error) {
+      if (DEMO_MODE) {
+        onToast("success", "Response sent successfully!");
+        setStep("success");
+      } else {
+        onToast(
+          "error",
+          error instanceof Error ? error.message : "Unable to send the response."
+        );
+      }
+    }
   }
 
   if (step === "success") {
@@ -8532,7 +8682,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("login");
   const [role, setRole] = useState<Role>("mentee");
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [selectedQuestionId, setSelectedQuestionId] = useState<number>(101);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [notifReadIds, setNotifReadIds] = useState<number[]>([]);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
   let toastId = 0;
@@ -8558,7 +8708,7 @@ export default function App() {
     );
   }
 
-  function openQuestion(id: number) {
+  function openQuestion(id: string | number) {
     setSelectedQuestionId(id);
     setScreen("question-detail");
   }
@@ -8683,6 +8833,7 @@ export default function App() {
           onBack={() => setScreen("dashboard")}
           onOpenQuestion={openQuestion}
           onNavigate={setScreen}
+          onToast={addToast}
           {...sharedNotifProps}
         />
       )}
