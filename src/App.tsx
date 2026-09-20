@@ -3488,6 +3488,16 @@ function QuestionDetailScreen({
   const [reported, setReported] = useState(false);
   const [boosted, setBoosted] = useState(false);
   const [boostCount, setBoostCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
+  const [editingAnswerContent, setEditingAnswerContent] = useState("");
+  const [savingAnswer, setSavingAnswer] = useState(false);
+
+  useEffect(() => {
+    getMe()
+      .then((me) => setCurrentUserId(me.id))
+      .catch(() => setCurrentUserId(null));
+  }, []);
 
   useEffect(() => {
     if (typeof questionId !== "string") {
@@ -3573,6 +3583,7 @@ function QuestionDetailScreen({
         answer: a.content,
         timestamp: new Date(a.createdAt).toLocaleString(),
         helpfulCount: 0,
+        mentorId: a.mentor?.id ?? null,
       }))
     : [];
 
@@ -3626,6 +3637,49 @@ function QuestionDetailScreen({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  }
+
+  function startEditingAnswer(id: string, content: string) {
+    setEditingAnswerId(id);
+    setEditingAnswerContent(content);
+  }
+
+  function cancelEditingAnswer() {
+    setEditingAnswerId(null);
+    setEditingAnswerContent("");
+  }
+
+  async function saveEditedAnswer() {
+    if (!editingAnswerId || typeof question.id !== "string") return;
+    const content = editingAnswerContent.trim();
+    if (!content) {
+      onToast("error", "Response cannot be empty.");
+      return;
+    }
+
+    setSavingAnswer(true);
+    try {
+      const result = await updateAnswer(question.id, editingAnswerId, content);
+      setLiveQuestion((prev) =>
+        prev
+          ? {
+              ...prev,
+              answers: prev.answers.map((answer) =>
+                answer.id === editingAnswerId ? result.item : answer
+              ),
+            }
+          : prev
+      );
+      cancelEditingAnswer();
+      onToast("success", "Response updated successfully.");
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update response."
+      );
+    } finally {
+      setSavingAnswer(false);
+    }
   }
 
   return (
@@ -3746,6 +3800,14 @@ function QuestionDetailScreen({
                   <div className="text-xs" style={{ color: C.textSec }}>
                     {question.date}
                   </div>
+                  {liveQuestion?.isMine && liveQuestion.moderationStatus === "PENDING" && (
+                    <div
+                      className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                      style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                    >
+                      Awaiting Approval
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   {isAnonymous && <PrivacyBadge type="hidden" />}
@@ -3870,19 +3932,50 @@ function QuestionDetailScreen({
                             className="w-11 h-11 rounded-full object-cover flex-shrink-0"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-sm" style={{ color: C.text }}>
-                                {r.mentor.name}
-                              </span>
-                            </div>
-                            <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                              {r.mentor.specialty} · {r.timestamp}
-                            </div>
-                          </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm" style={{ color: C.text }}>
+                            {r.mentor.name}
+                          </span>
+                          {currentUserId && r.mentorId === currentUserId && (
+                            <button
+                              type="button"
+                              onClick={() => startEditingAnswer(String(r.id), r.answer)}
+                              className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                              style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                            >
+                              Edit
+                            </button>
+                          )}
                         </div>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap mb-4" style={{ color: C.text }}>
-                          {r.answer}
-                        </p>
+                        <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                          {r.mentor.specialty} · {r.timestamp}
+                        </div>
+                      </div>
+                    </div>
+                    {editingAnswerId === String(r.id) ? (
+                      <div className="mb-4">
+                        <textarea
+                          rows={6}
+                          value={editingAnswerContent}
+                          onChange={(e) => setEditingAnswerContent(e.target.value)}
+                          className="w-full px-4 py-3 text-sm bg-white outline-none resize-none rounded-xl"
+                          style={{ color: C.text, border: "1.5px solid " + C.primary }}
+                        />
+                        <div className="flex items-center justify-end gap-2 mt-2">
+                          <Button variant="secondary" size="sm" onClick={cancelEditingAnswer} disabled={savingAnswer}>
+                            Cancel
+                          </Button>
+                          <Button variant="primary" size="sm" onClick={() => void saveEditedAnswer()} disabled={savingAnswer}>
+                            {savingAnswer ? "Saving…" : "Save Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap mb-4" style={{ color: C.text }}>
+                        {r.answer}
+                      </p>
+                    )}
                         <div
                           className="flex items-center justify-between pt-3"
                           style={{ borderTop: `1px solid ${C.border}` }}
