@@ -7869,68 +7869,100 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
 
 // ─── ADMIN REPORTS VIEW ────────────────────────────────────────────────────────
 
+type AdminReportItem = Awaited<ReturnType<typeof getAdminReports>>["items"][number];
+
 function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const [items, setItems] = useState(MODERATION_ITEMS);
-  const [filterStatus, setFilterStatus] = useState<ModerationStatus | "all">("reported");
-  const [reviewItem, setReviewItem] = useState<ModerationItem | null>(null);
-  const [actionModal, setActionModal] = useState<{ id: number; label: string; desc: string } | null>(null);
+  const [items, setItems] = useState<AdminReportItem[]>([]);
+  const [counts, setCounts] = useState({
+    PENDING: 0,
+    DISMISSED: 0,
+    ACTION_TAKEN: 0,
+  });
+  const [filterStatus, setFilterStatus] = useState<ReportStatusValue>("PENDING");
+  const [selectedReport, setSelectedReport] = useState<AdminReportItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
 
-  function handleApprove(id: string | number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
-    setReviewItem(null);
+  async function loadReports() {
+    setLoading(true);
+    try {
+      const response = await getAdminReports({
+        status: filterStatus,
+        limit: 50,
+      });
+      setItems(response.items);
+      setCounts(response.counts);
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to load reports."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleReject(id: string | number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-    setReviewItem(null);
+  useEffect(() => {
+    void loadReports();
+  }, [filterStatus]);
+
+  const REASON_LABELS: Record<string, string> = {
+    SPAM: "Spam",
+    HARASSMENT: "Harassment or abuse",
+    INAPPROPRIATE_CONTENT: "Inappropriate content",
+    MISINFORMATION: "Misinformation",
+    PRIVACY: "Privacy or personal information",
+    OFF_TOPIC: "Off-topic",
+    OTHER: "Other",
+  };
+
+  async function handleAction(report: AdminReportItem, action: "DISMISS" | "REMOVE_POST") {
+    if (working) return;
+    setWorking(true);
+    try {
+      await updateAdminReport(report.id, action);
+      setSelectedReport(null);
+      await loadReports();
+      onToast(
+        "success",
+        action === "REMOVE_POST"
+          ? "Post removed and all pending reports for it were resolved."
+          : "Report dismissed."
+      );
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update the report."
+      );
+    } finally {
+      setWorking(false);
+    }
   }
 
-  function handleAction(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-    setActionModal(null);
-    onToast("success", "Action completed.");
-  }
-
-  const filtered = items.filter(m => filterStatus === "all" || m.status === filterStatus);
-
-  const STATUS_TABS: { v: ModerationStatus | "all"; label: string }[] = [
-    { v: "reported", label: `Reported (${items.filter(m => m.status === "reported").length})` },
-    { v: "pending", label: `Pending (${items.filter(m => m.status === "pending").length})` },
-    { v: "approved", label: `Approved (${items.filter(m => m.status === "approved").length})` },
-    { v: "rejected", label: `Rejected (${items.filter(m => m.status === "rejected").length})` },
-    { v: "all", label: "All" },
+  const STATUS_TABS: Array<{ v: ReportStatusValue; label: string; count: number }> = [
+    { v: "PENDING", label: "Pending", count: counts.PENDING },
+    { v: "DISMISSED", label: "Dismissed", count: counts.DISMISSED },
+    { v: "ACTION_TAKEN", label: "Action taken", count: counts.ACTION_TAKEN },
   ];
-
-  const TYPE_LABEL: Record<ModerationItem["type"], string> = {
-    "anon-question": "Anon Question",
-    "reported-question": "Reported Question",
-    "reported-answer": "Reported Answer",
-    "suspicious": "Suspicious Activity",
-  };
-
-  const TYPE_COLOR: Record<ModerationItem["type"], { bg: string; color: string }> = {
-    "anon-question": { bg: C.pendingLight, color: C.pending },
-    "reported-question": { bg: C.errorLight, color: C.error },
-    "reported-answer": { bg: C.errorLight, color: C.error },
-    "suspicious": { bg: "#EDE9FE", color: "#7C3AED" },
-  };
-
-  const statusStyle: Record<ModerationStatus, { bg: string; color: string }> = {
-    pending:  { bg: C.pendingLight,  color: C.pending  },
-    approved: { bg: C.successLight,  color: C.success  },
-    rejected: { bg: C.errorLight,    color: C.error    },
-    reported: { bg: C.errorLight,    color: "#DC2626"  },
-  };
 
   return (
     <div className="fade-in flex flex-col gap-4">
-      <p className="text-sm" style={{ color: C.textSec }}>
-        All reports including flagged questions, reported answers, and suspicious account activity. Confirmation is required for every moderation action.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm" style={{ color: C.textSec }}>
+            Students and mentors can report approved public posts. Reviewers can dismiss a report or remove the reported post from mentor/public views.
+          </p>
+          <p className="text-xs mt-1" style={{ color: C.textSec }}>
+            Removing a post resolves all pending reports for that post.
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => void loadReports()}>
+          Refresh
+        </Button>
+      </div>
 
-      {/* Status tabs */}
       <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ backgroundColor: C.borderLight }}>
-        {STATUS_TABS.map(({ v, label }) => (
+        {STATUS_TABS.map(({ v, label, count }) => (
           <button
             key={v}
             onClick={() => setFilterStatus(v)}
@@ -7941,103 +7973,177 @@ function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) =>
               boxShadow: filterStatus === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
             }}
           >
-            {label}
+            {label} ({count})
           </button>
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div
           className="grid text-xs font-semibold px-5 py-3"
           style={{
-            gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto",
+            gridTemplateColumns: "2.4fr 1.2fr 1.4fr .9fr .9fr auto",
             backgroundColor: C.bg,
             borderBottom: `1px solid ${C.border}`,
             color: C.textSec,
           }}
         >
-          <div>CONTENT</div>
-          <div>TYPE</div>
+          <div>POST</div>
+          <div>REASON</div>
+          <div>REPORTER</div>
           <div>FLAGS</div>
-          <div>DATE</div>
           <div>STATUS</div>
-          <div>ACTIONS</div>
+          <div>ACTION</div>
         </div>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No items match this filter.</div>
+
+        {loading && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>
+            Loading reports…
+          </div>
         )}
-        {filtered.map((item, i) => (
+
+        {!loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>
+            No reports in this status.
+          </div>
+        )}
+
+        {!loading && items.map((item, index) => (
           <div
             key={item.id}
             className="grid items-center px-5 py-3.5 gap-3"
             style={{
-              gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto",
-              borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
+              gridTemplateColumns: "2.4fr 1.2fr 1.4fr .9fr .9fr auto",
+              borderTop: index === 0 ? "none" : `1px solid ${C.borderLight}`,
             }}
           >
-            <p
-              className="text-xs leading-snug overflow-hidden"
-              style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
-            >
-              {item.questionText}
-            </p>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: TYPE_COLOR[item.type].bg, color: TYPE_COLOR[item.type].color }}
-            >
-              {TYPE_LABEL[item.type]}
-            </span>
-            <div className="text-xs font-semibold" style={{ color: item.flagCount ? C.error : C.textSec }}>
-              {item.flagCount != null ? `${item.flagCount} flag${item.flagCount !== 1 ? "s" : ""}` : "—"}
-            </div>
-            <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-              style={{ backgroundColor: statusStyle[item.status].bg, color: statusStyle[item.status].color }}
-            >
-              {item.status}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setReviewItem(item)}
-                className="text-xs font-semibold px-2.5 py-1 rounded-xl transition-all hover:opacity-80"
-                style={{ backgroundColor: C.primaryLight, color: C.primary }}
+            <div className="min-w-0">
+              <p
+                className="text-xs font-semibold leading-snug overflow-hidden"
+                style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
               >
-                Review
-              </button>
-              {item.status === "reported" && (
-                <button
-                  onClick={() => setActionModal({ id: item.id, label: "Remove Content", desc: `Remove this content permanently. The reporter will not be notified.` })}
-                  className="text-xs font-semibold px-2.5 py-1 rounded-xl transition-all hover:opacity-80"
-                  style={{ backgroundColor: C.errorLight, color: C.error }}
-                >
-                  Remove
-                </button>
-              )}
+                {item.question.title}
+              </p>
+              <p className="text-xs mt-1" style={{ color: C.textSec }}>
+                {item.question.isAnonymous ? "Anonymous post" : "Public post"} · {new Date(item.question.createdAt).toLocaleDateString()}
+              </p>
             </div>
+
+            <span
+              className="text-xs px-2 py-1 rounded-full font-medium w-fit"
+              style={{ backgroundColor: C.errorLight, color: C.error }}
+            >
+              {REASON_LABELS[item.reason] ?? item.reason}
+            </span>
+
+            <div className="min-w-0">
+              <p className="text-xs font-medium truncate" style={{ color: C.text }}>
+                {item.reporter.name ?? "User"}
+              </p>
+              <p className="text-xs truncate" style={{ color: C.textSec }}>
+                {item.reporter.email}
+              </p>
+            </div>
+
+            <div className="text-xs font-semibold" style={{ color: item.question._count.reports > 1 ? C.error : C.textSec }}>
+              {item.question._count.reports}
+            </div>
+
+            <span
+              className="text-xs px-2 py-1 rounded-full font-medium w-fit"
+              style={{
+                backgroundColor:
+                  item.status === "PENDING" ? C.pendingLight :
+                  item.status === "ACTION_TAKEN" ? C.successLight :
+                  C.borderLight,
+                color:
+                  item.status === "PENDING" ? C.pending :
+                  item.status === "ACTION_TAKEN" ? C.success :
+                  C.textSec,
+              }}
+            >
+              {item.status === "ACTION_TAKEN" ? "Action taken" : item.status === "PENDING" ? "Pending" : "Dismissed"}
+            </span>
+
+            <Button variant="secondary" size="sm" onClick={() => setSelectedReport(item)}>
+              Review
+            </Button>
           </div>
         ))}
       </div>
 
-      {reviewItem && (
-        <ModerationReviewPanel
-          item={reviewItem}
-          onClose={() => setReviewItem(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onToast={onToast}
-        />
-      )}
-      {actionModal && (
-        <ActionModal
-          title={actionModal.label}
-          description={actionModal.desc}
-          confirmLabel="Confirm"
-          confirmVariant="danger"
-          onClose={() => setActionModal(null)}
-          onConfirm={() => handleAction(actionModal.id)}
-        />
+      {selectedReport && (
+        <Modal title="Review reported post" onClose={() => setSelectedReport(null)} width={600}>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CategoryBadge category={selectedReport.question.category.replaceAll("_", " ")} />
+              <span
+                className="text-xs px-2 py-1 rounded-full font-medium"
+                style={{ backgroundColor: C.errorLight, color: C.error }}
+              >
+                {REASON_LABELS[selectedReport.reason] ?? selectedReport.reason}
+              </span>
+              <span className="text-xs ml-auto" style={{ color: C.textSec }}>
+                {selectedReport.question._count.reports} total report{selectedReport.question._count.reports === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div>
+              <h4 className="text-base font-bold mb-1" style={{ color: C.text }}>
+                {selectedReport.question.title}
+              </h4>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.textSec }}>
+                {selectedReport.question.content}
+              </p>
+            </div>
+
+            {selectedReport.details && (
+              <div className="rounded-xl p-3" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.text }}>Reporter details</div>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: C.textSec }}>
+                  {selectedReport.details}
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl p-3" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: C.text }}>Reported by</div>
+              <p className="text-sm" style={{ color: C.text }}>
+                {selectedReport.reporter.name ?? "User"} · {selectedReport.reporter.email}
+              </p>
+              <p className="text-xs mt-1" style={{ color: C.textSec }}>
+                Current post moderation status: {selectedReport.question.moderationStatus}
+              </p>
+            </div>
+
+            {selectedReport.status === "PENDING" ? (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={working}
+                  onClick={() => void handleAction(selectedReport, "DISMISS")}
+                >
+                  Dismiss report
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={working}
+                  onClick={() => void handleAction(selectedReport, "REMOVE_POST")}
+                >
+                  Remove post
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end">
+                <Button variant="secondary" size="sm" onClick={() => setSelectedReport(null)}>
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );
