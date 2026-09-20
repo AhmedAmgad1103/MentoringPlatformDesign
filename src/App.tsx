@@ -718,53 +718,9 @@ function getMentorTier(points: number) {
   return { ...tier, next, progress };
 }
 
-const REWARD_MONTH_KEY = "medmentor_reward_month";
-const CURRENT_REWARD_MONTH = (() => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-})();
-
-const REWARD_RESET_THIS_MONTH = (() => {
-  if (typeof window === "undefined") return false;
-  const stored = window.localStorage.getItem(REWARD_MONTH_KEY);
-  if (stored === null) {
-    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
-    return false;
-  }
-  if (stored !== CURRENT_REWARD_MONTH) {
-    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
-    return true;
-  }
-  return false;
-})();
-
-function MentorTierBadge({ points, size = "sm" }: { points: number; size?: "sm" | "md" }) {
-  const tier = getMentorTier(points);
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full font-semibold ${
-        size === "sm" ? "text-xs px-2 py-0.5" : "text-sm px-3 py-1"
-      }`}
-      style={{ backgroundColor: tier.bg, color: tier.color }}
-    >
-      <span>{tier.emoji}</span> {tier.label}
-    </span>
-  );
-}
-
-const LEADERBOARD_MENTORS = [
-  { id: 1, name: "Dr. Mariam Khaled", specialty: "Internal Medicine", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=120&h=120&fit=crop&auto=format", points: 285 },
-  { id: 2, name: "Dr. Amara Osei", specialty: "Family Medicine", photo: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=120&h=120&fit=crop&auto=format", points: 340 },
-  { id: 3, name: "Dr. Priya Patel", specialty: "Neurology", photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=120&h=120&fit=crop&auto=format", points: 198 },
-  { id: 4, name: "Dr. Samuel Chen", specialty: "Surgery", photo: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=120&h=120&fit=crop&auto=format", points: 132 },
-  { id: 5, name: "Dr. Layla Ahmed", specialty: "Pediatrics", photo: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=120&h=120&fit=crop&auto=format", points: 61 },
-  { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
-].sort((a, b) => b.points - a.points);
-
-const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : MENTOR.points;
+const CURRENT_MENTOR_POINTS = MENTOR.points;
 const CURRENT_LEADERBOARD_MENTORS = LEADERBOARD_MENTORS.map((mentor) => ({
   ...mentor,
-  points: REWARD_RESET_THIS_MONTH ? 0 : mentor.points,
 }));
 
 const QUESTIONS = [
@@ -5994,6 +5950,19 @@ function MentorProfileScreen({
   const [profile, setProfile] = useState(MENTOR_PROFILE_DATA);
   const [draft, setDraft] = useState(profile);
   const [expertise, setExpertise] = useState(profile.expertise);
+  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; questionCount: number }>>([]);
+
+  useEffect(() => {
+    let active = true;
+    getMentorMentees()
+      .then((response) => {
+        if (active) setLiveMentees(response.items);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function saveEdit() {
     try {
@@ -6290,7 +6259,16 @@ function MentorProfileScreen({
         <Card className="p-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Current Mentees</h3>
           <div className="flex flex-col gap-2">
-            {displayMentees.map(m => (
+            {(liveMentees.length > 0
+              ? liveMentees.map((m, index) => ({
+                  ...MENTOR_MENTEES_DATA[index % MENTOR_MENTEES_DATA.length],
+                  id: m.id,
+                  name: m.name ?? "Mentee",
+                  email: m.email,
+                  totalQuestions: m.questionCount,
+                }))
+              : MENTOR_MENTEES_DATA
+            ).map(m => (
               <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
                 <div className="relative">
                   <img src={m.photo} alt={m.name} className="w-9 h-9 rounded-full object-cover" />
