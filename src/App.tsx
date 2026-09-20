@@ -6137,7 +6137,7 @@ function MentorDashboardScreen({
         </div>
 
         {/* MY MENTEES */}
-        {(activeSection === "all") && (
+        {(activeSection === "all" || activeSection === "mentees") && (
           <section className="mb-8 fade-in">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
