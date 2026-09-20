@@ -11,6 +11,9 @@ import {
   rejectQuestion as rejectQuestionApi,
   getMentorMentees as getMentorMenteesApi,
   getMessages as getMessagesApi,
+  getAdminReports as getAdminReportsApi,
+  reportQuestion as reportQuestionApi,
+  updateAdminReport as updateAdminReportApi,
   getQuestion as getQuestionApi,
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
@@ -25,6 +28,8 @@ import {
   type ApiQuestion,
   type ApiUser,
   type QuestionCategory,
+  type ReportReason,
+  type ReportStatus,
 } from "./apiClient";
 
 export interface DemoQuestion {
@@ -146,6 +151,7 @@ export async function getFeedQuestions() {
     boosted: q.boostCount,
     tags: [] as string[],
     boostedByMe: q.boostedByMe,
+    reportedByMe: q.reportedByMe,
     isAnonymous: q.isAnonymous,
     student: q.student,
   }));
@@ -212,6 +218,26 @@ export async function boostQuestion(questionId: string) {
 
 export async function unboostQuestion(questionId: string) {
   return unboostQuestionApi(questionId);
+}
+
+export async function reportQuestion(
+  questionId: string,
+  input: { reason: ReportReason; details?: string }
+) {
+  return reportQuestionApi(questionId, input);
+}
+
+export async function getAdminReports(
+  options: { status?: ReportStatus | "all"; page?: number; limit?: number } = {}
+) {
+  return getAdminReportsApi(options);
+}
+
+export async function updateAdminReport(
+  reportId: string,
+  action: "DISMISS" | "REMOVE_POST"
+) {
+  return updateAdminReportApi(reportId, action);
 }
 
 export async function updateQuestionStatus(
