@@ -87,6 +87,10 @@ export async function getQuestions(): Promise<DemoQuestion[]> {
   return response.items.map(mapQuestion);
 }
 
+export async function getAdminQuestions() {
+  return getQuestionsApi({ scope: "all", limit: 50, sort: "recent" });
+}
+
 export async function createQuestion(input: {
   title: string;
   category: string;
