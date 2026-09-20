@@ -14,6 +14,8 @@ import {
   getQuestion as getQuestionApi,
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
+  localLogin as localLoginApi,
+  localLogout as localLogoutApi,
   sendMessage as sendMessageApi,
   unboostQuestion as unboostQuestionApi,
   updateAnswer as updateAnswerApi,
@@ -300,4 +302,12 @@ export async function approveQuestion(questionId: string) {
 
 export async function rejectQuestion(questionId: string) {
   return rejectQuestionApi(questionId);
+}
+
+export async function localLogin(email: string, password: string) {
+  return localLoginApi(email, password);
+}
+
+export async function localLogout() {
+  return localLogoutApi();
 }
