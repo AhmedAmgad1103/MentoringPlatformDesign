@@ -36,7 +36,9 @@ export function visibleWhere(user: CurrentUser): Prisma.QuestionWhereInput {
 }
 
 export const publicFeedWhere = publicAndApproved
-export const mentorCommunityFeedWhere = mentorCommunityWhere
+export const mentorCommunityFeedWhere = {
+  OR: [mentorCommunityWhere, publicAndApproved],
+} satisfies Prisma.QuestionWhereInput
 
 const baseSelect = {
   id: true,
