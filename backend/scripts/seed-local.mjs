@@ -57,6 +57,22 @@ async function main() {
     data: { assignedMentorId: users["mentor@gmail.com"].id },
   })
 
+  // Legacy local data may contain community/anonymous questions created before
+  // moderation was required. Keep only direct private mentee -> assigned mentor
+  // questions outside moderation.
+  await prisma.question.updateMany({
+    where: {
+      moderationStatus: ModerationStatus.NOT_REQUIRED,
+      OR: [
+        { visibility: QuestionVisibility.PUBLIC },
+        { isAnonymous: true },
+      ],
+    },
+    data: {
+      moderationStatus: ModerationStatus.PENDING,
+    },
+  })
+
   const existingSeedQuestion = await prisma.question.findFirst({
     where: {
       studentId: users["student@gmail.com"].id,
