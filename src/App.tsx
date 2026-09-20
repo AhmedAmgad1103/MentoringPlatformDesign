@@ -7,6 +7,7 @@ import {
   getMentorQueue,
   getMentorMentees,
   getModerationQueue,
+  getAdminReports,
   getQuestionDetails,
   getQuestions,
   localLogin,
@@ -14,7 +15,9 @@ import {
   getMe,
   sendMessage,
   unboostQuestion,
+  updateAdminReport,
   updateQuestionStatus,
+  reportQuestion,
 } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
@@ -48,6 +51,17 @@ type Screen =
 type Role = "mentee" | "mentor" | "admin" | null;
 
 type ToastType = "success" | "error" | "info";
+
+type ReportReasonValue =
+  | "SPAM"
+  | "HARASSMENT"
+  | "INAPPROPRIATE_CONTENT"
+  | "MISINFORMATION"
+  | "PRIVACY"
+  | "OFF_TOPIC"
+  | "OTHER";
+
+type ReportStatusValue = "PENDING" | "DISMISSED" | "ACTION_TAKEN";
 
 interface Toast {
   id: number;
@@ -1077,6 +1091,7 @@ interface MentorQuestion {
   priority?: "high" | "normal";
   asker: { name: string; year?: string; track?: string; photo?: string } | null;
   responses: number;
+  reportedByMe?: boolean;
 }
 
 const MENTOR_WAITING_QUESTIONS: MentorQuestion[] = [
@@ -6856,6 +6871,115 @@ function ActionModal({
       <div className="flex items-center gap-3 justify-end">
         <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
         <Button variant={confirmVariant} size="sm" onClick={onConfirm}>{confirmLabel}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+function ReportQuestionModal({
+  questionId,
+  questionTitle,
+  onClose,
+  onReported,
+  onToast,
+}: {
+  questionId: string;
+  questionTitle: string;
+  onClose: () => void;
+  onReported: () => void;
+  onToast: (t: ToastType, msg: string) => void;
+}) {
+  const [reason, setReason] = useState<ReportReasonValue | "">("");
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const REASONS: Array<{ value: ReportReasonValue; label: string }> = [
+    { value: "SPAM", label: "Spam" },
+    { value: "HARASSMENT", label: "Harassment or abuse" },
+    { value: "INAPPROPRIATE_CONTENT", label: "Inappropriate content" },
+    { value: "MISINFORMATION", label: "Misinformation" },
+    { value: "PRIVACY", label: "Privacy or personal information" },
+    { value: "OFF_TOPIC", label: "Off-topic" },
+    { value: "OTHER", label: "Other" },
+  ];
+
+  async function submit() {
+    if (!reason || submitting) return;
+    setSubmitting(true);
+    try {
+      await reportQuestion(questionId, {
+        reason,
+        details: details.trim() || undefined,
+      });
+      onReported();
+      onClose();
+      onToast("success", "Post reported. An admin will review it.");
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to report this post."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title="Report post" onClose={onClose} width={520}>
+      <p className="text-sm mb-1 font-semibold" style={{ color: C.text }}>
+        Why are you reporting this post?
+      </p>
+      <p className="text-xs mb-4" style={{ color: C.textSec }}>
+        Reports are reviewed by admins. The post stays visible until an admin takes action.
+      </p>
+
+      <div className="flex flex-col gap-2 mb-4">
+        {REASONS.map((item) => (
+          <label
+            key={item.value}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
+            style={{
+              border: `1px solid ${reason === item.value ? C.primary : C.border}`,
+              backgroundColor: reason === item.value ? C.primaryLight : "#fff",
+            }}
+          >
+            <input
+              type="radio"
+              name="report-reason"
+              value={item.value}
+              checked={reason === item.value}
+              onChange={() => setReason(item.value)}
+            />
+            <span className="text-sm" style={{ color: C.text }}>{item.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <textarea
+        value={details}
+        onChange={(e) => setDetails(e.target.value)}
+        maxLength={1000}
+        rows={4}
+        placeholder="Add details for the admin (optional)…"
+        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none mb-1"
+        style={{ border: `1.5px solid ${C.border}`, color: C.text }}
+      />
+      <p className="text-xs mb-5 text-right" style={{ color: C.textSec }}>
+        {details.length}/1000
+      </p>
+
+      <div
+        className="rounded-xl px-3 py-2.5 mb-5 text-xs"
+        style={{ backgroundColor: C.bg, border: `1px solid ${C.border}`, color: C.textSec }}
+      >
+        <strong style={{ color: C.text }}>Post:</strong> {questionTitle}
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+        <Button variant="danger" size="sm" disabled={!reason || submitting} onClick={submit}>
+          {submitting ? "Reporting…" : "Report post"}
+        </Button>
       </div>
     </Modal>
   );
