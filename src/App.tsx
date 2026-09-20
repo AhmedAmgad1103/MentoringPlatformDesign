@@ -6046,7 +6046,8 @@ function MentorDashboardScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
-  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & { id: string | number };
+  const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
   const [showAllMentees, setShowAllMentees] = useState(false);
   const [reportingQuestion, setReportingQuestion] = useState<MentorQuestion | null>(null);
@@ -6458,7 +6459,7 @@ function MentorDashboardScreen({
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              {MENTOR_WAITING_QUESTIONS.map((q) => (
+              {waitingQuestions.map((q) => (
                 <MentorQuestionCard
                   key={q.id}
                   q={q}
@@ -6495,7 +6496,7 @@ function MentorDashboardScreen({
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {MENTOR_ANY_QUESTIONS.map((q) => (
+                {anyQuestions.map((q) => (
                   <MentorQuestionCard
                   key={q.id}
                   q={q}
@@ -6534,7 +6535,7 @@ function MentorDashboardScreen({
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {MENTOR_ANON_QUESTIONS.map((q) => (
+                {anonQuestions.map((q) => (
                   <MentorQuestionCard
                   key={q.id}
                   q={q}
@@ -6593,7 +6594,7 @@ function MentorDashboardScreen({
               <div>
                 <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
                 <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                  {displayMentees.length} assigned mentees
                 </p>
               </div>
               <button
