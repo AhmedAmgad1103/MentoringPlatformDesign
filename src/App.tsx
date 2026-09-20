@@ -10,6 +10,7 @@ import {
   getAdminReports,
   getQuestionDetails,
   getQuestions,
+  getAdminQuestions,
   localLogin,
   localLogout,
   getMe,
@@ -4905,149 +4906,55 @@ function AskQuestionScreen({
                   <path d="M6 9l2 2 4-4" stroke={C.success} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <p className="text-xs leading-relaxed" style={{ color: "#065F46" }}>
-                  Your name, profile picture, year, and track are visible to mentors and other students. All physician mentors can respond, and other students can read the answers.
+                  Your name, profile picture, year, and track will be visible after approval. All physician mentors can respond once the question is approved, and other students can read the answers after publication.
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-any-mentor", "Question shared with all mentors!", "any-mentor")}
-            submitLabel="Share with Mentors"
+            onSubmit={() => handleSubmit("success-any-mentor", "Question submitted for admin approval.", "any-mentor")}
+            submitLabel="Submit for Approval"
           />
         </div>
       </div>
     );
   }
 
-  // ── SUCCESS: ANY MENTOR (with responses) ──────────────────────────────────
+  // ── SUCCESS: ANY MENTOR ────────────────────────────────────────────────────
   if (step === "success-any-mentor") {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader onBack={onBack} title="Question Shared" subtitle="Your question is live" />
-        <div className="max-w-3xl mx-auto px-6 py-8 fade-in">
-          {/* Success banner */}
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
+        <div className="w-full max-w-md text-center fade-in">
           <div
-            className="rounded-2xl p-5 mb-6 flex items-start gap-4"
-            style={{ background: `linear-gradient(135deg, ${C.primaryLight} 0%, #C7D2FE 100%)`, border: `1px solid #A5B4FC` }}
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+            style={{ background: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)" }}
           >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: C.primary }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M5 10l3.5 3.5L15 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="13" stroke={C.pending} strokeWidth="2" />
+              <path d="M20 12v9l5 3" stroke={C.pending} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <PrivacyBadge type="public" />
+            <PrivacyBadge type="pending-approval" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your question is awaiting approval.</h2>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
+            Your question was submitted successfully, but it is not public yet. An admin must approve it before mentors can see it or students can read the answers.
+          </p>
+          <Card className="p-4 mb-6 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <PrivacyBadge type="public" />
+              <PrivacyBadge type="pending-approval" />
             </div>
-            <div className="flex-1">
-              <div className="font-bold text-sm mb-0.5" style={{ color: C.primary }}>Your question has been shared with all mentors.</div>
-              <p className="text-xs leading-relaxed" style={{ color: "#3730A3" }}>
-                {title || "What's the best approach to Step 1 study in a 10-week block?"}
-              </p>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {[
-              { label: "Mentors Viewed", value: "34" },
-              { label: "Responses", value: "3" },
-              { label: "Helpful Votes", value: String(30 + helpfulVotes.size) },
-            ].map((s) => (
-              <Card key={s.label} className="p-4 text-center">
-                <div className="text-2xl font-bold mb-0.5" style={{ color: C.primary }}>{s.value}</div>
-                <div className="text-xs" style={{ color: C.textSec }}>{s.label}</div>
-              </Card>
-            ))}
-          </div>
-
-          {/* Sort */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>
-              {SAMPLE_RESPONSES.length} Responses
-            </h3>
-            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: C.borderLight }}>
-              {(["helpful", "newest", "relevant"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSort(s)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
-                  style={{
-                    backgroundColor: sort === s ? "#fff" : "transparent",
-                    color: sort === s ? C.text : C.textSec,
-                    boxShadow: sort === s ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                  }}
-                >
-                  {s === "helpful" ? "Most Helpful" : s === "newest" ? "Newest" : "Most Relevant"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Responses */}
-          <div className="flex flex-col gap-4">
-            {sortedResponses.map((r, idx) => {
-              const voted = helpfulVotes.has(r.id);
-              const count = r.helpfulCount + (voted ? 1 : 0);
-              return (
-                <Card key={r.id} className="p-5">
-                  <div className="flex items-start gap-3 mb-3">
-                    <img
-                      src={r.mentor.photo}
-                      alt={r.mentor.name}
-                      className="w-11 h-11 rounded-full object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm" style={{ color: C.text }}>{r.mentor.name}</span>
-                        {idx === 0 && (
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                            style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
-                          >
-                            ⭐ Top Answer
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                        {r.mentor.specialty} · {r.timestamp}
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {r.mentor.expertise.map((e) => (
-                          <span
-                            key={e}
-                            className="text-xs px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                          >
-                            {e}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm leading-relaxed mb-4" style={{ color: C.text }}>
-                    {r.answer}
-                  </p>
-                  <div className="flex items-center justify-between pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
-                    <button
-                      onClick={() => toggleHelpful(r.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
-                      style={{
-                        backgroundColor: voted ? C.successLight : C.borderLight,
-                        color: voted ? C.success : C.textSec,
-                        border: `1px solid ${voted ? "#A7F3D0" : C.border}`,
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill={voted ? C.success : "none"}>
-                        <path d="M2.5 6.5L1 12.5h9l1.5-6H8V3a1.5 1.5 0 00-3 0v3.5H2.5z" stroke={voted ? C.success : C.textSec} strokeWidth="1.2" strokeLinejoin="round" />
-                      </svg>
-                      Helpful · {count}
-                    </button>
-                    <button className="text-xs" style={{ color: C.textSec }}>
-                      Reply to {r.mentor.name.split(" ")[1]}
-                    </button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-
-          <div className="mt-6">
-            <Button variant="secondary" size="md" fullWidth onClick={onBack}>
+            <p className="text-sm font-medium" style={{ color: C.text }}>
+              {title || "Your submitted question"}
+            </p>
+            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Other"}</p>
+          </Card>
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
+              Ask Another Question
+            </Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
               Return to Dashboard
             </Button>
           </div>
@@ -5311,7 +5218,7 @@ function AskQuestionScreen({
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question sent to mentors!", "anon-private")}
+            onSubmit={() => handleSubmit("success-anon-private", "Private anonymous question submitted for admin approval.", "anon-private")}
             submitLabel="Submit Privately"
           />
         </div>
@@ -5382,7 +5289,7 @@ function AskQuestionScreen({
           </div>
           <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your identity will remain hidden.</h2>
           <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
-            Your question has been privately sent to all physician mentors. You'll be notified when a mentor responds. Only you can see their answers — they will never appear in the student feed.
+            Your question was submitted for admin approval. After approval, the selected mentors can see and respond to it. Only you can see their answers — it will never appear in the student feed.
           </p>
           <Card className="p-4 mb-6 text-left">
             <div className="flex items-center gap-2 mb-2">
@@ -5438,7 +5345,7 @@ type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
 
 interface ModerationItem {
   id: string | number;
-  type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
+  type: "anon-question" | "any-mentor-question" | "private-question" | "reported-question" | "reported-answer" | "suspicious";
   questionText: string;
   category: string;
   submittedDate: string;
@@ -7711,95 +7618,87 @@ function AdminUsersView({ onToast }: { onToast: (t: ToastType, msg: string) => v
 // ─── ADMIN MODERATION VIEW ─────────────────────────────────────────────────────
 
 function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const [items, setItems] = useState(MODERATION_ITEMS.filter(m => m.type === "anon-question" || m.type === "suspicious"));
+  const [items, setItems] = useState<ModerationItem[]>([]);
   const [filterStatus, setFilterStatus] = useState<ModerationStatus | "all">("pending");
   const [reviewItem, setReviewItem] = useState<ModerationItem | null>(null);
-  const [liveItems, setLiveItems] = useState<ModerationItem[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function loadQueue() {
+    setLoading(true);
+    try {
+      const response = await getModerationQueue({ limit: 50 });
+      setItems(
+        response.items.map((item) => ({
+          id: item.id,
+          type: item.isAnonymous
+            ? item.visibility === "PUBLIC" ? "anon-question" : "private-question"
+            : item.visibility === "PUBLIC" ? "any-mentor-question" : "private-question",
+          questionText: item.content,
+          category: item.category.replaceAll("_", " "),
+          submittedDate: new Date(item.createdAt).toLocaleDateString(),
+          visibility: item.visibility.toLowerCase() as "public" | "private",
+          status: "pending",
+        }))
+      );
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to load moderation queue.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let active = true;
-    getModerationQueue({ limit: 50 })
-      .then((response) => {
-        if (!active) return;
-        setLiveItems(
-          response.items.map((item) => ({
-            id: item.id,
-            type: "anon-question",
-            questionText: item.content,
-            category: item.category.replaceAll("_", " "),
-            submittedDate: new Date(item.createdAt).toLocaleDateString(),
-            visibility: item.visibility.toLowerCase() as "public" | "private",
-            status: "pending",
-          }))
-        );
-      })
-      .catch(() => {
-        if (active) setLiveItems(null);
-      });
-
-    return () => {
-      active = false;
-    };
+    void loadQueue();
+    const interval = window.setInterval(() => {
+      void loadQueue();
+    }, 10000);
+    return () => window.clearInterval(interval);
   }, []);
 
   async function handleApprove(id: string | number) {
+    if (typeof id !== "string") return;
     try {
-      if (typeof id === "string") {
-        await approveQuestion(id);
-        setLiveItems((prev) => prev?.filter((m) => m.id !== id) ?? prev);
-      } else {
-        setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
-      }
+      await approveQuestion(id);
+      setItems((prev) => prev.filter((m) => m.id !== id));
       setReviewItem(null);
+      onToast("success", "Question approved and published.");
     } catch (error) {
-      onToast(
-        "error",
-        error instanceof Error ? error.message : "Unable to approve question."
-      );
+      onToast("error", error instanceof Error ? error.message : "Unable to approve question.");
     }
   }
 
-  async function handleReject(id: string | number, _reason?: string) {
+  async function handleReject(id: string | number) {
+    if (typeof id !== "string") return;
     try {
-      if (typeof id === "string") {
-        await rejectQuestion(id);
-        setLiveItems((prev) => prev?.filter((m) => m.id !== id) ?? prev);
-      } else {
-        setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-      }
+      await rejectQuestion(id);
+      setItems((prev) => prev.filter((m) => m.id !== id));
       setReviewItem(null);
+      onToast("success", "Question rejected.");
     } catch (error) {
-      onToast(
-        "error",
-        error instanceof Error ? error.message : "Unable to reject question."
-      );
+      onToast("error", error instanceof Error ? error.message : "Unable to reject question.");
     }
   }
 
-  const itemsToShow = liveItems ?? items;
-  const filtered = itemsToShow.filter(m => filterStatus === "all" || m.status === filterStatus);
+  const filtered = items.filter(m => filterStatus === "all" || m.status === filterStatus);
 
   const STATUS_TABS: { v: ModerationStatus | "all"; label: string }[] = [
-    { v: "pending", label: `Pending (${itemsToShow.filter(m => m.status === "pending").length})` },
-    { v: "approved", label: `Approved (${itemsToShow.filter(m => m.status === "approved").length})` },
-    { v: "rejected", label: `Rejected (${itemsToShow.filter(m => m.status === "rejected").length})` },
-    { v: "all", label: "All" },
+    { v: "pending", label: `Pending (${items.filter(m => m.status === "pending").length})` },
+    { v: "approved", label: "Approved (0)" },
+    { v: "rejected", label: "Rejected (0)" },
+    { v: "all", label: `All (${items.length})` },
   ];
-
-  const statusStyle: Record<ModerationStatus, { bg: string; color: string }> = {
-    pending:  { bg: C.pendingLight,  color: C.pending  },
-    approved: { bg: C.successLight,  color: C.success  },
-    rejected: { bg: C.errorLight,    color: C.error    },
-    reported: { bg: C.errorLight,    color: C.error    },
-  };
 
   return (
     <div className="fade-in flex flex-col gap-4">
-      <p className="text-sm" style={{ color: C.textSec }}>
-        Review anonymous questions before they are published. Student identity is always hidden from mentors and students — admin metadata is available only here for abuse prevention.
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm" style={{ color: C.textSec }}>
+          Review student questions before publication. Only direct private mentee → assigned mentor questions bypass moderation.
+        </p>
+        <Button variant="secondary" size="sm" onClick={() => void loadQueue()} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
+      </div>
 
-      {/* Status tab bar */}
       <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ backgroundColor: C.borderLight }}>
         {STATUS_TABS.map(({ v, label }) => (
           <button
@@ -7817,7 +7716,6 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div
           className="grid text-xs font-semibold px-5 py-3"
@@ -7832,343 +7730,81 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
           <div>CATEGORY</div>
           <div>DATE</div>
           <div>VISIBILITY</div>
-          <div>STATUS</div>
+          <div>TYPE</div>
           <div>ACTION</div>
         </div>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No items in this category.</div>
+        {loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading moderation queue…</div>
         )}
-        {filtered.map((item, i) => (
-          <div
-            key={item.id}
-            className="grid items-center px-5 py-3.5 gap-3"
-            style={{
-              gridTemplateColumns: "3fr 1fr 1fr 1fr 1fr auto",
-              borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
-            }}
-          >
-            {/* Question */}
-            <div className="flex items-start gap-2 min-w-0">
-              <span className="text-base flex-shrink-0 mt-0.5">🔒</span>
-              <p
-                className="text-xs leading-snug overflow-hidden"
-                style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
-              >
-                {item.questionText}
-              </p>
-            </div>
-            <CategoryBadge category={item.category} />
-            <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
-            <div>{item.visibility === "public" ? <PrivacyBadge type="public" /> : <PrivacyBadge type="mentors" />}</div>
-            <div>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-                style={{ backgroundColor: statusStyle[item.status].bg, color: statusStyle[item.status].color }}
-              >
-                {item.status}
-              </span>
-            </div>
-            <button
-              onClick={() => setReviewItem(item)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
-              style={{ backgroundColor: C.primaryLight, color: C.primary }}
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No questions awaiting moderation.</div>
+        )}
+        {filtered.map((item, i) => {
+          const typeLabel =
+            item.type === "any-mentor-question"
+              ? "Any Mentor"
+              : item.type === "anon-question"
+                ? "Anonymous · Public"
+                : "Anonymous · Private";
+          return (
+            <div
+              key={item.id}
+              className="grid items-center px-5 py-3.5 gap-3"
+              style={{
+                gridTemplateColumns: "3fr 1fr 1fr 1fr 1fr auto",
+                borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
+              }}
             >
-              Review
-            </button>
-          </div>
-        ))}
+              <div className="min-w-0">
+                <p
+                  className="text-xs leading-snug overflow-hidden"
+                  style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
+                >
+                  {item.questionText}
+                </p>
+              </div>
+              <CategoryBadge category={item.category} />
+              <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
+              <div>{item.visibility === "public" ? <PrivacyBadge type="public" /> : <PrivacyBadge type="private" />}</div>
+              <Badge variant="pending">{typeLabel}</Badge>
+              <button
+                onClick={() => setReviewItem(item)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+                style={{ backgroundColor: C.primaryLight, color: C.primary }}
+              >
+                Review
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {reviewItem && (
-        <ModerationReviewPanel
-          item={reviewItem}
-          onClose={() => setReviewItem(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onToast={onToast}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── ADMIN REPORTS VIEW ────────────────────────────────────────────────────────
-
-type AdminReportItem = Awaited<ReturnType<typeof getAdminReports>>["items"][number];
-
-function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const [items, setItems] = useState<AdminReportItem[]>([]);
-  const [counts, setCounts] = useState({
-    PENDING: 0,
-    DISMISSED: 0,
-    ACTION_TAKEN: 0,
-  });
-  const [filterStatus, setFilterStatus] = useState<ReportStatusValue>("PENDING");
-  const [selectedReport, setSelectedReport] = useState<AdminReportItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [working, setWorking] = useState(false);
-
-  async function loadReports() {
-    setLoading(true);
-    try {
-      const response = await getAdminReports({
-        status: filterStatus,
-        limit: 50,
-      });
-      setItems(response.items);
-      setCounts(response.counts);
-    } catch (error) {
-      onToast(
-        "error",
-        error instanceof Error ? error.message : "Unable to load reports."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadReports();
-  }, [filterStatus]);
-
-  const REASON_LABELS: Record<string, string> = {
-    SPAM: "Spam",
-    HARASSMENT: "Harassment or abuse",
-    INAPPROPRIATE_CONTENT: "Inappropriate content",
-    MISINFORMATION: "Misinformation",
-    PRIVACY: "Privacy or personal information",
-    OFF_TOPIC: "Off-topic",
-    OTHER: "Other",
-  };
-
-  async function handleAction(report: AdminReportItem, action: "DISMISS" | "REMOVE_POST") {
-    if (working) return;
-    setWorking(true);
-    try {
-      await updateAdminReport(report.id, action);
-      setSelectedReport(null);
-      await loadReports();
-      onToast(
-        "success",
-        action === "REMOVE_POST"
-          ? "Post removed and all pending reports for it were resolved."
-          : "Report dismissed."
-      );
-    } catch (error) {
-      onToast(
-        "error",
-        error instanceof Error ? error.message : "Unable to update the report."
-      );
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  const STATUS_TABS: Array<{ v: ReportStatusValue; label: string; count: number }> = [
-    { v: "PENDING", label: "Pending", count: counts.PENDING },
-    { v: "DISMISSED", label: "Dismissed", count: counts.DISMISSED },
-    { v: "ACTION_TAKEN", label: "Action taken", count: counts.ACTION_TAKEN },
-  ];
-
-  return (
-    <div className="fade-in flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm" style={{ color: C.textSec }}>
-            Students and mentors can report posts they can view. Reviewers can dismiss a report or remove the reported post from mentor/public views.
-          </p>
-          <p className="text-xs mt-1" style={{ color: C.textSec }}>
-            Removing a post resolves all pending reports for that post.
-          </p>
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => void loadReports()}>
-          Refresh
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ backgroundColor: C.borderLight }}>
-        {STATUS_TABS.map(({ v, label, count }) => (
-          <button
-            key={v}
-            onClick={() => setFilterStatus(v)}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{
-              backgroundColor: filterStatus === v ? "#fff" : "transparent",
-              color: filterStatus === v ? C.text : C.textSec,
-              boxShadow: filterStatus === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-            }}
-          >
-            {label} ({count})
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
-        <div
-          className="grid text-xs font-semibold px-5 py-3"
-          style={{
-            gridTemplateColumns: "2.4fr 1.2fr 1.4fr .9fr .9fr auto",
-            backgroundColor: C.bg,
-            borderBottom: `1px solid ${C.border}`,
-            color: C.textSec,
-          }}
-        >
-          <div>POST</div>
-          <div>REASON</div>
-          <div>REPORTER</div>
-          <div>FLAGS</div>
-          <div>STATUS</div>
-          <div>ACTION</div>
-        </div>
-
-        {loading && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>
-            Loading reports…
-          </div>
-        )}
-
-        {!loading && items.length === 0 && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>
-            No reports in this status.
-          </div>
-        )}
-
-        {!loading && items.map((item, index) => (
-          <div
-            key={item.id}
-            className="grid items-center px-5 py-3.5 gap-3"
-            style={{
-              gridTemplateColumns: "2.4fr 1.2fr 1.4fr .9fr .9fr auto",
-              borderTop: index === 0 ? "none" : `1px solid ${C.borderLight}`,
-            }}
-          >
-            <div className="min-w-0">
-              <p
-                className="text-xs font-semibold leading-snug overflow-hidden"
-                style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
-              >
-                {item.question.title}
-              </p>
-              <p className="text-xs mt-1" style={{ color: C.textSec }}>
-                {item.question.isAnonymous ? "Anonymous post" : "Public post"} · {new Date(item.question.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-
-            <span
-              className="text-xs px-2 py-1 rounded-full font-medium w-fit"
-              style={{ backgroundColor: C.errorLight, color: C.error }}
-            >
-              {REASON_LABELS[item.reason] ?? item.reason}
-            </span>
-
-            <div className="min-w-0">
-              <p className="text-xs font-medium truncate" style={{ color: C.text }}>
-                {item.reporter.name ?? "User"}
-              </p>
-              <p className="text-xs truncate" style={{ color: C.textSec }}>
-                {item.reporter.email}
-              </p>
-            </div>
-
-            <div className="text-xs font-semibold" style={{ color: item.question._count.reports > 1 ? C.error : C.textSec }}>
-              {item.question._count.reports}
-            </div>
-
-            <span
-              className="text-xs px-2 py-1 rounded-full font-medium w-fit"
-              style={{
-                backgroundColor:
-                  item.status === "PENDING" ? C.pendingLight :
-                  item.status === "ACTION_TAKEN" ? C.successLight :
-                  C.borderLight,
-                color:
-                  item.status === "PENDING" ? C.pending :
-                  item.status === "ACTION_TAKEN" ? C.success :
-                  C.textSec,
-              }}
-            >
-              {item.status === "ACTION_TAKEN" ? "Action taken" : item.status === "PENDING" ? "Pending" : "Dismissed"}
-            </span>
-
-            <Button variant="secondary" size="sm" onClick={() => setSelectedReport(item)}>
-              Review
-            </Button>
-          </div>
-        ))}
-      </div>
-
-      {selectedReport && (
-        <Modal title="Review reported post" onClose={() => setSelectedReport(null)} width={600}>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CategoryBadge category={selectedReport.question.category.replaceAll("_", " ")} />
-              <span
-                className="text-xs px-2 py-1 rounded-full font-medium"
-                style={{ backgroundColor: C.errorLight, color: C.error }}
-              >
-                {REASON_LABELS[selectedReport.reason] ?? selectedReport.reason}
-              </span>
-              <span className="text-xs ml-auto" style={{ color: C.textSec }}>
-                {selectedReport.question._count.reports} total report{selectedReport.question._count.reports === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            <div>
-              <h4 className="text-base font-bold mb-1" style={{ color: C.text }}>
-                {selectedReport.question.title}
-              </h4>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.textSec }}>
-                {selectedReport.question.content}
-              </p>
-            </div>
-
-            {selectedReport.details && (
-              <div className="rounded-xl p-3" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
-                <div className="text-xs font-semibold mb-1" style={{ color: C.text }}>Reporter details</div>
-                <p className="text-sm whitespace-pre-wrap" style={{ color: C.textSec }}>
-                  {selectedReport.details}
+        <ModalOverlay onClose={() => setReviewItem(null)}>
+          <div className="w-full max-w-xl bg-white rounded-2xl p-6 card-shadow-md">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h3 className="text-lg font-bold" style={{ color: C.text }}>Review question</h3>
+                <p className="text-xs mt-1" style={{ color: C.textSec }}>
+                  This question is currently pending approval and is not visible to mentors or other students.
                 </p>
               </div>
-            )}
-
-            <div className="rounded-xl p-3" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
-              <div className="text-xs font-semibold mb-1" style={{ color: C.text }}>Reported by</div>
-              <p className="text-sm" style={{ color: C.text }}>
-                {selectedReport.reporter.name ?? "User"} · {selectedReport.reporter.email}
-              </p>
-              <p className="text-xs mt-1" style={{ color: C.textSec }}>
-                Current post moderation status: {selectedReport.question.moderationStatus}
-              </p>
+              <button onClick={() => setReviewItem(null)} className="text-lg" style={{ color: C.textSec }}>×</button>
             </div>
-
-            {selectedReport.status === "PENDING" ? (
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={working}
-                  onClick={() => void handleAction(selectedReport, "DISMISS")}
-                >
-                  Dismiss report
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  disabled={working}
-                  onClick={() => void handleAction(selectedReport, "REMOVE_POST")}
-                >
-                  Remove post
-                </Button>
+            <div className="rounded-xl p-4 mb-5" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+              <p className="text-sm font-semibold mb-2" style={{ color: C.text }}>{reviewItem.questionText}</p>
+              <div className="flex items-center gap-2">
+                <PrivacyBadge type={reviewItem.visibility === "public" ? "public" : "private"} />
+                <Badge variant="pending">Pending approval</Badge>
               </div>
-            ) : (
-              <div className="flex items-center justify-end">
-                <Button variant="secondary" size="sm" onClick={() => setSelectedReport(null)}>
-                  Close
-                </Button>
-              </div>
-            )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" onClick={() => setReviewItem(null)}>Cancel</Button>
+              <Button variant="danger" onClick={() => void handleReject(reviewItem.id)}>Reject</Button>
+              <Button variant="primary" onClick={() => void handleApprove(reviewItem.id)}>Approve & Publish</Button>
+            </div>
           </div>
-        </Modal>
+        </ModalOverlay>
       )}
     </div>
   );
@@ -8177,14 +7813,51 @@ function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) =>
 // ─── ADMIN QUESTIONS VIEW ──────────────────────────────────────────────────────
 
 function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const allQ = [
-    ...MENTOR_WAITING_QUESTIONS,
-    ...MENTOR_ANY_QUESTIONS,
-    ...MENTOR_ANON_QUESTIONS,
-  ];
+  const [questions, setQuestions] = useState<Array<{
+    id: string;
+    question: string;
+    content: string;
+    category: string;
+    date: string;
+    type: MentorQuestion["type"];
+    asker: { name: string } | null;
+    moderationStatus: string;
+  }>>([]);
   const [search, setSearch] = useState("");
-  const filtered = allQ.filter(q =>
+  const [loading, setLoading] = useState(true);
+
+  async function loadQuestions() {
+    setLoading(true);
+    try {
+      const response = await getAdminQuestions();
+      setQuestions(
+        response.items.map((q) => ({
+          id: q.id,
+          question: q.title,
+          content: q.content,
+          category: q.category.replaceAll("_", " "),
+          date: new Date(q.createdAt).toLocaleDateString(),
+          type: q.isAnonymous
+            ? q.visibility === "PUBLIC" ? "anon-public" : "anon-private"
+            : q.visibility === "PUBLIC" ? "any-mentor" : "private",
+          asker: q.student ? { name: q.student.name ?? "Student" } : null,
+          moderationStatus: q.moderationStatus,
+        }))
+      );
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to load questions.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadQuestions();
+  }, []);
+
+  const filtered = questions.filter(q =>
     q.question.toLowerCase().includes(search.toLowerCase()) ||
+    q.content.toLowerCase().includes(search.toLowerCase()) ||
     q.category.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -8203,13 +7876,23 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
-          <input type="text" placeholder="Search questions…" value={search} onChange={e => setSearch(e.target.value)}
+          <input
+            type="text"
+            placeholder="Search questions…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-xl text-sm bg-white outline-none"
             style={{ border: `1.5px solid ${C.border}`, color: C.text }}
           />
         </div>
-        <span className="text-xs" style={{ color: C.textSec }}>{filtered.length} questions</span>
+        <span className="text-xs" style={{ color: C.textSec }}>
+          {filtered.length} questions
+        </span>
+        <Button variant="secondary" size="sm" onClick={() => void loadQuestions()} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
       </div>
+
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div className="grid text-xs font-semibold px-5 py-3"
           style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", backgroundColor: C.bg, borderBottom: `1px solid ${C.border}`, color: C.textSec }}>
@@ -8217,35 +7900,38 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
           <div>TYPE</div>
           <div>CATEGORY</div>
           <div>DATE</div>
-          <div>ACTIONS</div>
+          <div>STATUS</div>
         </div>
-        {filtered.map((q, i) => {
-          const isAnon = q.asker === null;
-          return (
-            <div key={q.id} className="grid items-center px-5 py-3.5 gap-3"
-              style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}` }}>
-              <div className="flex items-start gap-2 min-w-0">
-                {isAnon && <span className="text-base flex-shrink-0">🔒</span>}
-                <div className="min-w-0">
-                  <p className="text-xs overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {q.question}
-                  </p>
-                  {!isAnon && <div className="text-xs mt-0.5" style={{ color: C.textSec }}>{q.asker!.name}</div>}
+        {loading && questions.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading questions…</div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No questions found.</div>
+        )}
+        {filtered.map((q, i) => (
+          <div key={q.id} className="grid items-center px-5 py-3.5 gap-3"
+            style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}` }}>
+            <div className="flex items-start gap-2 min-w-0">
+              {q.asker === null && <span className="text-base flex-shrink-0">🔒</span>}
+              <div className="min-w-0">
+                <p className="text-xs overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  {q.question}
+                </p>
+                <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                  {q.asker?.name ?? "Anonymous Mentee"}
                 </div>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
-                {TYPE_LABEL[q.type]}
-              </span>
-              <CategoryBadge category={q.category} />
-              <div className="text-xs" style={{ color: C.textSec }}>{q.date}</div>
-              <button onClick={() => onToast("info", "Viewing full question thread…")}
-                className="text-xs font-semibold px-2.5 py-1 rounded-xl transition-all hover:opacity-80"
-                style={{ backgroundColor: C.primaryLight, color: C.primary }}>
-                View
-              </button>
             </div>
-          );
-        })}
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
+              {TYPE_LABEL[q.type]}
+            </span>
+            <CategoryBadge category={q.category} />
+            <div className="text-xs" style={{ color: C.textSec }}>{q.date}</div>
+            <Badge variant={q.moderationStatus === "PENDING" ? "pending" : q.moderationStatus === "REJECTED" ? "error" : "success"}>
+              {q.moderationStatus}
+            </Badge>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -8283,7 +7969,7 @@ function AdminSettingsView({ onToast }: { onToast: (t: ToastType, msg: string) =
     <div className="fade-in max-w-xl flex flex-col gap-5">
       <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${C.border}` }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: C.text }}>Moderation Settings</h3>
-        <Toggle label="Require approval for anonymous questions" desc="All anonymous questions go through admin review before publication." value={anonApproval} onChange={setAnonApproval} />
+        <Toggle label="Require approval for student questions" desc="All questions require admin approval except direct private mentee → assigned mentor questions." value={anonApproval} onChange={setAnonApproval} />
         <Toggle label="Auto-flag suspicious activity" desc="Automatically flag accounts with unusual posting patterns." value={autoFlag} onChange={setAutoFlag} />
         <Toggle label="Email notifications for reports" desc="Send an email alert when new reports are filed." value={emailNotifs} onChange={setEmailNotifs} />
       </div>
