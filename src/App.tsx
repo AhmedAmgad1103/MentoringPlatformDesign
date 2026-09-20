@@ -5178,7 +5178,13 @@ type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
 
 interface ModerationItem {
   id: string | number;
-  type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
+  type:
+    | "anon-question"
+    | "private-question"
+    | "any-mentor-question"
+    | "reported-question"
+    | "reported-answer"
+    | "suspicious";
   questionText: string;
   questionTitle?: string;
   category: string;
