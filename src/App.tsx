@@ -8274,7 +8274,7 @@ function AdminScreen({
       {section === "dashboard" && <AdminDashboardView onNavigate={onFullNavigate} />}
       {section === "users" && <AdminUsersView section="users" onToast={onToast} />}
        {section === "mentors" && <AdminUsersView section="mentors" onToast={onToast} />}
-       {section === "questions" && <AdminQuestionsView onToast={onToast} onOpenQuestion={onOpenQuestion} />
+       {section === "questions" && <AdminQuestionsView onToast={onToast} onOpenQuestion={onOpenQuestion} />}
       {section === "moderation" && <AdminModerationView onToast={onToast} />}
       {section === "reports" && <AdminReportsView onToast={onToast} />}
       {section === "settings" && <AdminSettingsView onToast={onToast} />}
