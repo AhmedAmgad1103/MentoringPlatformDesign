@@ -42,6 +42,7 @@ export interface DemoQuestion {
   title: string;
   category: string;
   status: string;
+  moderationStatus: ApiQuestion["moderationStatus"];
   createdAt: string;
   visibility: ApiQuestion["visibility"];
   isAnonymous: boolean;
@@ -54,6 +55,7 @@ function mapQuestion(q: ApiQuestion): DemoQuestion {
     title: q.title,
     category: categoryLabel(q.category),
     status: q.status,
+    moderationStatus: q.moderationStatus,
     createdAt: q.createdAt,
     visibility: q.visibility,
     isAnonymous: q.isAnonymous,
@@ -167,7 +169,7 @@ export async function getFeedQuestions() {
     preview: q.content,
     full: q.content,
     category: categoryLabel(q.category),
-    date: new Date(q.createdAt).toLocaleDateString(),
+    date: new Date(q.createdAt).toLocaleString(),
     createdAtMs: new Date(q.createdAt).getTime(),
     responses: q.answerCount,
     helpful: 0,
@@ -203,7 +205,7 @@ export async function getMentorQueue() {
     question: q.title,
     content: q.content,
     category: categoryLabel(q.category),
-    date: new Date(q.createdAt).toLocaleDateString(),
+    date: new Date(q.createdAt).toLocaleString(),
     priority: "normal" as const,
     asker: q.student
       ? {
