@@ -54,13 +54,14 @@ const baseSelect = {
   studentId: true,
   student: { select: { id: true, name: true } },
   mentor: { select: { id: true, name: true } },
-  _count: { select: { boosts: true, answers: true } },
+  _count: { select: { boosts: true, answers: true, reports: true } },
 } satisfies Prisma.QuestionSelect
 
 export function listSelect(viewerId: string) {
   return {
     ...baseSelect,
     boosts: { where: { userId: viewerId }, select: { id: true } },
+    reports: { where: { reporterId: viewerId }, select: { id: true, status: true } },
   } satisfies Prisma.QuestionSelect
 }
 
@@ -86,7 +87,7 @@ type DetailRow = Prisma.QuestionGetPayload<{ select: ReturnType<typeof detailSel
 export function toQuestionDTO(row: ListRow | DetailRow, viewer: CurrentUser) {
   const hideStudent = row.isAnonymous && viewer.role !== Role.ADMIN
 
-  const { studentId, student, _count, boosts, ...rest } = row
+  const { studentId, student, _count, boosts, reports, ...rest } = row
 
   return {
     ...rest,
@@ -94,6 +95,8 @@ export function toQuestionDTO(row: ListRow | DetailRow, viewer: CurrentUser) {
     student: hideStudent ? null : student,
     boostCount: _count.boosts,
     answerCount: _count.answers,
+    reportedByMe: reports.length > 0,
+    reportCount: viewer.role === Role.ADMIN ? _count.reports : undefined,
     boostedByMe: boosts.length > 0,
   }
 }
