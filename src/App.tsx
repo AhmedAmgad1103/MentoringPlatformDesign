@@ -765,26 +765,6 @@ const QUESTIONS = [
   },
 ];
 
-const NOTIFICATIONS = [
-  {
-    id: 1,
-    message: "Dr. Mariam Khaled answered your question about PE management",
-    time: "2 hours ago",
-    read: false,
-  },
-  {
-    id: 2,
-    message: "Your anonymous question received 2 new responses",
-    time: "Yesterday",
-    read: false,
-  },
-  {
-    id: 3,
-    message: "Reminder: Your mentoring session is tomorrow at 3:00 PM",
-    time: "2 days ago",
-    read: true,
-  },
-];
 
 const ASK_CATEGORIES = [
   "Clinical Rotations",
@@ -839,7 +819,7 @@ const SAMPLE_RESPONSES = [
   },
 ];
 
-// ─── FEED & NOTIFICATION DATA ─────────────────────────────────────────────────
+// ─── FEED DATA ───────────────────────────────────────────────────────────────
 
 interface FeedQuestion {
   id: string | number;
