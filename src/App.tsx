@@ -713,6 +713,32 @@ function getMentorTier(points: number) {
   return { ...tier, next, progress };
 }
 
+const REWARD_MONTH_KEY = "medmentor_reward_month";
+const CURRENT_REWARD_MONTH = (() => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+})();
+
+const REWARD_RESET_THIS_MONTH = (() => {
+  if (typeof window === "undefined") return false;
+  const stored = window.localStorage.getItem(REWARD_MONTH_KEY);
+  if (stored === null) {
+    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
+    return false;
+  }
+  if (stored !== CURRENT_REWARD_MONTH) {
+    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
+    return true;
+  }
+  return false;
+})();
+
+const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : CURRENT_MENTOR_POINTS;
+const CURRENT_LEADERBOARD_MENTORS = CURRENT_LEADERBOARD_MENTORS.map((mentor) => ({
+  ...mentor,
+  points: REWARD_RESET_THIS_MONTH ? 0 : mentor.points,
+}));
+
 function MentorTierBadge({ points, size = "sm" }: { points: number; size?: "sm" | "md" }) {
   const tier = getMentorTier(points);
   return (
@@ -2469,7 +2495,7 @@ function DashboardScreen({
                       <Badge variant={MENTOR.available ? "success" : "pending"}>
                         {MENTOR.available ? "Available" : "Busy"}
                       </Badge>
-                      <MentorTierBadge points={MENTOR.points} />
+                      <MentorTierBadge points={CURRENT_MENTOR_POINTS} />
                     </div>
                   </div>
                 </div>
@@ -6202,7 +6228,7 @@ function MentorDashboardScreen({
 
         {/* Rewards banner */}
         {(() => {
-          const tier = getMentorTier(MENTOR.points);
+          const tier = getMentorTier(CURRENT_MENTOR_POINTS);
           return (
             <Card className="p-5 mb-6 fade-in flex items-center gap-5 flex-wrap">
               <div
@@ -6214,17 +6240,17 @@ function MentorDashboardScreen({
               <div className="flex-1 min-w-[180px]">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="stat-numeral" style={{ color: tier.color }}>
-                    {MENTOR.points}
+                    {CURRENT_MENTOR_POINTS}
                   </span>
                   <span className="text-xs font-medium" style={{ color: C.textSec }}>
                     reward points
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MentorTierBadge points={MENTOR.points} size="md" />
+                  <MentorTierBadge points={CURRENT_MENTOR_POINTS} size="md" />
                   {tier.next && (
                     <span className="text-xs" style={{ color: C.textSec }}>
-                      {tier.next.min - MENTOR.points} points to {tier.next.label}
+                      {tier.next.min - CURRENT_MENTOR_POINTS} points to {tier.next.label}
                     </span>
                   )}
                 </div>
@@ -8826,7 +8852,7 @@ function MentorProfileScreen({
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.successLight, color: C.success }}>
                   Verified Mentor
                 </span>
-                <MentorTierBadge points={MENTOR.points} />
+                <MentorTierBadge points={CURRENT_MENTOR_POINTS} />
                 <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.borderLight, color: C.textSec }}>
                   Member since {profile.memberSince}
                 </span>
@@ -8860,7 +8886,7 @@ function MentorProfileScreen({
 
         {/* Mentor Rewards */}
         {(() => {
-          const tier = getMentorTier(MENTOR.points);
+          const tier = getMentorTier(CURRENT_MENTOR_POINTS);
           return (
             <Card className="p-5">
               <div className="flex items-center justify-between mb-3">
@@ -8882,7 +8908,7 @@ function MentorProfileScreen({
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="stat-numeral" style={{ color: tier.color }}>{MENTOR.points}</span>
+                    <span className="stat-numeral" style={{ color: tier.color }}>{CURRENT_MENTOR_POINTS}</span>
                     <span className="text-xs font-medium" style={{ color: C.textSec }}>points · {tier.label}</span>
                   </div>
                   {tier.next && (
@@ -8894,7 +8920,7 @@ function MentorProfileScreen({
                         />
                       </div>
                       <p className="text-xs mt-1" style={{ color: C.textSec }}>
-                        {tier.next.min - MENTOR.points} points to {tier.next.emoji} {tier.next.label}
+                        {tier.next.min - CURRENT_MENTOR_POINTS} points to {tier.next.emoji} {tier.next.label}
                       </p>
                     </>
                   )}
@@ -9002,7 +9028,7 @@ function LeaderboardScreen({
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {LEADERBOARD_MENTORS.map((m, idx) => {
+          {CURRENT_LEADERBOARD_MENTORS.map((m, idx) => {
             const tier = getMentorTier(m.points);
             const rank = idx + 1;
             const isTop3 = rank <= 3;
