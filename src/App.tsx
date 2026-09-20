@@ -5887,7 +5887,10 @@ function MentorDashboardScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
-  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & {
+    id: string | number;
+  };
+  const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
   const [showAllMentees, setShowAllMentees] = useState(false);
   const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
