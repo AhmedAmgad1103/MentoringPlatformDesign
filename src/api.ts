@@ -35,30 +35,6 @@ export interface DemoQuestion {
   createdAt: string;
 }
 
-const demoQuestions: DemoQuestion[] = [
-  {
-    id: "demo-1",
-    title: "How did you prepare for Step 2 CK?",
-    category: "BOARD_EXAMS",
-    status: "AWAITING_RESPONSE",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "demo-2",
-    title: "How do I manage burnout during rotations?",
-    category: "WELLNESS_BURNOUT",
-    status: "ANSWERED",
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: "demo-3",
-    title: "How should I balance research with clinical rotations?",
-    category: "RESEARCH",
-    status: "AWAITING_RESPONSE",
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-  },
-];
-
 function mapQuestion(q: ApiQuestion): DemoQuestion {
   return {
     id: q.id,
@@ -83,26 +59,9 @@ function categoryLabel(category: QuestionCategory) {
   return labels[category];
 }
 
-function isNetworkOrServerFailure(error: unknown) {
-  if (!(error instanceof Error)) return false;
-  return (
-    error.message.includes("Failed to fetch") ||
-    error.message.includes("NetworkError") ||
-    error.message.includes("status 500") ||
-    error.message.includes("status 502") ||
-    error.message.includes("status 503") ||
-    error.message.includes("status 504")
-  );
-}
-
 export async function getQuestions(): Promise<DemoQuestion[]> {
-  try {
-    const response = await getQuestionsApi({ scope: "mine", limit: 50 });
-    return response.items.map(mapQuestion);
-  } catch (error) {
-    if (isNetworkOrServerFailure(error)) return [...demoQuestions];
-    throw error;
-  }
+  const response = await getQuestionsApi({ scope: "mine", limit: 50 });
+  return response.items.map(mapQuestion);
 }
 
 export async function createQuestion(input: {
@@ -129,27 +88,14 @@ export async function createQuestion(input: {
           ? "PRIVATE"
           : undefined;
 
-  try {
-    const created = await createQuestionApi({
-      title: input.title,
-      body: input.body,
-      category: (input.category || "OTHER") as QuestionCategory,
-      askType,
-      privacy,
-    });
-    return mapQuestion(created);
-  } catch (error) {
-    if (isNetworkOrServerFailure(error)) {
-      return {
-        id: `demo-${Date.now()}`,
-        title: input.title,
-        category: input.category || "OTHER",
-        status: "AWAITING_RESPONSE",
-        createdAt: new Date().toISOString(),
-      };
-    }
-    throw error;
-  }
+  const created = await createQuestionApi({
+    title: input.title,
+    body: input.body,
+    category: (input.category || "OTHER") as QuestionCategory,
+    askType,
+    privacy,
+  });
+  return mapQuestion(created);
 }
 
 export async function sendMessage(input: {
@@ -158,17 +104,12 @@ export async function sendMessage(input: {
 }): Promise<{ success: true }> {
   if (!input.body.trim()) throw new Error("Message cannot be empty.");
 
-  try {
-    if (typeof input.recipientId !== "string") {
-      return { success: true };
-    }
-
-    await sendMessageApi(input.recipientId, input.body.trim());
-    return { success: true };
-  } catch (error) {
-    if (isNetworkOrServerFailure(error)) return { success: true };
-    throw error;
+  if (typeof input.recipientId !== "string") {
+    throw new Error("A persisted user id is required.");
   }
+
+  await sendMessageApi(input.recipientId, input.body.trim());
+  return { success: true };
 }
 
 export async function getFeedQuestions() {
