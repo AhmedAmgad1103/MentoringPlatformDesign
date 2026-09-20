@@ -466,3 +466,22 @@ export async function rejectQuestion(questionId: string) {
     method: "POST",
   })
 }
+
+export async function localLogin(email: string, password: string) {
+  return request<{
+    id: string
+    email: string
+    name: string | null
+    role: "STUDENT" | "MENTOR" | "ADMIN"
+    assignedMentorId: string | null
+  }>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export async function localLogout() {
+  return request<{ success: true }>("/api/auth/logout", {
+    method: "POST",
+  })
+}
