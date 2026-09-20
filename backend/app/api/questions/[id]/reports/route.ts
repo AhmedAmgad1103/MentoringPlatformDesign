@@ -4,7 +4,6 @@ import { badRequest, conflict, forbidden, notFound, unauthorized } from "@/lib/a
 import { canViewQuestion } from "@/lib/authz"
 import {
   ModerationStatus,
-  QuestionVisibility,
   ReportReason,
   Role,
 } from "@prisma/client"
@@ -43,7 +42,6 @@ export async function POST(
 
   if (
     !canViewQuestion(user, question) ||
-    question.visibility !== QuestionVisibility.PUBLIC ||
     (question.moderationStatus !== ModerationStatus.APPROVED &&
       question.moderationStatus !== ModerationStatus.NOT_REQUIRED)
   ) {
@@ -85,6 +83,26 @@ export async function POST(
   })
 
   if (existing) {
+    if (existing.status === "DISMISSED") {
+      const reactivated = await prisma.questionReport.update({
+        where: { id: existing.id },
+        data: {
+          reason,
+          details,
+          status: "PENDING",
+          reviewedAt: null,
+          reviewedById: null,
+        },
+        select: {
+          id: true,
+          status: true,
+          reason: true,
+          createdAt: true,
+        },
+      })
+      return Response.json({ item: reactivated })
+    }
+
     return conflict("You have already reported this post")
   }
 
