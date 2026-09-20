@@ -7324,6 +7324,26 @@ function ModerationReviewPanel({
 // ─── ADMIN DASHBOARD VIEW ─────────────────────────────────────────────────────
 
 function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const [livePending, setLivePending] = useState<Array<{
+    id: string;
+    content: string;
+    category: string;
+    createdAt: string;
+  }>>([]);
+
+  useEffect(() => {
+    getModerationQueue({ limit: 50 })
+      .then((response) => {
+        setLivePending(response.items.map((item) => ({
+          id: item.id,
+          content: item.content,
+          category: item.category.replaceAll("_", " "),
+          createdAt: item.createdAt,
+        })));
+      })
+      .catch(() => {});
+  }, []);
+
   const STATS = [
     { label: "Total Students", value: ADMIN_USERS.filter(u => u.role === "mentee").length, color: C.primary, bg: C.primaryLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="8" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M2 18c0-3.5 2.686-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M14 11v6M11 14h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
@@ -7335,13 +7355,13 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
     { label: "Questions Answered", value: 31, color: C.success, bg: C.successLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M7 10l2 2.5 4-4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: "Pending Moderation", value: MODERATION_ITEMS.filter(m => m.status === "pending").length, color: C.error, bg: C.errorLight,
+    { label: "Pending Moderation", value: livePending.length, color: C.error, bg: C.errorLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2l2.3 4.67 5.14.748-3.72 3.624.879 5.118L10 13.75l-4.599 2.41.879-5.118L2.56 7.418l5.14-.748L10 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
     { label: "Reported Content", value: MODERATION_ITEMS.filter(m => m.status === "reported").length, color: "#DC2626", bg: "#FEE2E2",
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3v7M10 13.5h.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M3.5 17.5l5.768-12.5a.8.8 0 011.464 0l5.768 12.5a.8.8 0 01-.732 1.13H4.232a.8.8 0 01-.732-1.13z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
   ];
 
-  const pendingModerationItems = MODERATION_ITEMS.filter(m => m.status === "pending");
+  const pendingModerationItems = livePending;
   const reportedItems = MODERATION_ITEMS.filter(m => m.status === "reported");
 
   return (
@@ -7377,14 +7397,14 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
           <div className="flex flex-col gap-2">
             {pendingModerationItems.slice(0, 3).map(item => (
               <div key={item.id} className="flex items-start gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
-                <span className="text-base flex-shrink-0">🔒</span>
+                <span className="text-base flex-shrink-0">📝</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium leading-snug overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {item.questionText}
+                    {item.content}
                   </p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <CategoryBadge category={item.category} />
-                    <span className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</span>
+                    <span className="text-xs" style={{ color: C.textSec }}>{new Date(item.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
                 <button className="text-xs font-semibold flex-shrink-0" style={{ color: C.primary }} onClick={() => onNavigate("admin-moderation")}>
