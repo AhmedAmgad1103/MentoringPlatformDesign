@@ -7644,12 +7644,12 @@ function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) =>
   const [reviewItem, setReviewItem] = useState<ModerationItem | null>(null);
   const [actionModal, setActionModal] = useState<{ id: number; label: string; desc: string } | null>(null);
 
-  function handleApprove(id: number) {
+  function handleApprove(id: string | number) {
     setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
     setReviewItem(null);
   }
 
-  function handleReject(id: number) {
+  function handleReject(id: string | number) {
     setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
     setReviewItem(null);
   }
