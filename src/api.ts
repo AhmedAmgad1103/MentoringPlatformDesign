@@ -183,6 +183,7 @@ export async function getFeedQuestions() {
     full: q.content,
     category: categoryLabel(q.category),
     date: new Date(q.createdAt).toLocaleDateString(),
+    createdAtMs: new Date(q.createdAt).getTime(),
     responses: q.answerCount,
     helpful: 0,
     boosted: q.boostCount,
