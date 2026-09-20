@@ -2901,11 +2901,13 @@ function FeedQuestionCard({
   onClick,
   isBoosted,
   onToggleBoost,
+  onToast,
 }: {
   question: FeedQuestion;
   onClick: () => void;
   isBoosted: boolean;
   onToggleBoost: (id: string | number) => void;
+  onToast: (t: ToastType, msg: string) => void;
 }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(Boolean(question.reportedByMe));
@@ -3040,10 +3042,7 @@ function FeedQuestionCard({
                       questionTitle={question.title}
                       onClose={() => setReportOpen(false)}
                       onReported={() => setReported(true)}
-                      onToast={(type, message) => {
-                        // The feed card does not own the global toast container; use a browser-safe fallback.
-                        if (type === "error") window.alert(message);
-                      }}
+                      onToast={onToast}
                     />
                   </div>
                 )}
@@ -3367,6 +3366,7 @@ function FeedScreen({
                 onClick={() => onOpenQuestion(q.id)}
                 isBoosted={boostedIds.has(q.id)}
                 onToggleBoost={toggleBoost}
+                onToast={onToast}
               />
             ))}
           </div>
@@ -3429,6 +3429,8 @@ function QuestionDetailScreen({
   const [boostedIds, setBoostedIds] = useState<Set<string | number>>(new Set());
   const [liveQuestion, setLiveQuestion] =
     useState<Awaited<ReturnType<typeof getQuestionDetails>> | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
 
   useEffect(() => {
     if (typeof questionId !== "string") {
@@ -3441,6 +3443,7 @@ function QuestionDetailScreen({
       .then((item) => {
         if (!active) return;
         setLiveQuestion(item);
+        setReported(Boolean(item.reportedByMe));
         setBoostedIds(item.boostedByMe ? new Set([item.id]) : new Set());
       })
       .catch(() => {
@@ -3518,6 +3521,8 @@ function QuestionDetailScreen({
         helpful: 0,
         boosted: liveQuestion.boostCount,
         tags: [],
+        reportedByMe: liveQuestion.reportedByMe,
+        isMine: liveQuestion.isMine,
       }
     : fallbackQuestion;
 
@@ -3727,6 +3732,21 @@ function QuestionDetailScreen({
                 </svg>
                 {question.boosted + (boostedIds.has(question.id) ? 1 : 0)}
               </button>
+              {!question.isMine && typeof question.id === "string" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!reported) setReportOpen(true);
+                  }}
+                  className="text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                  style={{
+                    backgroundColor: reported ? C.successLight : C.borderLight,
+                    color: reported ? C.success : C.textSec,
+                  }}
+                >
+                  {reported ? "Reported" : "Report"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -3778,6 +3798,16 @@ function QuestionDetailScreen({
             </div>
           )}
         </Card>
+
+        {reportOpen && typeof question.id === "string" && (
+          <ReportQuestionModal
+            questionId={question.id}
+            questionTitle={question.title}
+            onClose={() => setReportOpen(false)}
+            onReported={() => setReported(true)}
+            onToast={onToast}
+          />
+        )}
 
         {/* Responses */
         <div className="mb-8">
