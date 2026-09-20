@@ -37,6 +37,8 @@ The role is detected from the account. There is no role selector.
 
 ## Database
 
+Notifications are intentionally out of scope for the local test build; use the live question, answer, moderation, report, messaging, profile, and mentor-assignment flows instead.
+
 The database file is created at:
 
 `backend/data/mentoring.db`
@@ -60,7 +62,9 @@ It is intentionally ignored by Git, so posts, answers, boosts, messages, assignm
 13. Review the report, try Dismiss Report, then repeat the flow and use Remove Post.
 14. Confirm that Remove Post hides the reported post and resolves its pending reports.
 15. Test mentor-to-student messaging.
-16. Restart both servers and confirm your created data is still present.
+16. Test the admin Users page and mentor assignment.
+17. Edit the student and mentor display name from Profile and confirm it persists after restarting.
+18. Restart both servers and confirm your created data is still present.
 
 ## Reset the local database
 
@@ -69,7 +73,3 @@ Delete `backend/data/mentoring.db` and run `npm run dev` again. The setup script
 ## Post reports
 
 Students and mentors can report approved public posts, including posts already approved by an admin. Each user can report a given post once and may optionally add details. Admins can review pending reports, dismiss them, or remove the reported post. Removing a post changes its moderation state to rejected and resolves all pending reports for that post.
-
-## Mentor reward points
-
-Reward points are monthly. The demo reward cycle uses the machine's current calendar month; when a new month is detected, mentor points and leaderboard points reset to 0 for the new cycle. The current-cycle marker is stored in browser local storage under `medmentor_reward_month` so the reset survives closing and reopening the browser.
