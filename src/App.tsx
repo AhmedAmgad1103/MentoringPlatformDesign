@@ -3530,7 +3530,7 @@ function QuestionDetailScreen({
         (helpfulVotes.has(b.id) ? 1 : 0) -
         (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0))
       );
-    return a.id - b.id;
+    return String(b.id).localeCompare(String(a.id));
   });
 
   const related = FEED_QUESTIONS.filter(
