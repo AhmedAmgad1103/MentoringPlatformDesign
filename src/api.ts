@@ -42,15 +42,21 @@ export interface DemoQuestion {
   category: string;
   status: string;
   createdAt: string;
+  visibility: ApiQuestion["visibility"];
+  isAnonymous: boolean;
+  responses: number;
 }
 
 function mapQuestion(q: ApiQuestion): DemoQuestion {
   return {
     id: q.id,
     title: q.title,
-    category: q.category,
+    category: categoryLabel(q.category),
     status: q.status,
     createdAt: q.createdAt,
+    visibility: q.visibility,
+    isAnonymous: q.isAnonymous,
+    responses: q.answerCount,
   };
 }
 
