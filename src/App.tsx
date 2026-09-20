@@ -1258,6 +1258,7 @@ function LoginScreen({
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [emailError, setEmailError] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [touched, setTouched] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
@@ -1269,6 +1270,7 @@ function LoginScreen({
 
   function handleEmailChange(v: string) {
     setEmail(v);
+    setLoginError("");
     if (touched) setEmailError(validateEmail(v));
   }
 
@@ -1279,15 +1281,18 @@ function LoginScreen({
 
   async function handleSubmit() {
     setTouched(true);
-    const err = validateEmail(email);
+    const cleanEmail = email.trim();
+    const err = validateEmail(cleanEmail);
     setEmailError(err);
-    if (err || !email || !password || isSigningIn) return;
+    setLoginError("");
+
+    if (err || !cleanEmail || !password || isSigningIn) return;
 
     setIsSigningIn(true);
     try {
-      await onLogin(email.trim(), password);
+      await onLogin(cleanEmail, password);
     } catch (error) {
-      setEmailError(
+      setLoginError(
         error instanceof Error ? error.message : "Unable to sign in."
       );
     } finally {
@@ -1324,7 +1329,13 @@ function LoginScreen({
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+          >
             {[
               { label: "Board Exam Guidance", sub: "Proven strategies from attendings who aced Step 1 & 2" },
               { label: "Clinical Skills Coaching", sub: "Real feedback on presentations, notes, and procedures" },
@@ -1412,7 +1423,10 @@ function LoginScreen({
               type={showPw ? "text" : "password"}
               placeholder="Enter your password"
               value={password}
-              onChange={setPassword}
+              onChange={(value) => {
+                setPassword(value);
+                setLoginError("");
+              }}
               icon={<Icons.Lock />}
               rightElement={
                 <button
@@ -1426,13 +1440,26 @@ function LoginScreen({
               }
             />
 
-            <div className="flex justify-end">
-              <button className="text-sm font-medium" style={{ color: C.primary }}>
-                Forgot password?
-              </button>
-            </div>
+            {loginError && (
+              <div
+                className="rounded-xl px-3 py-2.5 text-sm"
+                style={{
+                  backgroundColor: C.errorLight,
+                  color: C.error,
+                  border: `1px solid ${C.error}33`,
+                }}
+              >
+                {loginError}
+              </div>
+            )}
 
-            <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid || isSigningIn}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={!isValid || isSigningIn}
+            >
               {isSigningIn ? "Signing In…" : "Sign In"}
             </Button>
 
@@ -1467,7 +1494,7 @@ function LoginScreen({
                 Local testing branch — seeded accounts are ready.
               </span>
             </p>
-          </div>
+          </form>
         </div>
       </div>
     </div>
