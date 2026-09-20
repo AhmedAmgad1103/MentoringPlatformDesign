@@ -6535,7 +6535,7 @@ function AdminShell({
                 )}
               </button>
             );
-          })}}
+          })}
         </nav>
 
         {/* Bottom: switch role */}
