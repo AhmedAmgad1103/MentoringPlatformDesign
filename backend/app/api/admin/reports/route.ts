@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/session"
 import { badRequest, forbidden, unauthorized } from "@/lib/api"
-import { ReportStatus, ReportReason, Role } from "@prisma/client"
+import { ReportStatus, Role } from "@prisma/client"
 
 const reportSelect = {
   id: true,
