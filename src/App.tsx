@@ -3810,7 +3810,7 @@ function QuestionDetailScreen({
           />
         )}
 
-        {/* Responses */
+        {/* Responses */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-base" style={{ color: C.text }}>
