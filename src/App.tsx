@@ -9,6 +9,9 @@ import {
   getModerationQueue,
   getQuestionDetails,
   getQuestions,
+  localLogin,
+  localLogout,
+  getMe,
   sendMessage,
   unboostQuestion,
   updateQuestionStatus,
@@ -79,7 +82,7 @@ const C = {
   borderLight:  "#F0EEF8",
 };
 
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 // ─── COMPONENT LIBRARY ───────────────────────────────────────────────────────
 
@@ -1241,17 +1244,21 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 // ─── SCREEN: LOGIN ────────────────────────────────────────────────────────────
 
-function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin: (role: Exclude<Role, null>) => void }) {
+function LoginScreen({
+  onLogin,
+}: {
+  onLogin: (email: string, password: string) => Promise<void>;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [touched, setTouched] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   function validateEmail(v: string) {
     if (!v) return "";
-    if (!v.includes("@")) return "";
-    if (!v.endsWith(".edu")) return "Please use your official medical school email address.";
+    if (!v.includes("@")) return "Enter a valid email address.";
     return "";
   }
 
@@ -1265,14 +1272,25 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin:
     setEmailError(validateEmail(email));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setTouched(true);
     const err = validateEmail(email);
     setEmailError(err);
-    if (!err && email && password) onNext();
+    if (err || !email || !password || isSigningIn) return;
+
+    setIsSigningIn(true);
+    try {
+      await onLogin(email.trim(), password);
+    } catch (error) {
+      setEmailError(
+        error instanceof Error ? error.message : "Unable to sign in."
+      );
+    } finally {
+      setIsSigningIn(false);
+    }
   }
 
-  const isValid = email.endsWith(".edu") && password.length >= 1;
+  const isValid = email.includes("@") && password.length >= 1;
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: C.bg }}>
@@ -1366,20 +1384,20 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin:
               <InputField
                 label="Medical School Email"
                 type="email"
-                placeholder="you@university.edu"
+                placeholder="student@gmail.com"
                 value={email}
                 onChange={handleEmailChange}
                 error={emailError}
-                helperText={!emailError ? "Use your official medical school email address to access the mentoring platform." : undefined}
+                helperText={!emailError ? "Local testing uses the three seeded accounts below. The role is detected automatically." : undefined}
                 icon={<Icons.Mail />}
               />
               {/* live validation indicator */}
-              {email.endsWith(".edu") && !emailError && (
+              {email.includes("@") && !emailError && (
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.successLight }}>
                     <Icons.Check />
                   </span>
-                  <span className="text-xs font-medium" style={{ color: C.success }}>Valid school email</span>
+                  <span className="text-xs font-medium" style={{ color: C.success }}>Valid email</span>
                 </div>
               )}
             </div>
@@ -1409,31 +1427,8 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin:
               </button>
             </div>
 
-            <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>
-              Sign In
-            </Button>
-
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
-              <span className="text-xs" style={{ color: C.textSec }}>or</span>
-              <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
-            </div>
-
-            <Button
-              variant="secondary"
-              size="lg"
-              fullWidth
-              onClick={() => {
-                setEmail("student@northwestern.edu");
-                setEmailError("");
-                setTouched(false);
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="1" y="1" width="16" height="16" rx="4" fill={C.primary} fillOpacity="0.12" />
-                <path d="M9 4L4 9l5 5 5-5-5-5z" fill={C.primary} />
-              </svg>
-              Continue with School Email (SSO)
+            <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid || isSigningIn}>
+              {isSigningIn ? "Signing In…" : "Sign In"}
             </Button>
 
             <div
@@ -1441,50 +1436,31 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin:
               style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}
             >
               <div className="flex items-center justify-between gap-3 mb-1">
-                <p className="text-sm font-semibold" style={{ color: C.text }}>Demo / Placeholder Accounts</p>
+                <p className="text-sm font-semibold" style={{ color: C.text }}>
+                  Local Test Accounts
+                </p>
                 <span
                   className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
                   style={{ backgroundColor: "#fff", color: C.primary }}
                 >
-                  Frontend only
+                  Role auto-detected
                 </span>
               </div>
               <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
-                These buttons skip verification and onboarding so you can test each dashboard with placeholder data.
+                Sign in with one of these accounts. The backend detects the role from the account automatically.
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onDemoLogin("mentee")}
-                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ backgroundColor: "#fff", color: C.primary, border: `1px solid ${C.border}` }}
-                >
-                  Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDemoLogin("mentor")}
-                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ backgroundColor: "#fff", color: C.success, border: `1px solid ${C.border}` }}
-                >
-                  Mentor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDemoLogin("admin")}
-                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ backgroundColor: "#fff", color: "#92400E", border: `1px solid ${C.border}` }}
-                >
-                  Admin
-                </button>
+              <div className="flex flex-col gap-1.5 text-xs" style={{ color: C.text }}>
+                <div><strong>Student:</strong> student@gmail.com / student@123</div>
+                <div><strong>Mentor:</strong> mentor@gmail.com / mentor@123</div>
+                <div><strong>Admin:</strong> admin@gmail.com / admin@123</div>
               </div>
             </div>
 
             <p className="text-center text-sm" style={{ color: C.textSec }}>
               Don't have an account?{" "}
-              <button className="font-semibold" style={{ color: C.primary }} onClick={onNext}>
-                Create account
-              </button>
+              <span className="font-medium" style={{ color: C.textSec }}>
+                Local testing branch — seeded accounts are ready.
+              </span>
             </p>
           </div>
         </div>
@@ -8860,12 +8836,70 @@ function MobileNav({
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("login");
-  const [role, setRole] = useState<Role>("mentee");
+  const [role, setRole] = useState<Role>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [notifReadIds, setNotifReadIds] = useState<number[]>([]);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
   let toastId = 0;
+
+  useEffect(() => {
+    let active = true;
+
+    getMe()
+      .then((user) => {
+        if (!active) return;
+        setRole(
+          user.role === "STUDENT"
+            ? "mentee"
+            : user.role === "MENTOR"
+              ? "mentor"
+              : "admin"
+        );
+        setScreen(
+          user.role === "STUDENT"
+            ? "dashboard"
+            : user.role === "MENTOR"
+              ? "mentor-dashboard"
+              : "admin-dashboard"
+        );
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleLogin(email: string, password: string) {
+    const user = await localLogin(email, password);
+    const nextRole =
+      user.role === "STUDENT"
+        ? "mentee"
+        : user.role === "MENTOR"
+          ? "mentor"
+          : "admin";
+
+    setRole(nextRole);
+    setScreen(
+      nextRole === "mentee"
+        ? "dashboard"
+        : nextRole === "mentor"
+          ? "mentor-dashboard"
+          : "admin-dashboard"
+    );
+  }
+
+  async function handleLogout() {
+    try {
+      await localLogout();
+    } finally {
+      setRole(null);
+      setScreen("login");
+    }
+  }
+
+
 
   function addToast(type: ToastType, message: string) {
     const id = ++toastId;
@@ -8922,25 +8956,7 @@ export default function App() {
   return (
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
       {screen === "login" && (
-        <LoginScreen
-          onNext={() => {
-            setScreen("verify");
-          }}
-          onDemoLogin={(demoRole) => {
-            setRole(demoRole);
-            setScreen(
-              demoRole === "mentee"
-                ? "dashboard"
-                : demoRole === "mentor"
-                  ? "mentor-dashboard"
-                  : "admin-dashboard",
-            );
-            addToast(
-              "info",
-              `Demo mode: signed in as ${demoRole === "mentee" ? "student" : demoRole} with placeholder data.`,
-            );
-          }}
-        />
+        <LoginScreen onLogin={handleLogin} />
       )}
       {screen === "verify" && (
         <VerifyScreen
@@ -9073,6 +9089,21 @@ export default function App() {
           role={role}
           onBack={() => setScreen(role === "mentor" ? "mentor-dashboard" : "dashboard")}
         />
+      )}
+
+      {role && screen !== "login" && (
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="fixed right-4 z-50 px-3 py-2 rounded-xl text-xs font-semibold bg-white card-shadow hover:opacity-80"
+          style={{
+            bottom: showMobileNav ? "76px" : "16px",
+            border: `1px solid ${C.border}`,
+            color: C.textSec,
+          }}
+        >
+          Sign out
+        </button>
       )}
 
       {/* Mobile bottom nav */}
