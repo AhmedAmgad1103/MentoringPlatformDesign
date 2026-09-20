@@ -96,5 +96,12 @@ export async function PATCH(
     return question
   })
 
-  return Response.json({ item: updated })
+  return Response.json({
+    item: {
+      id: report.id,
+      status: ReportStatus.ACTION_TAKEN,
+      moderationStatus: updated.moderationStatus,
+      questionStatus: updated.status,
+    },
+  })
 }
