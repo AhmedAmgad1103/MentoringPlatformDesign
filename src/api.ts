@@ -6,6 +6,10 @@ import {
   getAnswers as getAnswersApi,
   getMentorProfile,
   getMentors as getMentorsApi,
+  getAdminUsers as getAdminUsersApi,
+  getAdminMentors as getAdminMentorsApi,
+  assignMentor as assignMentorApi,
+  unassignMentor as unassignMentorApi,
   getModerationQueue as getModerationQueueApi,
   approveQuestion as approveQuestionApi,
   rejectQuestion as rejectQuestionApi,
@@ -255,6 +259,29 @@ export async function getMessages(withUserId: string, before?: string) {
 
 export async function getMentors() {
   return getMentorsApi();
+}
+
+export async function getAdminUsers(
+  options: {
+    role?: "STUDENT" | "MENTOR" | "ADMIN";
+    q?: string;
+    page?: number;
+    limit?: number;
+  } = {}
+) {
+  return getAdminUsersApi(options);
+}
+
+export async function getAdminMentors() {
+  return getAdminMentorsApi();
+}
+
+export async function assignMentor(studentId: string, mentorId: string) {
+  return assignMentorApi(studentId, mentorId);
+}
+
+export async function unassignMentor(studentId: string) {
+  return unassignMentorApi(studentId);
 }
 
 export async function getMe(): Promise<ApiUser> {
