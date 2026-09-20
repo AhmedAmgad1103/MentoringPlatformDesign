@@ -34,7 +34,12 @@ export function visibleWhere(user: CurrentUser): Prisma.QuestionWhereInput {
 
   return {
     OR: [
-      { studentId: user.id },
+      {
+        AND: [
+          { studentId: user.id },
+          { moderationStatus: { not: ModerationStatus.REJECTED } },
+        ],
+      },
       publicAndApproved,
     ],
   }
