@@ -1,9 +1,11 @@
-process.env.DATABASE_URL ??= "file:./data/mentoring.db"
-
+import "dotenv/config"
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3"
 import { createHash } from "node:crypto"
 import { PrismaClient, QuestionCategory, QuestionStatus, QuestionVisibility, ModerationStatus, Role } from "@prisma/client"
 
-const prisma = new PrismaClient()
+const connectionString = process.env.DATABASE_URL || "file:./data/mentoring.db"
+const adapter = new PrismaBetterSqlite3({ url: connectionString })
+const prisma = new PrismaClient({ adapter })
 
 function hashPassword(password) {
   return createHash("sha256").update(password, "utf8").digest("hex")
