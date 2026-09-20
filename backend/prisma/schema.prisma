@@ -1,5 +1,4 @@
 generator client {
-  reports           QuestionReport[]
   provider = "prisma-client-js"
 }
 
@@ -105,6 +104,7 @@ model Question {
 
   answers           Answer[]
   boosts            QuestionBoost[]
+  reports           QuestionReport[]
 
   @@index([studentId])
   @@index([mentorId])
