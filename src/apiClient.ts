@@ -411,3 +411,15 @@ export async function updateQuestionStatus(
     body: JSON.stringify({ status }),
   })
 }
+
+export async function getMentorMentees() {
+  return request<{
+    items: Array<{
+      id: string
+      name: string | null
+      email: string
+      createdAt: string
+      questionCount: number
+    }>
+  }>("/api/mentors/me/mentees")
+}
