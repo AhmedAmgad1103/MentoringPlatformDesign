@@ -3397,7 +3397,31 @@ function QuestionDetailScreen({
 }) {
   const [sort, setSort] = useState<"helpful" | "newest">("helpful");
   const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
-  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
+  const [boostedIds, setBoostedIds] = useState<Set<string | number>>(new Set());
+  const [liveQuestion, setLiveQuestion] =
+    useState<Awaited<ReturnType<typeof getQuestionDetails>> | null>(null);
+
+  useEffect(() => {
+    if (typeof questionId !== "string") {
+      setLiveQuestion(null);
+      return;
+    }
+
+    let active = true;
+    getQuestionDetails(questionId)
+      .then((item) => {
+        if (!active) return;
+        setLiveQuestion(item);
+        setBoostedIds(item.boostedByMe ? new Set([item.id]) : new Set());
+      })
+      .catch(() => {
+        if (active) setLiveQuestion(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [questionId]);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
