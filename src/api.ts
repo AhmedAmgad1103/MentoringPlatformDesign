@@ -152,6 +152,7 @@ export async function getFeedQuestions() {
     tags: [] as string[],
     boostedByMe: q.boostedByMe,
     reportedByMe: q.reportedByMe,
+    isMine: q.isMine,
     isAnonymous: q.isAnonymous,
     student: q.student,
   }));
