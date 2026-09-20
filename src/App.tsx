@@ -50,6 +50,7 @@ type Screen =
   | "mentor-answer"
   | "admin-dashboard"
   | "admin-users"
+  | "admin-mentors"
   | "admin-questions"
   | "admin-moderation"
   | "admin-reports"
@@ -6042,7 +6043,7 @@ function MentorDashboardScreen({
         {(() => {
           const tier = getMentorTier(MENTOR.points);
           return (
-            <Card className="p-5 mb-6 fade-in flex items-center gap-5 flex-wrap">
+            <Card className="p-5 mb-6 fade-in flex items-end justify-between gap-5 flex-wrap lg:flex-nowrap">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
                 style={{ backgroundColor: tier.bg }}
@@ -6075,9 +6076,20 @@ function MentorDashboardScreen({
                   </div>
                 )}
               </div>
-              <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
-                🏆 Top Mentors
-              </Button>
+              <div className="w-full lg:w-auto lg:min-w-[330px] rounded-2xl p-4" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <h3 className="text-xs font-bold" style={{ color: C.text }}>How to score points</h3>
+                  <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
+                    🏆 Leaderboard
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs" style={{ color: C.textSec }}>
+                  <div><strong style={{ color: C.text }}>+5</strong> Answer a question</div>
+                  <div><strong style={{ color: C.text }}>+2</strong> Helpful vote</div>
+                  <div><strong style={{ color: C.text }}>+3</strong> Answer within 24h</div>
+                  <div><strong style={{ color: C.text }}>+1</strong> Ask Any Mentor response</div>
+                </div>
+              </div>
             </Card>
           );
         })()}
@@ -6565,7 +6577,7 @@ function AdminShell({
   const sectionToScreen: Record<AdminSection, Screen> = {
     dashboard: "admin-dashboard",
     users: "admin-users",
-    mentors: "admin-users",
+    mentors: "admin-mentors",
     questions: "admin-questions",
     moderation: "admin-moderation",
     reports: "admin-reports",
@@ -7438,42 +7450,58 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
 
 // ─── ADMIN USERS VIEW ──────────────────────────────────────────────────────────
 
-function AdminUsersView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
+function AdminUsersView({
+  section,
+  onToast,
+}: {
+  section: "users" | "mentors";
+  onToast: (t: ToastType, msg: string) => void;
+}) {
   type LiveUser = Awaited<ReturnType<typeof getAdminUsers>>["items"][number];
   const [users, setUsers] = useState<LiveUser[]>([]);
   const [mentors, setMentors] = useState<Awaited<ReturnType<typeof getAdminMentors>>["items"]>([]);
   const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState<"all" | "STUDENT" | "MENTOR" | "ADMIN">("all");
   const [loading, setLoading] = useState(true);
+
+  const isMentorsSection = section === "mentors";
+  const role = isMentorsSection ? "MENTOR" : "STUDENT";
+  const title = isMentorsSection ? "Mentors" : "Students";
+  const searchPlaceholder = isMentorsSection
+    ? "Search mentors by name or email…"
+    : "Search students by name or email…";
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+
     const timer = window.setTimeout(() => {
-      Promise.all([
-        getAdminUsers({
-          role: filterRole === "all" ? undefined : filterRole,
-          q: search.trim() || undefined,
-          limit: 100,
-        }),
-        getAdminMentors(),
-      ])
+      const userRequest = getAdminUsers({
+        role,
+        q: search.trim() || undefined,
+        limit: 100,
+      });
+
+      const mentorRequest = isMentorsSection ? Promise.resolve(null) : getAdminMentors();
+
+      Promise.all([userRequest, mentorRequest])
         .then(([userResponse, mentorResponse]) => {
           if (!active) return;
           setUsers(userResponse.items);
-          setMentors(mentorResponse.items);
+          if (mentorResponse) setMentors(mentorResponse.items);
         })
         .catch((error) => {
-          if (active) onToast("error", error instanceof Error ? error.message : "Unable to load users.");
+          if (active) onToast("error", error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`);
         })
         .finally(() => {
           if (active) setLoading(false);
         });
     }, 150);
+
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [filterRole, search]);
+  }, [role, search, isMentorsSection, title, onToast]);
 
   async function changeMentor(user: LiveUser, mentorId: string) {
     try {
@@ -7495,45 +7523,41 @@ function AdminUsersView({ onToast }: { onToast: (t: ToastType, msg: string) => v
     <div className="fade-in">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-lg font-bold" style={{ color: C.text }}>Users</h2>
-          <p className="text-xs mt-1" style={{ color: C.textSec }}>Live users from the local SQLite database.</p>
+          <h2 className="text-lg font-bold" style={{ color: C.text }}>{title}</h2>
+          <p className="text-xs mt-1" style={{ color: C.textSec }}>
+            {isMentorsSection
+              ? "All mentor accounts. Search by mentor name or email."
+              : "All student accounts. Search by student name or email."}
+          </p>
         </div>
         <span className="text-xs font-semibold px-2.5 py-1 rounded-lg" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
-          {users.length} users
+          {users.length} {isMentorsSection ? "mentors" : "students"}
         </span>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setLoading(true);
-          }}
-          placeholder="Search users…"
-          className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none"
-          style={{ backgroundColor: "#fff", border: "1.5px solid " + C.border, color: C.text }}
-        />
-        <select
-          value={filterRole}
-          onChange={(e) => {
-            setFilterRole(e.target.value as typeof filterRole);
-            setLoading(true);
-          }}
-          className="px-3 py-2.5 rounded-xl text-sm outline-none"
-          style={{ backgroundColor: "#fff", border: "1.5px solid " + C.border, color: C.text }}
-        >
-          <option value="all">All roles</option>
-          <option value="STUDENT">Students</option>
-          <option value="MENTOR">Mentors</option>
-          <option value="ADMIN">Admins</option>
-        </select>
+      <div className="mb-4">
+        <div className="relative max-w-xl">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.textSec }}>
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm outline-none bg-white"
+            style={{ border: `1.5px solid ${C.border}`, color: C.text }}
+          />
+        </div>
+        <p className="text-[11px] mt-1.5" style={{ color: C.textSec }}>
+          Admin search includes email.
+        </p>
       </div>
 
       {loading ? (
-        <Card className="p-8 text-center text-sm" style={{ color: C.textSec }}>Loading users…</Card>
+        <Card className="p-8 text-center text-sm" style={{ color: C.textSec }}>Loading {title.toLowerCase()}…</Card>
       ) : users.length === 0 ? (
-        <Card className="p-8 text-center text-sm" style={{ color: C.textSec }}>No users found.</Card>
+        <Card className="p-8 text-center text-sm" style={{ color: C.textSec }}>No {title.toLowerCase()} found.</Card>
       ) : (
         <div className="flex flex-col gap-2">
           {users.map((user) => (
@@ -7546,11 +7570,11 @@ function AdminUsersView({ onToast }: { onToast: (t: ToastType, msg: string) => v
                   </div>
                   <div className="text-xs" style={{ color: C.textSec }}>{user.email}</div>
                   <div className="text-xs mt-1" style={{ color: C.textSec }}>
-                    {user.role} · {user.questionCount} questions · {user.answerCount} answers
+                    {user.questionCount} questions · {user.answerCount} answers
                   </div>
                 </div>
 
-                {user.role === "STUDENT" && (
+                {!isMentorsSection && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium" style={{ color: C.textSec }}>Mentor</span>
                     <select
@@ -8005,7 +8029,13 @@ function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) =>
 
 // ─── ADMIN QUESTIONS VIEW ──────────────────────────────────────────────────────
 
-function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
+function AdminQuestionsView({
+  onToast,
+  onOpenQuestion,
+}: {
+  onToast: (t: ToastType, msg: string) => void;
+  onOpenQuestion: (id: string) => void;
+}) {
   const [questions, setQuestions] = useState<Array<{
     id: string;
     question: string;
@@ -8013,7 +8043,7 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
     category: string;
     date: string;
     type: MentorQuestion["type"];
-    asker: { name: string } | null;
+    asker: { name: string; email: string } | null;
     moderationStatus: string;
   }>>([]);
   const [search, setSearch] = useState("");
@@ -8034,8 +8064,8 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
             ? q.visibility === "PUBLIC" ? "anon-public" : "anon-private"
             : q.visibility === "PUBLIC" ? "any-mentor" : "private",
           asker: q.student
-             ? { name: q.student.name ?? "Student", email: q.student.email }
-             : null,
+            ? { name: q.student.name ?? "Student", email: q.student.email }
+            : null,
           moderationStatus: q.moderationStatus,
         }))
       );
@@ -8050,11 +8080,17 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
     void loadQuestions();
   }, []);
 
-  const filtered = questions.filter(q =>
-    q.question.toLowerCase().includes(search.toLowerCase()) ||
-    q.content.toLowerCase().includes(search.toLowerCase()) ||
-    q.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const needle = search.trim().toLowerCase();
+  const filtered = questions.filter((q) => {
+    if (!needle) return true;
+    return (
+      q.question.toLowerCase().includes(needle) ||
+      q.content.toLowerCase().includes(needle) ||
+      q.category.toLowerCase().includes(needle) ||
+      (q.asker?.name.toLowerCase().includes(needle) ?? false) ||
+      (q.asker?.email.toLowerCase().includes(needle) ?? false)
+    );
+  });
 
   const TYPE_LABEL: Record<MentorQuestion["type"], string> = {
     private: "Private",
@@ -8066,27 +8102,30 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
   return (
     <div className="fade-in flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 max-w-lg">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.textSec }}>
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
           <input
             type="text"
-            placeholder="Search questions…"
+            placeholder="Search title, student name, or email…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-sm bg-white outline-none"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white outline-none"
             style={{ border: `1.5px solid ${C.border}`, color: C.text }}
           />
         </div>
-        <span className="text-xs" style={{ color: C.textSec }}>
+        <span className="text-xs whitespace-nowrap" style={{ color: C.textSec }}>
           {filtered.length} questions
         </span>
         <Button variant="secondary" size="sm" onClick={() => void loadQuestions()} disabled={loading}>
           {loading ? "Refreshing…" : "Refresh"}
         </Button>
       </div>
+      <p className="text-[11px] -mt-2" style={{ color: C.textSec }}>
+        Admin search includes the student email for anonymous and non-anonymous posts.
+      </p>
 
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div className="grid text-xs font-semibold px-5 py-3"
@@ -8104,8 +8143,20 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
           <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No questions found.</div>
         )}
         {filtered.map((q, i) => (
-          <div key={q.id} className="grid items-center px-5 py-3.5 gap-3"
-            style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}` }}>
+          <div
+            key={q.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpenQuestion(q.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpenQuestion(q.id);
+              }
+            }}
+            className="grid items-center px-5 py-3.5 gap-3 cursor-pointer transition-colors hover:bg-[#FAF9FE] focus:outline-none focus:bg-[#FAF9FE]"
+            style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}` }}
+          >
             <div className="flex items-start gap-2 min-w-0">
               {q.asker === null && <span className="text-base flex-shrink-0">🔒</span>}
               <div className="min-w-0">
@@ -8115,11 +8166,11 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
                 <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
                   {q.asker?.name ?? "Anonymous Mentee"}
                 </div>
-                 {q.asker?.email && (
-                   <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                     {q.asker.email}
-                   </div>
-                 )}
+                {q.asker?.email && (
+                  <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                    {q.asker.email}
+                  </div>
+                )}
               </div>
             </div>
             <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
@@ -8190,10 +8241,12 @@ function AdminSettingsView({ onToast }: { onToast: (t: ToastType, msg: string) =
 function AdminScreen({
   initialSection,
   onFullNavigate,
+  onOpenQuestion,
   onToast,
 }: {
   initialSection: AdminSection;
   onFullNavigate: (s: Screen) => void;
+  onOpenQuestion: (id: string) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [section, setSection] = useState<AdminSection>(initialSection);
@@ -8207,7 +8260,7 @@ function AdminScreen({
     const map: Record<AdminSection, Screen> = {
       dashboard: "admin-dashboard",
       users: "admin-users",
-      mentors: "admin-users",
+      mentors: "admin-mentors",
       questions: "admin-questions",
       moderation: "admin-moderation",
       reports: "admin-reports",
@@ -9287,7 +9340,7 @@ export default function App() {
       {screen === "question-detail" && (
         <QuestionDetailScreen
           questionId={selectedQuestionId}
-          onBack={() => setScreen("feed")}
+          onBack={() => setScreen(role === "admin" ? "admin-questions" : "feed")}
           onOpenQuestion={openQuestion}
           onNavigate={setScreen}
           onToast={addToast}
@@ -9307,7 +9360,7 @@ export default function App() {
           onToast={addToast}
         />
       )}
-      {(screen === "admin-dashboard" || screen === "admin-users" || screen === "admin-questions" || screen === "admin-moderation" || screen === "admin-reports" || screen === "admin-settings") && (
+      {(screen === "admin-dashboard" || screen === "admin-users" || screen === "admin-mentors" || screen === "admin-questions" || screen === "admin-moderation" || screen === "admin-reports" || screen === "admin-settings") && (
         <AdminScreen
           initialSection={
             screen === "admin-dashboard" ? "dashboard"
