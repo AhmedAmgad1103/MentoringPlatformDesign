@@ -73,3 +73,5 @@ Delete `backend/data/mentoring.db` and run `npm run dev` again. The setup script
 ## Post reports
 
 Students and mentors can report approved public posts, including posts already approved by an admin. Each user can report a given post once and may optionally add details. Admins can review pending reports, dismiss them, or remove the reported post. Removing a post changes its moderation state to rejected and resolves all pending reports for that post.
+
+Notifications are intentionally not part of this local full-stack test. No notification events are generated or persisted by the local backend.
