@@ -1372,13 +1372,7 @@ function LoginScreen({
             </p>
           </div>
 
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleSubmit();
-            }}
-          >
+          <div className="flex flex-col gap-4">
             {[
               { label: "Board Exam Guidance", sub: "Proven strategies from attendings who aced Step 1 & 2" },
               { label: "Clinical Skills Coaching", sub: "Real feedback on presentations, notes, and procedures" },
@@ -1438,7 +1432,13 @@ function LoginScreen({
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+          >
             <div>
               <InputField
                 label="Medical School Email"
