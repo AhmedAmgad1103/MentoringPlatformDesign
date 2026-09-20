@@ -741,6 +741,31 @@ const LEADERBOARD_MENTORS = [
   { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
 ].sort((a, b) => b.points - a.points);
 
+const REWARD_MONTH_KEY = "medmentor_reward_month";
+const CURRENT_REWARD_MONTH = (() => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+})();
+
+const REWARD_RESET_THIS_MONTH = (() => {
+  if (typeof window === "undefined") return false;
+  const stored = window.localStorage.getItem(REWARD_MONTH_KEY);
+
+  if (stored === null) {
+    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
+    return false;
+  }
+
+  if (stored !== CURRENT_REWARD_MONTH) {
+    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
+    return true;
+  }
+
+  return false;
+})();
+
+const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : MENTOR.points;
+
 const QUESTIONS = [
   {
     id: 1,
