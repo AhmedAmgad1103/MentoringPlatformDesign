@@ -1306,7 +1306,7 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 // ─── SCREEN: LOGIN ────────────────────────────────────────────────────────────
 
-function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin: (role: Exclude<Role, null>) => void }) {
+function LoginScreen({ onNext, onDemoLogin }: { onNext: (email: string) => void; onDemoLogin: (role: Exclude<Role, null>) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -1338,7 +1338,7 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: () => void; onDemoLogin:
 
     try {
       await login(email, "mentee");
-      onNext();
+      onNext(email.trim());
     } catch (error) {
       setEmailError(error instanceof Error ? error.message : "Unable to sign in. Please try again.");
     }
@@ -9188,6 +9188,7 @@ function MobileNav({
 export default function App() {
   const [screen, setScreen] = useState<Screen>("login");
   const [role, setRole] = useState<Role>(null);
+  const [authEmail, setAuthEmail] = useState("");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
@@ -9212,16 +9213,21 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  function handleRoleSelect(r: Role) {
-    if (!r) return;
-    setRole(r);
-    setScreen(
-      r === "mentee"
-        ? "onboarding-mentee"
-        : r === "mentor"
-          ? "onboarding-mentor"
-          : "admin-dashboard",
-    );
+  async function handleRoleSelect(r: Role) {
+    if (!r || !authEmail) return;
+    try {
+      await login(authEmail, r);
+      setRole(r);
+      setScreen(
+        r === "mentee"
+          ? "onboarding-mentee"
+          : r === "mentor"
+            ? "onboarding-mentor"
+            : "admin-dashboard",
+      );
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to select role.");
+    }
   }
 
   function openQuestion(id: string | number) {
