@@ -9252,7 +9252,8 @@ export default function App() {
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
       {screen === "login" && (
         <LoginScreen
-          onNext={() => {
+          onNext={(email) => {
+            setAuthEmail(email);
             setScreen("verify");
           }}
           onDemoLogin={(demoRole) => {
