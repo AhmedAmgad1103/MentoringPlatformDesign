@@ -1,5 +1,34 @@
 import { useState, useRef, useEffect } from "react";
-import { getQuestions, createQuestion, sendMessage, login } from "./api";
+import {
+  boostQuestion,
+  createAnswer,
+  updateAnswer,
+  createQuestion,
+  getFeedQuestions,
+  getMentorQueue,
+  getMentorMentees,
+  getModerationQueue,
+  approveQuestion,
+  rejectQuestion,
+  getAdminReports,
+  getQuestionDetails,
+  getQuestions,
+  getAdminQuestions,
+  login,
+  logout,
+  getMe,
+  sendMessage,
+  unboostQuestion,
+  updateAdminReport,
+  updateQuestionStatus,
+  reportQuestion,
+  updateMe,
+  getAdminUsers,
+  getAdminMentors,
+  getAdminStats,
+  assignMentor,
+  unassignMentor,
+} from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +50,7 @@ type Screen =
   | "mentor-answer"
   | "admin-dashboard"
   | "admin-users"
+  | "admin-mentors"
   | "admin-questions"
   | "admin-moderation"
   | "admin-reports"
@@ -32,6 +62,17 @@ type Screen =
 type Role = "mentee" | "mentor" | "admin" | null;
 
 type ToastType = "success" | "error" | "info";
+
+type ReportReasonValue =
+  | "SPAM"
+  | "HARASSMENT"
+  | "INAPPROPRIATE_CONTENT"
+  | "MISINFORMATION"
+  | "PRIVACY"
+  | "OFF_TOPIC"
+  | "OTHER";
+
+type ReportStatusValue = "PENDING" | "DISMISSED" | "ACTION_TAKEN";
 
 interface Toast {
   id: number;
@@ -66,7 +107,14 @@ const C = {
   borderLight:  "#F0EEF8",
 };
 
-const DEMO_MODE = true;
+const DEMO_MODE = false;
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 // ─── COMPONENT LIBRARY ───────────────────────────────────────────────────────
 
@@ -83,7 +131,7 @@ function Button({
   children: React.ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   fullWidth?: boolean;
   type?: "button" | "submit";
@@ -706,6 +754,31 @@ const LEADERBOARD_MENTORS = [
   { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
 ].sort((a, b) => b.points - a.points);
 
+const REWARD_MONTH_KEY = "medmentor_reward_month";
+const CURRENT_REWARD_MONTH = (() => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+})();
+
+const REWARD_RESET_THIS_MONTH = (() => {
+  if (typeof window === "undefined") return false;
+  const stored = window.localStorage.getItem(REWARD_MONTH_KEY);
+
+  if (stored === null) {
+    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
+    return false;
+  }
+
+  if (stored !== CURRENT_REWARD_MONTH) {
+    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
+    return true;
+  }
+
+  return false;
+})();
+
+const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : MENTOR.points;
+
 const QUESTIONS = [
   {
     id: 1,
@@ -826,7 +899,7 @@ const SAMPLE_RESPONSES = [
 // ─── FEED & NOTIFICATION DATA ─────────────────────────────────────────────────
 
 interface FeedQuestion {
-  id: number;
+  id: string | number;
   title: string;
   preview: string;
   full: string;
@@ -836,6 +909,11 @@ interface FeedQuestion {
   helpful: number;
   boosted: number;
   tags: string[];
+  createdAtMs?: number;
+  reportedByMe?: boolean;
+  isMine?: boolean;
+  isAnonymous?: boolean;
+  moderationStatus?: "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED";
 }
 
 const FEED_QUESTIONS: FeedQuestion[] = [
@@ -1052,14 +1130,16 @@ const MENTOR_MENTEES_DATA = [
 ];
 
 interface MentorQuestion {
-  id: number;
+  id: string | number;
   type: "private" | "any-mentor" | "anon-public" | "anon-private";
   question: string;
+  content?: string;
   category: string;
   date: string;
   priority?: "high" | "normal";
   asker: { name: string; year?: string; track?: string; photo?: string } | null;
   responses: number;
+  reportedByMe?: boolean;
 }
 
 const MENTOR_WAITING_QUESTIONS: MentorQuestion[] = [
@@ -2065,19 +2145,23 @@ function DashboardScreen({
 }: {
   onToast: (t: ToastType, msg: string) => void;
   onNavigate: (s: Screen) => void;
-  onOpenQuestion: (id: number) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  onOpenQuestion: (id: string | number) => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"questions" | "notifications">("questions");
   const [searchQuery, setSearchQuery] = useState("");
   const [backendQuestionCount, setBackendQuestionCount] = useState<number | null>(null);
   const [backendLoadError, setBackendLoadError] = useState(false);
+  const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+  const readIds = notifReadIds ?? [];
+  const markRead = onMarkRead ?? (() => {});
+  const markAllRead = onMarkAllRead ?? (() => {});
+  const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !readIds.includes(n.id)).length;
   const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
 
   useEffect(() => {
@@ -2085,6 +2169,7 @@ function DashboardScreen({
     getQuestions()
       .then((questions) => {
         if (!active) return;
+        setRecentQuestions(questions);
         setBackendQuestionCount(questions.length);
         setBackendLoadError(false);
       })
@@ -2214,9 +2299,9 @@ function DashboardScreen({
               {notifDropdownOpen && (
                 <NotificationDropdown
                   notifications={ALL_NOTIFICATIONS}
-                  readIds={notifReadIds}
-                  onMarkRead={onMarkRead}
-                  onMarkAllRead={onMarkAllRead}
+                  readIds={readIds}
+                  onMarkRead={markRead}
+                  onMarkAllRead={markAllRead}
                   onViewAll={() => {
                     setNotifDropdownOpen(false);
                     onNavigate("notifications-page");
@@ -2317,69 +2402,111 @@ function DashboardScreen({
 
             {activeTab === "questions" && (
               <div className="flex flex-col gap-3">
-                {QUESTIONS.filter((q) =>
-                  !searchQuery || q.question.toLowerCase().includes(searchQuery.toLowerCase())
-                ).map((q) => (
-                  <Card
-                    key={q.id}
-                    className="p-5 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => onOpenQuestion(FEED_QUESTIONS[q.id % FEED_QUESTIONS.length]?.id || 101)}
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <p className="text-sm font-medium leading-snug flex-1" style={{ color: C.text }}>
-                        {q.question}
-                      </p>
-                      <Badge variant={statusVariant[q.status] || "neutral"}>{q.status}</Badge>
-                    </div>
-
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ backgroundColor: C.borderLight, color: C.textSec }}
-                      >
-                        {q.tag}
-                      </span>
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: q.type === "Private" ? C.pendingLight : q.type === "Anonymous" ? "#F3E8FF" : C.primaryLight,
-                          color: q.type === "Private" ? C.pending : q.type === "Anonymous" ? "#7C3AED" : C.primary,
-                        }}
-                      >
-                        {q.type === "Private" ? "🔒 Private" : q.type === "Anonymous" ? "👤 Anonymous" : "🌐 Public"}
-                      </span>
-                      <span className="text-xs" style={{ color: C.textSec }}>{q.date}</span>
-                      {q.responses > 0 && (
-                        <span className="text-xs flex items-center gap-1" style={{ color: C.textSec }}>
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z" stroke="currentColor" strokeWidth="1.1" />
-                          </svg>
-                          {q.responses} response{q.responses !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
-
-                    {q.latest && (
-                      <div
-                        className="mt-3 flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg"
-                        style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: C.primary }} />
-                        {q.latest}
+                {recentQuestions
+                  .filter((q) =>
+                    !searchQuery ||
+                    q.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((q) => (
+                    <Card
+                      key={q.id}
+                      className="p-5 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => onOpenQuestion(q.id)}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="text-sm font-medium leading-snug flex-1" style={{ color: C.text }}>
+                          {q.title}
+                        </p>
+                        <Badge
+                          variant={
+                            q.moderationStatus === "PENDING"
+                              ? "info"
+                              : q.status === "ANSWERED"
+                                ? "success"
+                                : q.status === "CLOSED"
+                                  ? "neutral"
+                                  : "pending"
+                          }
+                        >
+                          {q.moderationStatus === "PENDING"
+                            ? "Awaiting Approval"
+                            : q.status === "ANSWERED"
+                              ? "Answered"
+                              : q.status === "CLOSED"
+                                ? "Closed"
+                                : "Awaiting Response"}
+                        </Badge>
                       </div>
-                    )}
-                  </Card>
-                ))}
 
-                {QUESTIONS.filter((q) =>
-                  !searchQuery || q.question.toLowerCase().includes(searchQuery.toLowerCase())
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ backgroundColor: C.borderLight, color: C.textSec }}
+                        >
+                          {q.category}
+                        </span>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: q.isAnonymous
+                              ? "#F3E8FF"
+                              : q.visibility === "PRIVATE"
+                                ? C.pendingLight
+                                : C.primaryLight,
+                            color: q.isAnonymous
+                              ? "#7C3AED"
+                              : q.visibility === "PRIVATE"
+                                ? C.pending
+                                : C.primary,
+                          }}
+                        >
+                          {q.isAnonymous
+                            ? "👤 Anonymous"
+                            : q.visibility === "PRIVATE"
+                              ? "🔒 Private"
+                              : "🌐 Public"}
+                        </span>
+                        <span className="text-xs" style={{ color: C.textSec }}>
+                          {formatDateTime(q.createdAt)}
+                        </span>
+                        {q.moderationStatus === "PENDING" && (
+                          <span className="text-xs font-medium" style={{ color: C.primary }}>
+                            Awaiting admin approval
+                          </span>
+                        )}
+                        {q.responses > 0 && (
+                          <span className="text-xs flex items-center gap-1" style={{ color: C.textSec }}>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <path
+                                d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z"
+                                stroke="currentColor"
+                                strokeWidth="1.1"
+                              />
+                            </svg>
+                            {q.responses} response{q.responses !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+
+                {recentQuestions.filter((q) =>
+                  !searchQuery ||
+                  q.title.toLowerCase().includes(searchQuery.toLowerCase())
                 ).length === 0 && (
                   <div className="flex flex-col items-center py-12 gap-3">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: C.borderLight }}>
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: C.borderLight }}
+                    >
                       <Icons.Search />
                     </div>
-                    <p className="text-sm font-medium" style={{ color: C.text }}>No questions match "{searchQuery}"</p>
-                    <p className="text-xs" style={{ color: C.textSec }}>Try a different search term</p>
+                    <p className="text-sm font-medium" style={{ color: C.text }}>
+                      {searchQuery ? `No questions match "${searchQuery}"` : "No questions yet"}
+                    </p>
+                    <p className="text-xs" style={{ color: C.textSec }}>
+                      {searchQuery ? "Try a different search term" : "Questions you submit will appear here, newest first."}
+                    </p>
                   </div>
                 )}
 
@@ -2392,7 +2519,6 @@ function DashboardScreen({
                 </button>
               </div>
             )}
-
             {activeTab === "notifications" && (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between mb-1">
@@ -2901,111 +3027,108 @@ function FeedQuestionCard({
   onClick,
   isBoosted,
   onToggleBoost,
+  onToast,
 }: {
   question: FeedQuestion;
   onClick: () => void;
   isBoosted: boolean;
-  onToggleBoost: (id: number) => void;
+  onToggleBoost: (id: string | number) => void;
+  onToast: (t: ToastType, msg: string) => void;
 }) {
-  return (
-    <Card
-      className="p-5 cursor-pointer"
-      onClick={onClick}
-      style={{ transition: "box-shadow 0.2s, transform 0.2s" }}
-    >
-      <div
-        onMouseEnter={(e) => {
-          (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow =
-            "0 8px 24px rgba(0,0,0,0.1)";
-          (e.currentTarget.parentElement as HTMLDivElement).style.transform =
-            "translateY(-2px)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow = "";
-          (e.currentTarget.parentElement as HTMLDivElement).style.transform = "";
-        }}
-      >
-        {/* Author row */}
-        <div className="flex items-center gap-2.5 mb-3">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: C.borderLight }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="4.5" r="2.5" stroke={C.textSec} strokeWidth="1.2" />
-              <path d="M1.5 13c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke={C.textSec} strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold" style={{ color: C.text }}>
-              Anonymous Mentee
-            </div>
-            <div className="text-xs" style={{ color: C.textSec }}>
-              {question.date}
-            </div>
-          </div>
-          <CategoryBadge category={question.category} />
-        </div>
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(Boolean(question.reportedByMe));
 
-        {/* Question */}
-        <h3
-          className="font-semibold text-sm leading-snug mb-1.5"
-          style={{ color: C.text }}
-        >
-          {question.title}
-        </h3>
-        <p
-          className="text-xs leading-relaxed mb-3 overflow-hidden"
-          style={{
-            color: C.textSec,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
+  return (
+    <>
+      <Card
+        className="p-5 cursor-pointer"
+        onClick={onClick}
+        style={{ transition: "box-shadow 0.2s, transform 0.2s" }}
+      >
+        <div
+          onMouseEnter={(e) => {
+            (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow =
+              "0 8px 24px rgba(0,0,0,0.1)";
+            (e.currentTarget.parentElement as HTMLDivElement).style.transform =
+              "translateY(-2px)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget.parentElement as HTMLDivElement).style.boxShadow = "";
+            (e.currentTarget.parentElement as HTMLDivElement).style.transform = "";
           }}
         >
-          {question.preview}
-        </p>
-
-        {/* Tags */}
-        {question.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {question.tags.slice(0, 3).map((t) => (
-              <span
-                key={t}
-                className="text-xs px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: C.borderLight, color: C.textSec }}
-              >
-                {t}
-              </span>
-            ))}
+          {/* Author row */}
+          <div className="flex items-center gap-2.5 mb-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: C.borderLight }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="4.5" r="2.5" stroke={C.textSec} strokeWidth="1.2" />
+                <path d="M1.5 13c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke={C.textSec} strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold" style={{ color: C.text }}>
+                {question.isAnonymous === false ? "Student" : "Anonymous Mentee"}
+              </div>
+              <div className="text-xs" style={{ color: C.textSec }}>
+                {question.date}
+              </div>
+            </div>
+            <CategoryBadge category={question.category} />
           </div>
-        )}
 
-        {/* Stats footer */}
-        <div
-          className="flex items-center gap-4 pt-3"
-          style={{ borderTop: `1px solid ${C.borderLight}` }}
-        >
-          <span
-            className="flex items-center gap-1 text-xs"
-            style={{ color: C.textSec }}
+          {/* Question */}
+          <h3
+            className="font-semibold text-sm leading-snug mb-1.5"
+            style={{ color: C.text }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z" stroke="currentColor" strokeWidth="1.1" />
-            </svg>
-            <strong style={{ color: C.text }}>{question.responses}</strong> mentor{" "}
-            {question.responses === 1 ? "answer" : "answers"}
-          </span>
-          <span
-            className="flex items-center gap-1 text-xs"
-            style={{ color: C.textSec }}
+            {question.title}
+          </h3>
+          <p
+            className="text-xs leading-relaxed mb-3 overflow-hidden"
+            style={{
+              color: C.textSec,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+            }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2.5 5.5L2 10h6l1.5-4.5H7V3a1 1 0 00-2 0v2.5H2.5z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-            </svg>
-            <strong style={{ color: C.text }}>{question.helpful}</strong> helpful
-          </span>
-              <button
+            {question.preview}
+          </p>
+
+          {/* Tags */}
+          {question.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {question.tags.slice(0, 3).map((t) => (
+                <span
+                  key={t}
+                  className="text-xs px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: C.borderLight, color: C.textSec }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Stats footer */}
+          <div
+            className="flex items-center gap-3 pt-3"
+            style={{ borderTop: `1px solid ${C.borderLight}` }}
+          >
+            <span
+              className="flex items-center gap-1 text-xs"
+              style={{ color: C.textSec }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z" stroke="currentColor" strokeWidth="1.1" />
+              </svg>
+              <strong style={{ color: C.text }}>{question.responses}</strong> mentor{" "}
+              {question.responses === 1 ? "answer" : "answers"}
+            </span>
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleBoost(question.id);
@@ -3021,16 +3144,48 @@ function FeedQuestionCard({
               </svg>
               {question.boosted + (isBoosted ? 1 : 0)}
             </button>
-        <span
-            className="ml-auto flex items-center gap-1 text-xs font-semibold"
-            style={{ color: C.primary }}
-          >
-            Read answers
-            <Icons.ChevronRight />
-          </span>
+
+            {!question.isMine && typeof question.id === "string" && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!reported) setReportOpen(true);
+                  }}
+                  className="text-xs font-medium px-2 py-1 rounded-full transition-colors"
+                  style={{
+                    backgroundColor: reported ? C.successLight : C.borderLight,
+                    color: reported ? C.success : C.textSec,
+                  }}
+                >
+                  {reported ? "Reported" : "Report"}
+                </button>
+                {reportOpen && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ReportQuestionModal
+                      questionId={question.id}
+                      questionTitle={question.title}
+                      onClose={() => setReportOpen(false)}
+                      onReported={() => setReported(true)}
+                      onToast={onToast}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <span
+              className="ml-auto flex items-center gap-1 text-xs font-semibold"
+              style={{ color: C.primary }}
+            >
+              Read answers
+              <Icons.ChevronRight />
+            </span>
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </>
   );
 }
 
@@ -3040,29 +3195,81 @@ function FeedScreen({
   onBack,
   onOpenQuestion,
   onNavigate,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
+  notifReadIds = [],
+  onMarkRead = () => {},
+  onMarkAllRead = () => {},
+  onToast,
 }: {
   onBack: () => void;
-  onOpenQuestion: (id: number) => void;
+  onOpenQuestion: (id: string | number) => void;
   onNavigate: (s: Screen) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
+  onToast: (t: ToastType, msg: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<"recent" | "helpful" | "answered" | "boosted">("recent");
-  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
+  const [boostedIds, setBoostedIds] = useState<Set<string | number>>(new Set());
+  const [liveQuestions, setLiveQuestions] = useState<FeedQuestion[] | null>(null);
 
-  const toggleBoost = (id: number) => {
-    setBoostedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+  useEffect(() => {
+    let active = true;
+    getFeedQuestions()
+      .then((items) => {
+        if (active) {
+          setLiveQuestions(items);
+          setBoostedIds(
+            new Set(items.filter((q) => q.boostedByMe).map((q) => q.id))
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setLiveQuestions(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function toggleBoost(id: string | number) {
+    if (typeof id !== "string") {
+      setBoostedIds((prev) => {
+        const next = new Set(prev);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+      });
+      return;
+    }
+
+    const alreadyBoosted = boostedIds.has(id);
+    try {
+      const result = alreadyBoosted
+        ? await unboostQuestion(id)
+        : await boostQuestion(id);
+
+      setBoostedIds((prev) => {
+        const next = new Set(prev);
+        if (result.boosted) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+
+      setLiveQuestions((prev) =>
+        prev
+          ? prev.map((q) =>
+              q.id === id ? { ...q, boosted: result.boostCount } : q
+            )
+          : prev
+      );
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update boost."
+      );
+    }
+  }
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -3089,7 +3296,9 @@ function FeedScreen({
     "Other",
   ];
 
-  const filtered = FEED_QUESTIONS.filter((q) => {
+  const sourceQuestions = liveQuestions ?? FEED_QUESTIONS;
+
+  const filtered = sourceQuestions.filter((q) => {
     const matchSearch =
       !search ||
       q.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -3101,7 +3310,11 @@ function FeedScreen({
     if (sort === "answered") return b.responses - a.responses;
     if (sort === "boosted")
       return (b.boosted + (boostedIds.has(b.id) ? 1 : 0)) - (a.boosted + (boostedIds.has(a.id) ? 1 : 0));
-    return b.id - a.id;
+    if (b.createdAtMs !== undefined && a.createdAtMs !== undefined)
+      return b.createdAtMs - a.createdAtMs;
+    if (typeof b.id === "number" && typeof a.id === "number")
+      return b.id - a.id;
+    return 0;
   });
 
   return (
@@ -3147,39 +3360,6 @@ function FeedScreen({
           </div>
 
           <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="relative" ref={notifRef}>
-              <button
-                onClick={() => setNotifOpen(!notifOpen)}
-                className="relative p-2 rounded-xl"
-                style={{ color: C.textSec }}
-              >
-                <Icons.Bell />
-                {unread > 0 && (
-                  <span
-                    className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
-                    style={{ backgroundColor: C.error, fontSize: 9 }}
-                  >
-                    {unread}
-                  </span>
-                )}
-              </button>
-              {notifOpen && (
-                <NotificationDropdown
-                  notifications={ALL_NOTIFICATIONS}
-                  readIds={notifReadIds}
-                  onMarkRead={onMarkRead}
-                  onMarkAllRead={onMarkAllRead}
-                  onViewAll={() => {
-                    setNotifOpen(false);
-                    onNavigate("notifications-page");
-                  }}
-                  onOpenQuestion={(id) => {
-                    setNotifOpen(false);
-                    onOpenQuestion(id);
-                  }}
-                />
-              )}
-            </div>
             <Logo size="sm" />
           </div>
         </div>
@@ -3279,6 +3459,7 @@ function FeedScreen({
                 onClick={() => onOpenQuestion(q.id)}
                 isBoosted={boostedIds.has(q.id)}
                 onToggleBoost={toggleBoost}
+                onToast={onToast}
               />
             ))}
           </div>
@@ -3322,82 +3503,174 @@ function QuestionDetailScreen({
   onBack,
   onOpenQuestion,
   onNavigate,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
+  notifReadIds = [],
+  onMarkRead = () => {},
+  onMarkAllRead = () => {},
   onToast,
 }: {
-  questionId: number;
+  questionId: string | number;
   onBack: () => void;
-  onOpenQuestion: (id: number) => void;
+  onOpenQuestion: (id: string | number) => void;
   onNavigate: (s: Screen) => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
+  notifReadIds?: number[];
+  onMarkRead?: (id: number) => void;
+  onMarkAllRead?: () => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [sort, setSort] = useState<"helpful" | "newest">("helpful");
-  const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
-  const [boostedIds, setBoostedIds] = useState<Set<number>>(new Set());
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
-
-  const toggleBoost = (id: number) => {
-    setBoostedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const unread = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+  const [helpfulVotes, setHelpfulVotes] = useState<Set<string | number>>(new Set());
+  const [liveQuestion, setLiveQuestion] =
+    useState<Awaited<ReturnType<typeof getQuestionDetails>> | null>(null);
+  const [loading, setLoading] = useState(typeof questionId === "string");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [boosted, setBoosted] = useState(false);
+  const [boostCount, setBoostCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
+  const [editingAnswerContent, setEditingAnswerContent] = useState("");
+  const [savingAnswer, setSavingAnswer] = useState(false);
 
   useEffect(() => {
-    if (!notifOpen) return;
-    function h(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node))
-        setNotifOpen(false);
+    getMe()
+      .then((me) => setCurrentUserId(me.id))
+      .catch(() => setCurrentUserId(null));
+  }, []);
+
+  useEffect(() => {
+    if (typeof questionId !== "string") {
+      setLoading(false);
+      setLoadError(null);
+      setLiveQuestion(null);
+      return;
     }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [notifOpen]);
 
-  const question = FEED_QUESTIONS.find((q) => q.id === questionId) || FEED_QUESTIONS[0];
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
 
-  const RESPONSES_EXTENDED = [
-    ...SAMPLE_RESPONSES,
-    {
-      id: 4,
-      mentor: {
-        name: "Dr. Amara Osei",
-        specialty: "Family Medicine",
-        photo: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=80&h=80&fit=crop&auto=format",
-        expertise: ["Study Skills", "Wellness & Burnout"],
-      },
-      answer:
-        "One strategy that's consistently underrated: find even one study partner for daily accountability check-ins — not for content review, just for emotional grounding and keeping each other on track. The isolation of dedicated is itself a performance variable that most students don't account for. Even a 20-minute morning walk with a colleague can stabilize your output going into an afternoon block.",
-      timestamp: "3 days ago",
-      helpfulCount: 5,
-    },
-  ];
+    getQuestionDetails(questionId)
+      .then((item) => {
+        if (!active) return;
+        setLiveQuestion(item);
+        setReported(Boolean(item.reportedByMe));
+        setBoosted(Boolean(item.boostedByMe));
+        setBoostCount(item.boostCount);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLiveQuestion(null);
+        setLoadError(
+          error instanceof Error ? error.message : "Unable to load this question."
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-  const sortedResponses = [...RESPONSES_EXTENDED].sort((a, b) => {
-    if (sort === "helpful")
+    return () => {
+      active = false;
+    };
+  }, [questionId]);
+
+  const unread = ALL_NOTIFICATIONS.filter(
+    (n) => !n.read && !notifReadIds.includes(n.id)
+  ).length;
+
+  const fallbackQuestion =
+    FEED_QUESTIONS.find((q) => q.id === questionId) ?? FEED_QUESTIONS[0];
+
+  const question: FeedQuestion = liveQuestion
+    ? {
+        id: liveQuestion.id,
+        title: liveQuestion.title,
+        preview: liveQuestion.content,
+        full: liveQuestion.content,
+        category: liveQuestion.category.replaceAll("_", " "),
+        date: formatDateTime(liveQuestion.createdAt),
+        responses: liveQuestion.answerCount,
+        helpful: 0,
+        boosted: liveQuestion.boostCount,
+        tags: [],
+        reportedByMe: liveQuestion.reportedByMe,
+        isMine: liveQuestion.isMine,
+        isAnonymous: liveQuestion.isAnonymous,
+      }
+    : fallbackQuestion;
+
+  const questionContent = liveQuestion?.content ?? question.full;
+  const isAnonymous = liveQuestion?.isAnonymous ?? question.isAnonymous ?? true;
+  const canReport =
+    Boolean(liveQuestion) &&
+    !liveQuestion?.isMine &&
+    liveQuestion?.visibility === "PUBLIC" &&
+    (liveQuestion?.moderationStatus === "APPROVED" ||
+      liveQuestion?.moderationStatus === "NOT_REQUIRED") &&
+    typeof liveQuestion?.id === "string";
+
+  const responses = liveQuestion
+    ? (Array.isArray(liveQuestion.answers) ? liveQuestion.answers : []).map((a) => ({
+        id: a.id,
+        mentor: {
+          name: a.mentor?.name ?? "Mentor",
+          specialty: "Physician Mentor",
+          photo:
+            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=80&h=80&fit=crop&auto=format",
+          expertise: [],
+        },
+        answer: a.content,
+        timestamp: new Date(a.createdAt).toLocaleString(),
+        helpfulCount: 0,
+        mentorId: a.mentor?.id ?? null,
+      }))
+    : [];
+
+  const sortedResponses = [...responses].sort((a, b) => {
+    if (sort === "helpful") {
       return (
         b.helpfulCount +
         (helpfulVotes.has(b.id) ? 1 : 0) -
         (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0))
       );
-    return a.id - b.id;
+    }
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
-  const related = FEED_QUESTIONS.filter(
-    (q) => q.id !== questionId && q.category === question.category
-  ).slice(0, 3);
-  const fallbackRelated = FEED_QUESTIONS.filter((q) => q.id !== questionId).slice(0, 3);
+  const related = FEED_QUESTIONS
+    .filter((q) => q.id !== questionId && q.category === question.category)
+    .slice(0, 3);
+  const fallbackRelated = FEED_QUESTIONS
+    .filter((q) => q.id !== questionId)
+    .slice(0, 3);
   const relatedToShow = related.length >= 2 ? related : fallbackRelated;
 
-  function toggleHelpful(id: number) {
+  async function toggleBoost() {
+    if (typeof question.id !== "string") {
+      setBoosted((prev) => !prev);
+      setBoostCount((prev) => prev + (boosted ? -1 : 1));
+      return;
+    }
+
+    try {
+      if (boosted) {
+        const result = await unboostQuestion(question.id);
+        setBoosted(false);
+        setBoostCount(result.boostCount);
+      } else {
+        const result = await boostQuestion(question.id);
+        setBoosted(true);
+        setBoostCount(result.boostCount);
+      }
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update boost."
+      );
+    }
+  }
+
+  function toggleHelpful(id: string | number) {
     setHelpfulVotes((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -3405,9 +3678,51 @@ function QuestionDetailScreen({
     });
   }
 
+  function startEditingAnswer(id: string, content: string) {
+    setEditingAnswerId(id);
+    setEditingAnswerContent(content);
+  }
+
+  function cancelEditingAnswer() {
+    setEditingAnswerId(null);
+    setEditingAnswerContent("");
+  }
+
+  async function saveEditedAnswer() {
+    if (!editingAnswerId || typeof question.id !== "string") return;
+    const content = editingAnswerContent.trim();
+    if (!content) {
+      onToast("error", "Response cannot be empty.");
+      return;
+    }
+
+    setSavingAnswer(true);
+    try {
+      const result = await updateAnswer(question.id, editingAnswerId, content);
+      setLiveQuestion((prev) =>
+        prev
+          ? {
+              ...prev,
+              answers: prev.answers.map((answer) =>
+                answer.id === editingAnswerId ? result.item : answer
+              ),
+            }
+          : prev
+      );
+      cancelEditingAnswer();
+      onToast("success", "Response updated successfully.");
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to update response."
+      );
+    } finally {
+      setSavingAnswer(false);
+    }
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      {/* Header */}
       <header
         className="sticky top-0 z-30 bg-white"
         style={{ borderBottom: `1px solid ${C.border}` }}
@@ -3422,19 +3737,17 @@ function QuestionDetailScreen({
             Questions
           </button>
           <div className="flex-1 min-w-0">
-            <p
-              className="text-sm font-semibold truncate"
-              style={{ color: C.text }}
-            >
+            <p className="text-sm font-semibold truncate" style={{ color: C.text }}>
               {question.title}
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="relative" ref={notifRef}>
+          <div className="flex items-center gap-3">
+            <div className="relative">
               <button
-                onClick={() => setNotifOpen(!notifOpen)}
-                className="relative p-2 rounded-xl"
+                onClick={() => onNavigate("notifications-page")}
+                className="p-2 rounded-xl"
                 style={{ color: C.textSec }}
+                title={`${unread} unread notifications`}
               >
                 <Icons.Bell />
                 {unread > 0 && (
@@ -3446,22 +3759,6 @@ function QuestionDetailScreen({
                   </span>
                 )}
               </button>
-              {notifOpen && (
-                <NotificationDropdown
-                  notifications={ALL_NOTIFICATIONS}
-                  readIds={notifReadIds}
-                  onMarkRead={onMarkRead}
-                  onMarkAllRead={onMarkAllRead}
-                  onViewAll={() => {
-                    setNotifOpen(false);
-                    onNavigate("notifications-page");
-                  }}
-                  onOpenQuestion={(id) => {
-                    setNotifOpen(false);
-                    onOpenQuestion(id);
-                  }}
-                />
-              )}
             </div>
             <Logo size="sm" />
           </div>
@@ -3469,496 +3766,322 @@ function QuestionDetailScreen({
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 fade-in">
-        {/* Question card */}
-        <Card className="p-6 mb-6">
-          {/* Anonymous author */}
-          <div className="flex items-center gap-3 mb-4">
-            <div
-              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: C.borderLight }}
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <circle cx="10" cy="7" r="4" stroke={C.textSec} strokeWidth="1.4" />
-                <path
-                  d="M3 19c0-3.866 3.134-6 7-6s7 2.134 7 6"
-                  stroke={C.textSec}
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-sm" style={{ color: C.text }}>
-                Anonymous Mentee
-              </div>
-              <div className="text-xs" style={{ color: C.textSec }}>
-                {question.date}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              <PrivacyBadge type="hidden" />
-              <CategoryBadge category={question.category} />
-            </div>
-          </div>
+        {loading && (
+          <Card className="p-10 text-center mb-6">
+            <p className="text-sm" style={{ color: C.textSec }}>
+              Loading question…
+            </p>
+          </Card>
+        )}
 
-          {/* Privacy notice */}
-          <div
-            className="flex items-start gap-2 px-3 py-2.5 rounded-xl mb-4 text-xs"
-            style={{ backgroundColor: "#FFF8ED", border: `1px solid #FDE68A` }}
-          >
-            <span className="mt-0.5">🔒</span>
-            <span style={{ color: "#92400E" }}>
-              <strong>Privacy protected:</strong> The identity of the student who asked this question is not disclosed anywhere on this page. All responses are from verified physician mentors.
-            </span>
-          </div>
-
-          {/* Full question */}
-          <h2
-            className="text-lg font-bold mb-3 leading-snug"
-            style={{ color: C.text }}
-          >
-            {question.title}
-          </h2>
-          <p
-            className="text-sm leading-relaxed mb-4"
-            style={{ color: C.text }}
-          >
-            {question.full}
-          </p>
-
-          {/* Tags */}
-          <div className="flex flex-wrap gap-1.5 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
-            {question.tags.map((t) => (
-              <span
-                key={t}
-                className="text-xs px-2.5 py-1 rounded-full font-medium"
-                style={{ backgroundColor: C.borderLight, color: C.textSec }}
-              >
-                {t}
-              </span>
-            ))}
-            <div className="ml-auto flex items-center gap-3 text-xs" style={{ color: C.textSec }}>
-              <span>
-                <strong style={{ color: C.text }}>{question.responses}</strong> answers
-              </span>
-              <span>
-                <strong style={{ color: C.text }}>{question.helpful}</strong> helpful
-              </span>
-              <button
-                onClick={() => toggleBoost(question.id)}
-                className="flex items-center gap-1 font-semibold px-2.5 py-1 rounded-full transition-colors"
-                style={{
-                  backgroundColor: boostedIds.has(question.id) ? C.primary : C.primaryLight,
-                  color: boostedIds.has(question.id) ? "#fff" : C.primary,
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
-                </svg>
-                {question.boosted + (boostedIds.has(question.id) ? 1 : 0)}
-              </button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Responses */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-base" style={{ color: C.text }}>
-              Mentor Responses
-              <span
-                className="ml-2 px-2 py-0.5 rounded-full text-sm font-semibold"
-                style={{ backgroundColor: C.primaryLight, color: C.primary }}
-              >
-                {RESPONSES_EXTENDED.length}
-              </span>
-            </h3>
-            <div
-              className="flex items-center gap-1 p-1 rounded-xl"
-              style={{ backgroundColor: C.borderLight }}
-            >
-              {(["helpful", "newest"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSort(s)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
-                  style={{
-                    backgroundColor: sort === s ? "#fff" : "transparent",
-                    color: sort === s ? C.text : C.textSec,
-                    boxShadow:
-                      sort === s ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+        {loadError && !liveQuestion && (
+          <Card className="p-6 mb-6" style={{ borderColor: C.error }}>
+            <h2 className="text-base font-bold mb-2" style={{ color: C.text }}>
+              Could not load this question
+            </h2>
+            <p className="text-sm mb-4" style={{ color: C.textSec }}>
+              {loadError}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={onBack}>Back</Button>
+              {typeof questionId === "string" && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setLoadError(null);
+                    setLoading(true);
+                    getQuestionDetails(questionId)
+                      .then((item) => {
+                        setLiveQuestion(item);
+                        setReported(Boolean(item.reportedByMe));
+                        setBoosted(Boolean(item.boostedByMe));
+                        setBoostCount(item.boostCount);
+                      })
+                      .catch((error) =>
+                        setLoadError(
+                          error instanceof Error
+                            ? error.message
+                            : "Unable to load this question."
+                        )
+                      )
+                      .finally(() => setLoading(false));
                   }}
                 >
-                  {s === "helpful" ? "Most Helpful" : "Newest"}
-                </button>
-              ))}
+                  Try again
+                </Button>
+              )}
             </div>
-          </div>
+          </Card>
+        )}
 
-          <div className="flex flex-col gap-4">
-            {sortedResponses.map((r, idx) => {
-              const voted = helpfulVotes.has(r.id);
-              const count = r.helpfulCount + (voted ? 1 : 0);
-              return (
-                <Card key={r.id} className="p-5">
-                  <div className="flex items-start gap-3 mb-3">
-                    <img
-                      src={r.mentor.photo}
-                      alt={r.mentor.name}
-                      className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+        {!loading && !loadError && (
+          <>
+            <Card className="p-6 mb-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: C.borderLight }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="7" r="4" stroke={C.textSec} strokeWidth="1.4" />
+                    <path
+                      d="M3 19c0-3.866 3.134-6 7-6s7 2.134 7 6"
+                      stroke={C.textSec}
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
                     />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm" style={{ color: C.text }}>
-                          {r.mentor.name}
-                        </span>
-                        {idx === 0 && (
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                            style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
-                          >
-                            ⭐ Top Answer
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                        {r.mentor.specialty} · {r.timestamp}
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {r.mentor.expertise.map((e) => (
-                          <span
-                            key={e}
-                            className="text-xs px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                          >
-                            {e}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={{ color: C.text }}>
+                    {isAnonymous ? "Anonymous Mentee" : liveQuestion?.student?.name ?? "Student"}
                   </div>
-                  <p
-                    className="text-sm leading-relaxed mb-4"
-                    style={{ color: C.text }}
-                  >
-                    {r.answer}
-                  </p>
-                  <div
-                    className="flex items-center justify-between pt-3"
-                    style={{ borderTop: `1px solid ${C.border}` }}
-                  >
+                  <div className="text-xs" style={{ color: C.textSec }}>
+                    {question.date}
+                  </div>
+                  {liveQuestion?.isMine && liveQuestion.moderationStatus === "PENDING" && (
+                    <div
+                      className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                      style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                    >
+                      Awaiting Approval
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {isAnonymous && <PrivacyBadge type="hidden" />}
+                  <PrivacyBadge type={liveQuestion?.visibility === "PUBLIC" ? "public" : "private"} />
+                  <CategoryBadge category={question.category} />
+                </div>
+              </div>
+
+              <h1 className="text-xl font-bold mb-3 leading-snug" style={{ color: C.text }}>
+                {question.title}
+              </h1>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap mb-5" style={{ color: C.text }}>
+                {questionContent}
+              </p>
+
+              <div
+                className="flex items-center gap-3 flex-wrap pt-4"
+                style={{ borderTop: `1px solid ${C.border}` }}
+              >
+                <span className="text-xs" style={{ color: C.textSec }}>
+                  <strong style={{ color: C.text }}>
+                    {liveQuestion?.answerCount ?? question.responses}
+                  </strong>{" "}
+                  {(liveQuestion?.answerCount ?? question.responses) === 1 ? "answer" : "answers"}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => void toggleBoost()}
+                  disabled={Boolean(liveQuestion?.isMine)}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{
+                    backgroundColor: boosted ? C.primary : C.primaryLight,
+                    color: boosted ? "#fff" : C.primary,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
+                  </svg>
+                  {boostCount || question.boosted}
+                </button>
+
+                {canReport && (
+                  <>
                     <button
-                      onClick={() => toggleHelpful(r.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+                      type="button"
+                      onClick={() => {
+                        if (!reported) setReportOpen(true);
+                      }}
+                      className="text-xs font-medium px-2.5 py-1.5 rounded-xl"
                       style={{
-                        backgroundColor: voted ? C.successLight : C.borderLight,
-                        color: voted ? C.success : C.textSec,
-                        border: `1px solid ${voted ? "#A7F3D0" : C.border}`,
+                        backgroundColor: reported ? C.successLight : C.borderLight,
+                        color: reported ? C.success : C.textSec,
                       }}
                     >
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 14 14"
-                        fill={voted ? C.success : "none"}
-                      >
-                        <path
-                          d="M2.5 6.5L1 12.5h9l1.5-6H8V3a1.5 1.5 0 00-3 0v3.5H2.5z"
-                          stroke={voted ? C.success : C.textSec}
-                          strokeWidth="1.2"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Helpful · {count}
+                      {reported ? "Reported" : "Report"}
                     </button>
-                    <button
-                      className="text-xs font-medium"
-                      style={{ color: C.textSec }}
-                      onClick={() => onToast("info", `Opening message to ${r.mentor.name}…`)}
-                    >
-                      Follow up with {r.mentor.name.split(" ")[1]}
-                    </button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
+                    {reported && (
+                      <span className="text-xs" style={{ color: C.success }}>
+                        This post has been reported to an admin.
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
 
-        {/* Related questions */}
-        {relatedToShow.length > 0 && (
-          <div>
-            <h3 className="font-bold text-base mb-4" style={{ color: C.text }}>
-              Related Questions
-            </h3>
-            <div className="flex flex-col gap-3">
-              {relatedToShow.map((q) => (
-                <Card
-                  key={q.id}
-                  className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => onOpenQuestion(q.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ backgroundColor: C.borderLight }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <circle cx="6" cy="4" r="2.5" stroke={C.textSec} strokeWidth="1.1" />
-                        <path d="M1.5 11c0-2.5 2-3.8 4.5-3.8s4.5 1.3 4.5 3.8" stroke={C.textSec} strokeWidth="1.1" strokeLinecap="round" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold leading-snug mb-1" style={{ color: C.text }}>
-                        {q.title}
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <CategoryBadge category={q.category} />
-                        <span className="text-xs" style={{ color: C.textSec }}>
-                          {q.responses} answers
-                        </span>
-                        <span className="text-xs" style={{ color: C.textSec }}>
-                          {q.helpful} helpful
-                        </span>
+            <section className="mb-8">
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <h2 className="font-bold text-base" style={{ color: C.text }}>
+                  Mentor Responses
+                  <span
+                    className="ml-2 px-2 py-0.5 rounded-full text-sm font-semibold"
+                    style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                  >
+                    {responses.length}
+                  </span>
+                </h2>
+
+                {responses.length > 0 && (
+                  <div
+                    className="flex items-center gap-1 p-1 rounded-xl"
+                    style={{ backgroundColor: C.borderLight }}
+                  >
+                    {(["helpful", "newest"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSort(s)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize"
+                        style={{
+                          backgroundColor: sort === s ? "#fff" : "transparent",
+                          color: sort === s ? C.text : C.textSec,
+                        }}
+                      >
+                        {s === "helpful" ? "Most Helpful" : "Newest"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {responses.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <p className="text-sm font-medium mb-1" style={{ color: C.text }}>
+                    No mentor responses yet
+                  </p>
+                  <p className="text-xs" style={{ color: C.textSec }}>
+                    Your question is waiting for a mentor response.
+                  </p>
+                </Card>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {sortedResponses.map((r) => {
+                    const voted = helpfulVotes.has(r.id);
+                    const count = r.helpfulCount + (voted ? 1 : 0);
+                    return (
+                      <Card key={r.id} className="p-5">
+                        <div className="flex items-start gap-3 mb-3">
+                          <img
+                            src={r.mentor.photo}
+                            alt={r.mentor.name}
+                            className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm" style={{ color: C.text }}>
+                            {r.mentor.name}
+                          </span>
+                          {currentUserId && r.mentorId === currentUserId && (
+                            <button
+                              type="button"
+                              onClick={() => startEditingAnswer(String(r.id), r.answer)}
+                              className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                              style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                        <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                          {r.mentor.specialty} · {r.timestamp}
+                        </div>
                       </div>
                     </div>
-                    <span style={{ color: C.textSec }} className="flex-shrink-0 mt-1">
-                      <Icons.ChevronRight />
-                    </span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ─── SCREEN: NOTIFICATIONS PAGE ───────────────────────────────────────────────
-
-function NotificationsPage({
-  onBack,
-  notifReadIds,
-  onMarkRead,
-  onMarkAllRead,
-  onOpenQuestion,
-}: {
-  onBack: () => void;
-  notifReadIds: number[];
-  onMarkRead: (id: number) => void;
-  onMarkAllRead: () => void;
-  onOpenQuestion: (id: number) => void;
-}) {
-  const unread = ALL_NOTIFICATIONS.filter(
-    (n) => !n.read && !notifReadIds.includes(n.id)
-  ).length;
-
-  const unreadItems = ALL_NOTIFICATIONS.filter(
-    (n) => !n.read && !notifReadIds.includes(n.id)
-  );
-  const readItems = ALL_NOTIFICATIONS.filter(
-    (n) => n.read || notifReadIds.includes(n.id)
-  );
-
-  const TYPE_LABELS: Record<string, string> = {
-    "mentor-answered":      "Mentor answered",
-    "any-mentor-responded": "Mentor responded",
-    "anon-approved":        "Question approved",
-    "anon-response":        "Anonymous response",
-    "rejected":             "Question rejected",
-    "session":              "Session confirmed",
-    "helpful":              "Marked helpful",
-  };
-
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      <header
-        className="sticky top-0 z-30 bg-white"
-        style={{ borderBottom: `1px solid ${C.border}` }}
-      >
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 transition-opacity"
-            style={{ color: C.textSec, backgroundColor: C.borderLight }}
-          >
-            <Icons.ArrowLeft />
-            Dashboard
-          </button>
-          <h1 className="font-bold text-base" style={{ color: C.text }}>
-            Notifications
-          </h1>
-          {unread > 0 && (
-            <span
-              className="px-2 py-0.5 rounded-full text-white text-xs font-bold"
-              style={{ backgroundColor: C.error }}
-            >
-              {unread} unread
-            </span>
-          )}
-          {unread > 0 && (
-            <button
-              onClick={onMarkAllRead}
-              className="ml-auto text-sm font-semibold"
-              style={{ color: C.primary }}
-            >
-              Mark all read
-            </button>
-          )}
-          <Logo size="sm" />
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-6 py-6 fade-in">
-        {/* Unread section */}
-        {unreadItems.length > 0 && (
-          <div className="mb-6">
-            <div
-              className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: C.textSec }}
-            >
-              Unread
-            </div>
-            <div className="flex flex-col gap-2">
-              {unreadItems.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => {
-                    onMarkRead(n.id);
-                    if (n.questionId) onOpenQuestion(n.questionId);
-                  }}
-                  className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-all"
-                  style={{
-                    backgroundColor: "#F5F8FF",
-                    border: `1.5px solid #C7D2FE`,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = C.primaryLight)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#F5F8FF")
-                  }
-                >
-                  <NotifIcon type={n.type} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="text-xs font-semibold uppercase tracking-wide"
-                        style={{ color: C.primary }}
-                      >
-                        {TYPE_LABELS[n.type] || "Notification"}
-                      </span>
-                    </div>
-                    <p
-                      className="text-sm font-semibold leading-snug mb-0.5"
-                      style={{ color: C.text }}
-                    >
-                      {n.message}
-                    </p>
-                    <p className="text-xs leading-relaxed mb-1" style={{ color: C.textSec }}>
-                      {n.detail}
-                    </p>
-                    <p className="text-xs" style={{ color: C.textSec }}>
-                      {n.time}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: C.primary }}
-                    />
-                    {n.questionId && (
-                      <Icons.ChevronRight />
+                    {editingAnswerId === String(r.id) ? (
+                      <div className="mb-4">
+                        <textarea
+                          rows={6}
+                          value={editingAnswerContent}
+                          onChange={(e) => setEditingAnswerContent(e.target.value)}
+                          className="w-full px-4 py-3 text-sm bg-white outline-none resize-none rounded-xl"
+                          style={{ color: C.text, border: "1.5px solid " + C.primary }}
+                        />
+                        <div className="flex items-center justify-end gap-2 mt-2">
+                          <Button variant="secondary" size="sm" onClick={cancelEditingAnswer} disabled={savingAnswer}>
+                            Cancel
+                          </Button>
+                          <Button variant="primary" size="sm" onClick={() => void saveEditedAnswer()} disabled={savingAnswer}>
+                            {savingAnswer ? "Saving…" : "Save Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap mb-4" style={{ color: C.text }}>
+                        {r.answer}
+                      </p>
                     )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+                        <div
+                          className="flex items-center justify-between pt-3"
+                          style={{ borderTop: `1px solid ${C.border}` }}
+                        >
+                          <button
+                            onClick={() => toggleHelpful(r.id)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium"
+                            style={{
+                              backgroundColor: voted ? C.successLight : C.borderLight,
+                              color: voted ? C.success : C.textSec,
+                              border: `1px solid ${voted ? "#A7F3D0" : C.border}`,
+                            }}
+                          >
+                            👍 Helpful · {count}
+                          </button>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
-        {/* Read section */}
-        {readItems.length > 0 && (
-          <div>
-            <div
-              className="text-xs font-semibold uppercase tracking-wider mb-3"
-              style={{ color: C.textSec }}
-            >
-              Earlier
-            </div>
-            <div className="flex flex-col gap-2">
-              {readItems.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => {
-                    if (n.questionId) onOpenQuestion(n.questionId);
-                  }}
-                  className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-all"
-                  style={{
-                    backgroundColor: "#fff",
-                    border: `1px solid ${C.border}`,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = C.borderLight)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#fff")
-                  }
-                >
-                  <NotifIcon type={n.type} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="text-xs font-medium uppercase tracking-wide"
-                        style={{ color: C.textSec }}
-                      >
-                        {TYPE_LABELS[n.type] || "Notification"}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-snug mb-0.5" style={{ color: C.text }}>
-                      {n.message}
-                    </p>
-                    <p className="text-xs leading-relaxed mb-1" style={{ color: C.textSec }}>
-                      {n.detail}
-                    </p>
-                    <p className="text-xs" style={{ color: C.textSec }}>
-                      {n.time}
-                    </p>
-                  </div>
-                  {n.questionId && (
-                    <span style={{ color: C.textSec }} className="flex-shrink-0 mt-0.5">
-                      <Icons.ChevronRight />
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {ALL_NOTIFICATIONS.length === 0 && (
-          <div className="flex flex-col items-center py-16 gap-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: C.borderLight }}
-            >
-              <Icons.Bell />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-sm mb-1" style={{ color: C.text }}>
-                No notifications yet
-              </p>
-              <p className="text-xs" style={{ color: C.textSec }}>
-                We'll notify you when mentors respond to your questions.
-              </p>
-            </div>
-          </div>
+            {relatedToShow.length > 0 && !liveQuestion && (
+              <section>
+                <h2 className="font-bold text-base mb-4" style={{ color: C.text }}>
+                  Related Questions
+                </h2>
+                <div className="flex flex-col gap-3">
+                  {relatedToShow.map((q) => (
+                    <Card
+                      key={q.id}
+                      className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => onOpenQuestion(q.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold mb-1" style={{ color: C.text }}>
+                            {q.title}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <CategoryBadge category={q.category} />
+                            <span className="text-xs" style={{ color: C.textSec }}>
+                              {q.responses} answers
+                            </span>
+                          </div>
+                        </div>
+                        <Icons.ChevronRight />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
       </main>
+
+      {reportOpen && canReport && liveQuestion && (
+        <ReportQuestionModal
+          questionId={liveQuestion.id}
+          questionTitle={liveQuestion.title}
+          onClose={() => setReportOpen(false)}
+          onReported={() => setReported(true)}
+          onToast={onToast}
+        />
+      )}
     </div>
   );
 }
@@ -5093,12 +5216,20 @@ const ADMIN_USERS: AdminUser[] = [
 type ModerationStatus = "pending" | "approved" | "rejected" | "reported";
 
 interface ModerationItem {
-  id: number;
-  type: "anon-question" | "reported-question" | "reported-answer" | "suspicious";
+  id: string | number;
+  type:
+    | "anon-question"
+    | "private-question"
+    | "any-mentor-question"
+    | "reported-question"
+    | "reported-answer"
+    | "suspicious";
   questionText: string;
+  questionTitle?: string;
   category: string;
   submittedDate: string;
   visibility: "public" | "private";
+  submittedBy?: { name: string | null; email: string };
   status: ModerationStatus;
   internalNote?: string;
   reportReason?: string;
@@ -5125,6 +5256,8 @@ const REJECT_REASONS = [
   "Spam",
   "Other",
 ];
+
+
 
 // ─── MENTOR ANSWER SCREEN ─────────────────────────────────────────────────────
 
@@ -5245,10 +5378,18 @@ function MentorAnswerScreen({
     }, 0);
   }
 
-  function handleSubmit() {
-    if (!answer.trim()) return;
-    onToast("success", "Response sent successfully!");
-    setStep("success");
+  async function handleSubmit() {
+    if (answer.trim().length < 10) return;
+    try {
+      await createAnswer(String(question.id), answer.trim());
+      onToast("success", "Response sent successfully!");
+      setStep("success");
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to submit response."
+      );
+    }
   }
 
   if (step === "success") {
@@ -5370,17 +5511,24 @@ function MentorAnswerScreen({
                   <path d="M3 19c0-3.866 3.134-6 7-6s7 2.134 7 6" stroke={C.textSec} strokeWidth="1.4" strokeLinecap="round" />
                 </svg>
               </div>
-            ) : (
+            ) : question.asker ? (
               <img
-                src={question.asker!.photo}
-                alt={question.asker!.name}
+                src={question.asker.photo}
+                alt={question.asker.name}
                 className="w-11 h-11 rounded-full object-cover flex-shrink-0"
               />
+            ) : (
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: C.borderLight }}
+              >
+                <span className="text-xs font-semibold" style={{ color: C.textSec }}>ST</span>
+              </div>
             )}
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm" style={{ color: C.text }}>
-                  {isAnon ? "Anonymous Mentee" : question.asker!.name}
+                  {isAnon ? "Anonymous Mentee" : question.asker?.name ?? "Student"}
                 </span>
                 {!isAnon && question.asker?.year && (
                   <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: C.borderLight, color: C.textSec }}>
@@ -5400,8 +5548,11 @@ function MentorAnswerScreen({
               </div>
             </div>
           </div>
-          <p className="text-sm leading-relaxed font-medium" style={{ color: C.text }}>
+          <h2 className="text-base font-bold leading-snug mb-2" style={{ color: C.text }}>
             {question.question}
+          </h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.textSec }}>
+            {question.content?.trim() || question.question}
           </p>
         </Card>
 
@@ -5552,10 +5703,10 @@ function MentorAnswerScreen({
 
         <p className="text-center text-xs mt-2" style={{ color: C.textSec }}>
           {question.type === "anon-private"
-            ? "The student will be notified anonymously. You will not learn their identity."
+            ? "The student can view the response in the anonymous thread. You will not learn their identity."
             : question.type === "anon-public"
             ? "Your response will be attributed to you publicly."
-            : "The student will be notified once you submit."}
+            : "The student can view the response in their question thread."}
         </p>
       </main>
     </div>
@@ -5567,10 +5718,14 @@ function MentorAnswerScreen({
 function MentorQuestionCard({
   q,
   onAnswer,
+  onReport,
+  reported,
   compact = false,
 }: {
   q: MentorQuestion;
   onAnswer: (q: MentorQuestion) => void;
+  onReport: (q: MentorQuestion) => void;
+  reported: boolean;
   compact?: boolean;
 }) {
   const isAnon = q.asker === null;
@@ -5582,7 +5737,10 @@ function MentorQuestionCard({
   };
 
   return (
-    <Card className="p-4">
+    <Card
+      className="p-4 transition-all hover:shadow-md hover:-translate-y-0.5"
+      onClick={() => onAnswer(q)}
+    >
       {/* Asker row */}
       <div className="flex items-center gap-2.5 mb-3">
         {isAnon ? (
@@ -5646,14 +5804,39 @@ function MentorQuestionCard({
 
       {/* Footer */}
       <div
-        className="flex items-center justify-between pt-3"
+        className="flex items-center justify-between gap-2 pt-3"
         style={{ borderTop: `1px solid ${C.borderLight}` }}
       >
         <CategoryBadge category={q.category} />
-        <Button variant="primary" size="sm" onClick={() => onAnswer(q)}>
-          Answer
-          <Icons.ChevronRight />
-        </Button>
+        <div className="flex items-center gap-2">
+          {typeof q.id === "string" && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReport(q);
+              }}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-xl transition-colors"
+              style={{
+                backgroundColor: reported ? C.successLight : C.borderLight,
+                color: reported ? C.success : C.textSec,
+              }}
+            >
+              {reported ? "Reported" : "Report"}
+            </button>
+          )}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAnswer(q);
+            }}
+          >
+            Answer
+            <Icons.ChevronRight />
+          </Button>
+        </div>
       </div>
     </Card>
   );
@@ -5668,13 +5851,44 @@ function MentorDashboardScreen({
   onAnswerQuestion: (q: MentorQuestion) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
-  const [activeSection, setActiveSection] = useState<"all" | "waiting" | "any" | "anon">("all");
+  const [activeSection, setActiveSection] = useState<"all" | "mentees" | "waiting" | "any" | "anon">("all");
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
-  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & { id: string | number };
+  const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
   const [showAllMentees, setShowAllMentees] = useState(false);
+  const [reportingQuestion, setReportingQuestion] = useState<MentorQuestion | null>(null);
+  const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<string | number>>(new Set());
+  const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
+  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getMentorQueue()
+      .then((items) => {
+        if (!active) return;
+        const typed = items as MentorQuestion[];
+        setLiveMentorQuestions(typed);
+        setReportedQuestionIds(new Set(typed.filter((q) => q.reportedByMe).map((q) => q.id)));
+      })
+      .catch(() => {
+        if (active) setLiveMentorQuestions(null);
+      });
+
+    getMentorMentees()
+      .then((response) => {
+        if (active) setLiveMentees(response.items);
+      })
+      .catch(() => {
+        if (active) setLiveMentees(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5703,15 +5917,33 @@ function MentorDashboardScreen({
     setMessageText("");
   }
 
+  const waitingQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "private") ?? MENTOR_WAITING_QUESTIONS;
+  const anyQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "any-mentor") ?? MENTOR_ANY_QUESTIONS;
+  const anonQuestions =
+    liveMentorQuestions?.filter((q) => q.type === "anon-public" || q.type === "anon-private") ??
+    MENTOR_ANON_QUESTIONS;
+
+  const displayMentees = liveMentees
+    ? liveMentees.map((m, index) => ({
+        ...MENTOR_MENTEES_DATA[index % MENTOR_MENTEES_DATA.length],
+        id: m.id,
+        name: m.name ?? "Mentee",
+        email: m.email,
+        totalQuestions: m.questionCount,
+      }))
+    : MENTOR_MENTEES_DATA;
+
   const totalWaiting =
-    MENTOR_WAITING_QUESTIONS.length +
-    MENTOR_ANY_QUESTIONS.filter((q) => q.responses === 0).length +
-    MENTOR_ANON_QUESTIONS.filter((q) => q.responses === 0).length;
+    waitingQuestions.length +
+    anyQuestions.filter((q) => q.responses === 0).length +
+    anonQuestions.filter((q) => q.responses === 0).length;
 
   const STATS = [
     {
       label: "Assigned Mentees",
-      value: MENTOR_MENTEES_DATA.length,
+      value: displayMentees.length,
       bg: C.successLight,
       color: C.success,
       icon: (
@@ -5723,7 +5955,7 @@ function MentorDashboardScreen({
     },
     {
       label: "Awaiting Response",
-      value: MENTOR_WAITING_QUESTIONS.length,
+      value: waitingQuestions.length,
       bg: C.errorLight,
       color: C.error,
       icon: (
@@ -5735,7 +5967,7 @@ function MentorDashboardScreen({
     },
     {
       label: "Ask Any Mentor",
-      value: MENTOR_ANY_QUESTIONS.length,
+      value: anyQuestions.length,
       bg: C.primaryLight,
       color: C.primary,
       icon: (
@@ -5749,7 +5981,7 @@ function MentorDashboardScreen({
     },
     {
       label: "Anonymous",
-      value: MENTOR_ANON_QUESTIONS.length,
+      value: anonQuestions.length,
       bg: C.pendingLight,
       color: C.pending,
       icon: (
@@ -5849,7 +6081,7 @@ function MentorDashboardScreen({
         {(() => {
           const tier = getMentorTier(MENTOR.points);
           return (
-            <Card className="p-5 mb-6 fade-in flex items-center gap-5 flex-wrap">
+            <Card className="p-5 mb-6 fade-in flex items-end justify-between gap-5 flex-wrap lg:flex-nowrap">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
                 style={{ backgroundColor: tier.bg }}
@@ -5882,64 +6114,68 @@ function MentorDashboardScreen({
                   </div>
                 )}
               </div>
-              <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
-                🏆 Top Mentors
-              </Button>
+              <div className="w-full lg:w-auto lg:min-w-[330px] rounded-2xl p-4" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <h3 className="text-xs font-bold" style={{ color: C.text }}>How to score points</h3>
+                  <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
+                    🏆 Leaderboard
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs" style={{ color: C.textSec }}>
+                  <div><strong style={{ color: C.text }}>+5</strong> Answer a question</div>
+                  <div><strong style={{ color: C.text }}>+2</strong> Helpful vote</div>
+                  <div><strong style={{ color: C.text }}>+3</strong> Answer within 24h</div>
+                  <div><strong style={{ color: C.text }}>+1</strong> Ask Any Mentor response</div>
+                </div>
+              </div>
             </Card>
           );
         })()}
 
-        {/* Stats row */}
+        {/* Dashboard filters */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
-          {STATS.map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl p-4 flex flex-col"
-              style={{ backgroundColor: s.bg, border: `1px solid ${s.color}22` }}
-            >
-              <div className="flex items-start justify-between mb-1">
-                <div style={{ color: s.color }}>{s.icon}</div>
-                <span className="stat-numeral" style={{ color: s.color }}>
-                  {s.value}
-                </span>
-              </div>
-              <div className="stat-label" style={{ color: s.color }}>
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
+          {STATS.map((s) => {
+            const section =
+              s.label === "Assigned Mentees"
+                ? "mentees"
+                : s.label === "Awaiting Response"
+                  ? "waiting"
+                  : s.label === "Ask Any Mentor"
+                    ? "any"
+                    : s.label === "Anonymous"
+                      ? "anon"
+                      : "all";
+            const active = activeSection === section;
 
-        {/* Section nav */}
-        <div
-          className="flex items-center gap-1 mb-6 p-1 rounded-xl w-fit"
-          style={{ backgroundColor: C.borderLight }}
-        >
-          {(
-            [
-              { v: "all",     label: "All Sections"  },
-              { v: "waiting", label: `Waiting (${MENTOR_WAITING_QUESTIONS.length})` },
-              { v: "any",     label: `Ask Any Mentor (${MENTOR_ANY_QUESTIONS.length})` },
-              { v: "anon",    label: `Anonymous (${MENTOR_ANON_QUESTIONS.length})` },
-            ] as const
-          ).map(({ v, label }) => (
-            <button
-              key={v}
-              onClick={() => setActiveSection(v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{
-                backgroundColor: activeSection === v ? "#fff" : "transparent",
-                color: activeSection === v ? C.text : C.textSec,
-                boxShadow: activeSection === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}
-            >
-              {label}
-            </button>
-          ))}
+            return (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setActiveSection(section)}
+                className="rounded-xl p-4 flex flex-col text-left transition-all duration-150 cursor-pointer hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: s.bg,
+                  border: `1px solid ${s.color}22`,
+                  boxShadow: active ? `0 0 0 2px ${s.color}33, 0 4px 12px rgba(30,27,58,0.08)` : "none",
+                  transform: active ? "translateY(-1px)" : undefined,
+                }}
+              >
+                <div className="flex items-start justify-between mb-1">
+                  <div style={{ color: s.color }}>{s.icon}</div>
+                  <span className="stat-numeral" style={{ color: s.color }}>
+                    {s.value}
+                  </span>
+                </div>
+                <div className="stat-label" style={{ color: s.color }}>
+                  {s.label}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* MY MENTEES */}
-        {(activeSection === "all") && (
+        {(activeSection === "all" || activeSection === "mentees") && (
           <section className="mb-8 fade-in">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -5956,7 +6192,7 @@ function MentorDashboardScreen({
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {MENTOR_MENTEES_DATA.map((m) => (
+              {displayMentees.map((m) => (
                 <Card key={m.id} className="p-4">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="relative flex-shrink-0">
@@ -6030,14 +6266,22 @@ function MentorDashboardScreen({
                     className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
                     style={{ backgroundColor: C.error }}
                   >
-                    {MENTOR_WAITING_QUESTIONS.length}
+                    {waitingQuestions.length}
                   </span>
                 </div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              {MENTOR_WAITING_QUESTIONS.map((q) => (
-                <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} />
+              {waitingQuestions.map((q) => (
+                <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                />
               ))}
             </div>
           </section>
@@ -6059,14 +6303,23 @@ function MentorDashboardScreen({
                       className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
                       style={{ backgroundColor: C.primary }}
                     >
-                      {MENTOR_ANY_QUESTIONS.length}
+                      {anyQuestions.length}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {MENTOR_ANY_QUESTIONS.map((q) => (
-                  <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} compact />
+                {anyQuestions.map((q) => (
+                  <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                  compact
+                />
                 ))}
                 <p className="text-xs px-1" style={{ color: C.textSec }}>
                   These questions were submitted to all mentors at the school. Your response will be visible to the student and their peers.
@@ -6089,14 +6342,23 @@ function MentorDashboardScreen({
                       className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
                       style={{ backgroundColor: C.pending }}
                     >
-                      {MENTOR_ANON_QUESTIONS.length}
+                      {anonQuestions.length}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
-                {MENTOR_ANON_QUESTIONS.map((q) => (
-                  <MentorQuestionCard key={q.id} q={q} onAnswer={onAnswerQuestion} compact />
+                {anonQuestions.map((q) => (
+                  <MentorQuestionCard
+                  key={q.id}
+                  q={q}
+                  onAnswer={onAnswerQuestion}
+                  onReport={(question) => {
+                    if (typeof question.id === "string") setReportingQuestion(question);
+                  }}
+                  reported={reportedQuestionIds.has(q.id) || Boolean(q.reportedByMe)}
+                  compact
+                />
                 ))}
                 {/* Privacy reminder */}
                 <div
@@ -6113,6 +6375,18 @@ function MentorDashboardScreen({
           )}
         </div>
       </main>
+
+      {reportingQuestion && typeof reportingQuestion.id === "string" && (
+        <ReportQuestionModal
+          questionId={reportingQuestion.id}
+          questionTitle={reportingQuestion.question}
+          onClose={() => setReportingQuestion(null)}
+          onReported={() => {
+            setReportedQuestionIds((prev) => new Set(prev).add(reportingQuestion.id as string));
+          }}
+          onToast={onToast}
+        />
+      )}
 
       {showAllMentees && (
         <div
@@ -6133,7 +6407,7 @@ function MentorDashboardScreen({
               <div>
                 <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
                 <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                  {displayMentees.length} assigned mentees
                 </p>
               </div>
               <button
@@ -6146,7 +6420,7 @@ function MentorDashboardScreen({
               </button>
             </div>
             <div className="p-5 overflow-y-auto flex flex-col gap-3">
-              {MENTOR_MENTEES_DATA.map((m) => (
+              {displayMentees.map((m) => (
                 <div
                   key={m.id}
                   className="flex items-center gap-3 p-3 rounded-xl"
@@ -6260,6 +6534,10 @@ function MentorDashboardScreen({
 
 // ─── ADMIN COMPONENTS ────────────────────────────────────────────────────────
 
+
+
+
+
 type AdminSection = "dashboard" | "users" | "mentors" | "questions" | "moderation" | "reports" | "settings";
 
 const ADMIN_NAV: { id: AdminSection; label: string; icon: React.ReactNode; badge?: number }[] = [
@@ -6307,11 +6585,30 @@ function AdminShell({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [adminStats, setAdminStats] = useState<Awaited<ReturnType<typeof getAdminStats>> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const stats = await getAdminStats();
+        if (active) setAdminStats(stats);
+      } catch {
+        if (active) setAdminStats(null);
+      }
+    };
+    void load();
+    const interval = window.setInterval(load, 10000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const sectionToScreen: Record<AdminSection, Screen> = {
     dashboard: "admin-dashboard",
     users: "admin-users",
-    mentors: "admin-users",
+    mentors: "admin-mentors",
     questions: "admin-questions",
     moderation: "admin-moderation",
     reports: "admin-reports",
@@ -6363,6 +6660,14 @@ function AdminShell({
         <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5">
           {ADMIN_NAV.map(({ id, label, icon, badge }) => {
             const active = section === id || (id === "mentors" && section === "users");
+            const liveBadge =
+              adminStats == null
+                ? 0
+                : id === "moderation"
+                  ? adminStats.pendingModeration
+                  : id === "reports"
+                    ? adminStats.reportedContent
+                    : badge ?? 0;
             return (
               <button
                 key={id}
@@ -6376,15 +6681,15 @@ function AdminShell({
               >
                 <span className="flex-shrink-0">{icon}</span>
                 {sidebarOpen && <span className="text-xs font-medium flex-1">{label}</span>}
-                {sidebarOpen && badge != null && badge > 0 && (
+                {sidebarOpen && liveBadge > 0 && (
                   <span
                     className="text-xs font-bold px-1.5 py-0.5 rounded-full"
                     style={{ backgroundColor: C.error, color: "#fff", fontSize: "10px" }}
                   >
-                    {badge}
+                    {liveBadge}
                   </span>
                 )}
-                {!sidebarOpen && badge != null && badge > 0 && (
+                {!sidebarOpen && liveBadge > 0 && (
                   <span
                     className="absolute left-7 top-1 w-2 h-2 rounded-full"
                     style={{ backgroundColor: C.error }}
@@ -6614,6 +6919,117 @@ function ActionModal({
   );
 }
 
+function ReportQuestionModal({
+  questionId,
+  questionTitle,
+  onClose,
+  onReported,
+  onToast,
+}: {
+  questionId: string;
+  questionTitle: string;
+  onClose: () => void;
+  onReported: () => void;
+  onToast: (t: ToastType, msg: string) => void;
+}) {
+  const [reason, setReason] = useState<ReportReasonValue | "">("");
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const REASONS: Array<{ value: ReportReasonValue; label: string }> = [
+    { value: "SPAM", label: "Spam" },
+    { value: "HARASSMENT", label: "Harassment or abuse" },
+    { value: "INAPPROPRIATE_CONTENT", label: "Inappropriate content" },
+    { value: "MISINFORMATION", label: "Misinformation" },
+    { value: "PRIVACY", label: "Privacy or personal information" },
+    { value: "OFF_TOPIC", label: "Off-topic" },
+    { value: "OTHER", label: "Other" },
+  ];
+
+  async function submit() {
+    if (!reason || submitting) return;
+    setSubmitting(true);
+    try {
+      await reportQuestion(questionId, {
+        reason,
+        details: details.trim() || undefined,
+      });
+      onReported();
+      onClose();
+      onToast("success", "Post reported. An admin will review it.");
+    } catch (error) {
+      onToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to report this post."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title="Report post" onClose={onClose} width={520}>
+      <p className="text-sm mb-1 font-semibold" style={{ color: C.text }}>
+        Why are you reporting this post?
+      </p>
+      <p className="text-xs mb-4" style={{ color: C.textSec }}>
+        Reports are reviewed by admins. The post stays visible until an admin takes action.
+      </p>
+
+      <div className="flex flex-col gap-2 mb-4">
+        {REASONS.map((item) => (
+          <label
+            key={item.value}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
+            style={{
+              border: `1px solid ${reason === item.value ? C.primary : C.border}`,
+              backgroundColor: reason === item.value ? C.primaryLight : "#fff",
+            }}
+          >
+            <input
+              type="radio"
+              name="report-reason"
+              value={item.value}
+              checked={reason === item.value}
+              onChange={() => setReason(item.value)}
+            />
+            <span className="text-sm" style={{ color: C.text }}>{item.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <textarea
+        value={details}
+        onChange={(e) => setDetails(e.target.value)}
+        maxLength={1000}
+        rows={4}
+        placeholder="Add details for the admin (optional)…"
+        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none mb-1"
+        style={{ border: `1.5px solid ${C.border}`, color: C.text }}
+      />
+      <p className="text-xs mb-5 text-right" style={{ color: C.textSec }}>
+        {details.length}/1000
+      </p>
+
+      <div
+        className="rounded-xl px-3 py-2.5 mb-5 text-xs"
+        style={{ backgroundColor: C.bg, border: `1px solid ${C.border}`, color: C.textSec }}
+      >
+        <strong style={{ color: C.text }}>Post:</strong> {questionTitle}
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+        <Button variant="danger" size="sm" disabled={!reason || submitting} onClick={submit}>
+          {submitting ? "Reporting…" : "Report post"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+
+
 // ─── MODERATION REVIEW PANEL ───────────────────────────────────────────────────
 
 function ModerationReviewPanel({
@@ -6765,7 +7181,7 @@ function ModerationReviewPanel({
                   className="px-4 py-3 rounded-xl text-sm leading-relaxed"
                   style={{ backgroundColor: C.bg, border: `1px solid ${C.border}`, color: C.text }}
                 >
-                  {item.questionText}
+                  {item.questionTitle ?? item.questionText}
                 </div>
               </div>
 
@@ -6841,39 +7257,110 @@ function ModerationReviewPanel({
 
 // ─── ADMIN DASHBOARD VIEW ─────────────────────────────────────────────────────
 
+
+
 function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const [liveStats, setLiveStats] = useState<Awaited<ReturnType<typeof getAdminStats>> | null>(null);
+  const [livePending, setLivePending] = useState<Array<{
+    id: string;
+    content: string;
+    category: string;
+    createdAt: string;
+  }>>([]);
+  const [liveReports, setLiveReports] = useState<Array<{
+    id: string;
+    questionText: string;
+    reportCount: number;
+    reportReason: string;
+  }>>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    const load = async () => {
+      try {
+        const [stats, moderation, reports] = await Promise.all([
+          getAdminStats(),
+          getModerationQueue({ limit: 50 }),
+          getAdminReports({ status: "PENDING", limit: 5 }),
+        ]);
+
+        if (!active) return;
+
+        setLiveStats(stats);
+        setLivePending(moderation.items.map((item) => ({
+          id: item.id,
+          content: item.content,
+          category: item.category.replaceAll("_", " "),
+          createdAt: item.createdAt,
+        })));
+        setLiveReports(reports.items.map((report) => ({
+          id: report.id,
+          questionText: report.question.title || report.question.content,
+          reportCount: report.question._count.reports,
+          reportReason: report.reason.replaceAll("_", " "),
+        })));
+      } catch {
+        // Keep the dashboard usable while the data is loading or unavailable.
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(load, 10000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const STATS = [
-    { label: "Total Students", value: ADMIN_USERS.filter(u => u.role === "mentee").length, color: C.primary, bg: C.primaryLight,
+    { label: "Total Students", value: liveStats?.totalStudents ?? "—", color: C.primary, bg: C.primaryLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="8" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M2 18c0-3.5 2.686-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M14 11v6M11 14h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
-    { label: "Total Mentors", value: ADMIN_USERS.filter(u => u.role === "mentor").length, color: C.success, bg: C.successLight,
+    { label: "Total Mentors", value: liveStats?.totalMentors ?? "—", color: C.success, bg: C.successLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M3 18c0-3.5 3.134-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M7 6.5l2 2 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: "Pending Mentors", value: ADMIN_USERS.filter(u => u.role === "pending-mentor").length, color: C.pending, bg: C.pendingLight,
-      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M3 18c0-3.5 3.134-6 7-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M15 12v3.5M15 17.5h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
-    { label: "Questions Submitted", value: 47, color: "#7C3AED", bg: "#EDE9FE",
+    { label: "Pending Mentors", value: liveStats?.pendingMentors ?? "—", color: C.pending, bg: C.pendingLight,
+      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/><path d="M3 18c0-3.5 3.134-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M15 12v3.5M15 17.5h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
+    { label: "Questions Submitted", value: liveStats?.totalQuestions ?? "—", color: "#7C3AED", bg: "#EDE9FE",
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
-    { label: "Questions Answered", value: 31, color: C.success, bg: C.successLight,
-      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M7 10l2 2.5 4-4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { label: "Pending Moderation", value: MODERATION_ITEMS.filter(m => m.status === "pending").length, color: C.error, bg: C.errorLight,
+    { label: "Questions Answered", value: liveStats?.questionsAnswered ?? "—", color: C.success, bg: C.successLight,
+      icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10c0 3.5-3.134 6.5-7 6.5-.9 0-1.76-.15-2.53-.43L3 18l.8-3.5A6.5 6.5 0 013 10c0-3.5 3.134-6.5 7-6.5s7 3.5 7 6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M7 10l2 2.5 4-4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+    { label: "Pending Moderation", value: liveStats?.pendingModeration ?? "—", color: C.error, bg: C.errorLight,
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2l2.3 4.67 5.14.748-3.72 3.624.879 5.118L10 13.75l-4.599 2.41.879-5.118L2.56 7.418l5.14-.748L10 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
-    { label: "Reported Content", value: MODERATION_ITEMS.filter(m => m.status === "reported").length, color: "#DC2626", bg: "#FEE2E2",
+    { label: "Reported Content", value: liveStats?.reportedContent ?? "—", color: "#DC2626", bg: "#FEE2E2",
       icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3v7M10 13.5h.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M3.5 17.5l5.768-12.5a.8.8 0 011.464 0l5.768 12.5a.8.8 0 01-.732 1.13H4.232a.8.8 0 01-.732-1.13z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg> },
   ];
 
-  const pendingModerationItems = MODERATION_ITEMS.filter(m => m.status === "pending");
-  const reportedItems = MODERATION_ITEMS.filter(m => m.status === "reported");
+  const pendingModerationItems = livePending;
+  const reportedItems = liveReports;
+  const statDestinations: Record<string, Screen> = {
+    "Total Students": "admin-users",
+    "Total Mentors": "admin-mentors",
+     "Pending Mentors": "admin-mentors",
+    "Questions Submitted": "admin-questions",
+    "Questions Answered": "admin-questions",
+    "Pending Moderation": "admin-moderation",
+    "Reported Content": "admin-reports",
+  };
 
   return (
     <div className="fade-in flex flex-col gap-6">
       {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {STATS.map(s => (
-          <div key={s.label} className="rounded-2xl p-4" style={{ backgroundColor: s.bg, border: `1px solid ${s.color}20` }}>
+          <button
+            type="button"
+            key={s.label}
+            onClick={() => onNavigate(statDestinations[s.label])}
+            className="rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+            style={{ backgroundColor: s.bg, border: `1px solid ${s.color}20` }}
+          >
             <div className="flex items-start justify-between mb-1">
               <div style={{ color: s.color }}>{s.icon}</div>
               <span className="stat-numeral" style={{ color: s.color }}>{s.value}</span>
             </div>
             <div className="stat-label" style={{ color: s.color }}>{s.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -6895,14 +7382,14 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
           <div className="flex flex-col gap-2">
             {pendingModerationItems.slice(0, 3).map(item => (
               <div key={item.id} className="flex items-start gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
-                <span className="text-base flex-shrink-0">🔒</span>
+                <span className="text-base flex-shrink-0">📝</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium leading-snug overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {item.questionText}
+                    {item.content}
                   </p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <CategoryBadge category={item.category} />
-                    <span className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</span>
+                    <span className="text-xs" style={{ color: C.textSec }}>{formatDateTime(item.createdAt)}</span>
                   </div>
                 </div>
                 <button className="text-xs font-semibold flex-shrink-0" style={{ color: C.primary }} onClick={() => onNavigate("admin-moderation")}>
@@ -6938,7 +7425,7 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
                     {item.questionText}
                   </p>
                   <div className="text-xs mt-0.5" style={{ color: C.error }}>
-                    {item.flagCount} report{item.flagCount !== 1 ? "s" : ""} · {item.reportReason}
+                    {item.reportCount} report{item.reportCount !== 1 ? "s" : ""} · {item.reportReason}
                   </div>
                 </div>
                 <button className="text-xs font-semibold flex-shrink-0" style={{ color: C.primary }} onClick={() => onNavigate("admin-reports")}>
@@ -6994,193 +7481,152 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
 
 // ─── ADMIN USERS VIEW ──────────────────────────────────────────────────────────
 
-function AdminUsersView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
+function AdminUsersView({
+  section,
+  onToast,
+}: {
+  section: "users" | "mentors";
+  onToast: (t: ToastType, msg: string) => void;
+}) {
+  type LiveUser = Awaited<ReturnType<typeof getAdminUsers>>["items"][number];
+  const [users, setUsers] = useState<LiveUser[]>([]);
+  const [mentors, setMentors] = useState<Awaited<ReturnType<typeof getAdminMentors>>["items"]>([]);
   const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState<"all" | "mentee" | "mentor" | "pending-mentor">("all");
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "suspended" | "pending">("all");
-  const [actionModal, setActionModal] = useState<{ user: AdminUser; action: string } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = ADMIN_USERS.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    const matchRole = filterRole === "all" || u.role === filterRole;
-    const matchStatus = filterStatus === "all" || u.status === filterStatus;
-    return matchSearch && matchRole && matchStatus;
-  });
+  const isMentorsSection = section === "mentors";
+  const role = isMentorsSection ? "MENTOR" : "STUDENT";
+  const title = isMentorsSection ? "Mentors" : "Students";
+  const searchPlaceholder = isMentorsSection
+    ? "Search mentors by name or email…"
+    : "Search students by name or email…";
 
-  function handleAction(user: AdminUser, action: string) {
-    setActionModal(null);
-    onToast("success", `${action} applied to ${user.name}.`);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    const timer = window.setTimeout(() => {
+      const userRequest = getAdminUsers({
+        role,
+        q: search.trim() || undefined,
+        limit: 100,
+      });
+
+      const mentorRequest = isMentorsSection ? Promise.resolve(null) : getAdminMentors();
+
+      Promise.all([userRequest, mentorRequest])
+        .then(([userResponse, mentorResponse]) => {
+          if (!active) return;
+          setUsers(userResponse.items);
+          if (mentorResponse) setMentors(mentorResponse.items);
+        })
+        .catch((error) => {
+          if (active) onToast("error", error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.`);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 150);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [role, search, isMentorsSection, title, onToast]);
+
+  async function changeMentor(user: LiveUser, mentorId: string) {
+    try {
+      const updated = mentorId
+        ? await assignMentor(user.id, mentorId)
+        : await unassignMentor(user.id);
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === user.id ? { ...item, assignedMentor: updated.item.assignedMentor } : item
+        )
+      );
+      onToast("success", mentorId ? "Mentor assigned." : "Mentor unassigned.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to update mentor assignment.");
+    }
   }
 
-  const roleColor: Record<string, { bg: string; color: string }> = {
-    mentee: { bg: C.primaryLight, color: C.primary },
-    mentor: { bg: C.successLight, color: C.success },
-    "pending-mentor": { bg: C.pendingLight, color: C.pending },
-  };
-
-  const statusColor: Record<string, { bg: string; color: string }> = {
-    active: { bg: C.successLight, color: C.success },
-    suspended: { bg: C.errorLight, color: C.error },
-    pending: { bg: C.pendingLight, color: C.pending },
-  };
-
   return (
-    <div className="fade-in flex flex-col gap-4">
-      {/* Filters row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
+    <div className="fade-in">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: C.text }}>{title}</h2>
+          <p className="text-xs mt-1" style={{ color: C.textSec }}>
+            {isMentorsSection
+              ? "All mentor accounts. Search by mentor name or email."
+              : "All student accounts. Search by student name or email."}
+          </p>
+        </div>
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
+          {users.length} {isMentorsSection ? "mentors" : "students"}
+        </span>
+      </div>
+
+      <div className="mb-4">
+        <div className="relative max-w-xl">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.textSec }}>
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
           <input
-            type="text"
-            placeholder="Search users…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-sm bg-white outline-none"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm outline-none bg-white"
             style={{ border: `1.5px solid ${C.border}`, color: C.text }}
           />
         </div>
-        <select
-          value={filterRole}
-          onChange={e => setFilterRole(e.target.value as typeof filterRole)}
-          className="px-3 py-2 rounded-xl text-sm bg-white outline-none"
-          style={{ border: `1.5px solid ${C.border}`, color: C.text }}
-        >
-          <option value="all">All Roles</option>
-          <option value="mentee">Mentees</option>
-          <option value="mentor">Mentors</option>
-          <option value="pending-mentor">Pending Mentor</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
-          className="px-3 py-2 rounded-xl text-sm bg-white outline-none"
-          style={{ border: `1.5px solid ${C.border}`, color: C.text }}
-        >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
-          <option value="pending">Pending</option>
-        </select>
-        <span className="text-xs font-medium" style={{ color: C.textSec }}>{filtered.length} users</span>
+        <p className="text-[11px] mt-1.5" style={{ color: C.textSec }}>
+          Admin search includes email.
+        </p>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
-        <div
-          className="grid text-xs font-semibold px-5 py-3"
-          style={{
-            gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr auto",
-            backgroundColor: C.bg,
-            borderBottom: `1px solid ${C.border}`,
-            color: C.textSec,
-          }}
-        >
-          <div>NAME</div>
-          <div>EMAIL / SCHOOL</div>
-          <div>ROLE</div>
-          <div>STATUS</div>
-          <div>JOINED</div>
-          <div>ACTIONS</div>
-        </div>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No users match your filters.</div>
-        )}
-        {filtered.map((u, i) => (
-          <div
-            key={u.id}
-            className="grid items-center px-5 py-3.5 gap-3 hover:opacity-95 transition-opacity"
-            style={{
-              gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr auto",
-              borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
-            }}
-          >
-            {/* Name */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Avatar name={u.name} src={u.photo} size={32} />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold truncate" style={{ color: C.text }}>{u.name}</div>
-                {u.year && <div className="text-xs" style={{ color: C.textSec }}>{u.year} · {u.track}</div>}
+      {loading ? (
+        <Card className="p-8 text-center text-sm" style={{ color: C.textSec }}>Loading {title.toLowerCase()}…</Card>
+      ) : users.length === 0 ? (
+        <Card className="p-8 text-center text-sm" style={{ color: C.textSec }}>No {title.toLowerCase()} found.</Card>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {users.map((user) => (
+            <Card key={user.id} className="p-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <Avatar name={user.name ?? user.email} size={40} />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={{ color: C.text }}>
+                    {user.name ?? "Unnamed user"}
+                  </div>
+                  <div className="text-xs" style={{ color: C.textSec }}>{user.email}</div>
+                  <div className="text-xs mt-1" style={{ color: C.textSec }}>
+                    {user.questionCount} questions · {user.answerCount} answers
+                  </div>
+                </div>
+
+                {!isMentorsSection && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium" style={{ color: C.textSec }}>Mentor</span>
+                    <select
+                      value={user.assignedMentor?.id ?? ""}
+                      onChange={(e) => void changeMentor(user, e.target.value)}
+                      className="px-2.5 py-2 rounded-lg text-xs outline-none"
+                      style={{ backgroundColor: C.bg, border: "1px solid " + C.border, color: C.text }}
+                    >
+                      <option value="">Unassigned</option>
+                      {mentors.map((mentor) => (
+                        <option key={mentor.id} value={mentor.id}>
+                          {mentor.name ?? mentor.email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Email */}
-            <div className="min-w-0">
-              <div className="text-xs truncate" style={{ color: C.text }}>{u.email}</div>
-              <div className="text-xs truncate" style={{ color: C.textSec }}>{u.school}</div>
-            </div>
-            {/* Role */}
-            <div>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ backgroundColor: roleColor[u.role]?.bg, color: roleColor[u.role]?.color }}
-              >
-                {u.role === "pending-mentor" ? "Pending" : u.role}
-              </span>
-            </div>
-            {/* Status */}
-            <div>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ backgroundColor: statusColor[u.status]?.bg, color: statusColor[u.status]?.color }}
-              >
-                {u.status}
-              </span>
-            </div>
-            {/* Joined */}
-            <div className="text-xs" style={{ color: C.textSec }}>{u.joinDate}</div>
-            {/* Actions */}
-            <div className="flex items-center gap-1">
-              {u.role === "pending-mentor" && (
-                <button
-                  onClick={() => setActionModal({ user: u, action: "Approve mentor" })}
-                  className="text-xs px-2 py-1 rounded-lg font-semibold transition-opacity hover:opacity-80"
-                  style={{ backgroundColor: C.successLight, color: C.success }}
-                >
-                  Approve
-                </button>
-              )}
-              {u.status === "active" && (
-                <button
-                  onClick={() => setActionModal({ user: u, action: "Suspend user" })}
-                  className="text-xs px-2 py-1 rounded-lg font-semibold transition-opacity hover:opacity-80"
-                  style={{ backgroundColor: C.errorLight, color: C.error }}
-                >
-                  Suspend
-                </button>
-              )}
-              {u.status === "suspended" && (
-                <button
-                  onClick={() => setActionModal({ user: u, action: "Reinstate user" })}
-                  className="text-xs px-2 py-1 rounded-lg font-semibold transition-opacity hover:opacity-80"
-                  style={{ backgroundColor: C.successLight, color: C.success }}
-                >
-                  Reinstate
-                </button>
-              )}
-              <button
-                onClick={() => onToast("info", `Viewing profile for ${u.name}`)}
-                className="text-xs px-2 py-1 rounded-lg font-semibold transition-opacity hover:opacity-80"
-                style={{ backgroundColor: C.primaryLight, color: C.primary }}
-              >
-                View
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Action confirmation modal */}
-      {actionModal && (
-        <ActionModal
-          title={`${actionModal.action}?`}
-          description={`You are about to ${actionModal.action.toLowerCase()} for ${actionModal.user.name} (${actionModal.user.email}). This action can be reversed.`}
-          confirmLabel={actionModal.action.split(" ")[0]}
-          confirmVariant={actionModal.action.includes("Suspend") || actionModal.action.includes("Remove") ? "danger" : "primary"}
-          onClose={() => setActionModal(null)}
-          onConfirm={() => handleAction(actionModal.user, actionModal.action)}
-        />
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -7189,43 +7635,89 @@ function AdminUsersView({ onToast }: { onToast: (t: ToastType, msg: string) => v
 // ─── ADMIN MODERATION VIEW ─────────────────────────────────────────────────────
 
 function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const [items, setItems] = useState(MODERATION_ITEMS.filter(m => m.type === "anon-question" || m.type === "suspicious"));
+  const [items, setItems] = useState<ModerationItem[]>([]);
   const [filterStatus, setFilterStatus] = useState<ModerationStatus | "all">("pending");
   const [reviewItem, setReviewItem] = useState<ModerationItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  function handleApprove(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
-    setReviewItem(null);
+  async function loadQueue() {
+    setLoading(true);
+    try {
+      const response = await getModerationQueue({ limit: 50 });
+      setItems(
+        response.items.map((item) => ({
+          id: item.id,
+          type: item.isAnonymous
+            ? item.visibility === "PUBLIC" ? "anon-question" : "private-question"
+            : item.visibility === "PUBLIC" ? "any-mentor-question" : "private-question",
+          questionText: item.content,
+          questionTitle: item.title,
+          category: item.category.replaceAll("_", " "),
+          submittedDate: formatDateTime(item.createdAt),
+          visibility: item.visibility.toLowerCase() as "public" | "private",
+           submittedBy: item.student,
+          status: "pending",
+        }))
+      );
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to load moderation queue.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleReject(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-    setReviewItem(null);
+  useEffect(() => {
+    void loadQueue();
+    const interval = window.setInterval(() => {
+      void loadQueue();
+    }, 10000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  async function handleApprove(id: string | number) {
+    if (typeof id !== "string") return;
+    try {
+      await approveQuestion(id);
+      setItems((prev) => prev.filter((m) => m.id !== id));
+      setReviewItem(null);
+      onToast("success", "Question approved and published.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to approve question.");
+    }
+  }
+
+  async function handleReject(id: string | number) {
+    if (typeof id !== "string") return;
+    try {
+      await rejectQuestion(id);
+      setItems((prev) => prev.filter((m) => m.id !== id));
+      setReviewItem(null);
+      onToast("success", "Question rejected.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to reject question.");
+    }
   }
 
   const filtered = items.filter(m => filterStatus === "all" || m.status === filterStatus);
 
   const STATUS_TABS: { v: ModerationStatus | "all"; label: string }[] = [
     { v: "pending", label: `Pending (${items.filter(m => m.status === "pending").length})` },
-    { v: "approved", label: `Approved (${items.filter(m => m.status === "approved").length})` },
-    { v: "rejected", label: `Rejected (${items.filter(m => m.status === "rejected").length})` },
-    { v: "all", label: "All" },
+    { v: "approved", label: "Approved (0)" },
+    { v: "rejected", label: "Rejected (0)" },
+    { v: "all", label: `All (${items.length})` },
   ];
-
-  const statusStyle: Record<ModerationStatus, { bg: string; color: string }> = {
-    pending:  { bg: C.pendingLight,  color: C.pending  },
-    approved: { bg: C.successLight,  color: C.success  },
-    rejected: { bg: C.errorLight,    color: C.error    },
-    reported: { bg: C.errorLight,    color: C.error    },
-  };
 
   return (
     <div className="fade-in flex flex-col gap-4">
-      <p className="text-sm" style={{ color: C.textSec }}>
-        Review anonymous questions before they are published. Student identity is always hidden from mentors and students — admin metadata is available only here for abuse prevention.
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm" style={{ color: C.textSec }}>
+          Review student questions before publication. Only direct private mentee → assigned mentor questions bypass moderation.
+        </p>
+        <Button variant="secondary" size="sm" onClick={() => void loadQueue()} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
+      </div>
 
-      {/* Status tab bar */}
       <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ backgroundColor: C.borderLight }}>
         {STATUS_TABS.map(({ v, label }) => (
           <button
@@ -7243,252 +7735,324 @@ function AdminModerationView({ onToast }: { onToast: (t: ToastType, msg: string)
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div
           className="grid text-xs font-semibold px-5 py-3"
           style={{
-            gridTemplateColumns: "3fr 1fr 1fr 1fr 1fr auto",
+            gridTemplateColumns: "2.3fr 1.2fr 1fr 1.15fr 1fr 1fr auto",
             backgroundColor: C.bg,
             borderBottom: `1px solid ${C.border}`,
             color: C.textSec,
           }}
         >
           <div>QUESTION</div>
-          <div>CATEGORY</div>
-          <div>DATE</div>
-          <div>VISIBILITY</div>
-          <div>STATUS</div>
-          <div>ACTION</div>
+          <div>POSTED BY</div>
+           <div>CATEGORY</div>
+           <div>DATE</div>
+           <div>VISIBILITY</div>
+           <div>TYPE</div>
+           <div>ACTION</div>
         </div>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No items in this category.</div>
+        {loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading moderation queue…</div>
         )}
-        {filtered.map((item, i) => (
-          <div
-            key={item.id}
-            className="grid items-center px-5 py-3.5 gap-3"
-            style={{
-              gridTemplateColumns: "3fr 1fr 1fr 1fr 1fr auto",
-              borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
-            }}
-          >
-            {/* Question */}
-            <div className="flex items-start gap-2 min-w-0">
-              <span className="text-base flex-shrink-0 mt-0.5">🔒</span>
-              <p
-                className="text-xs leading-snug overflow-hidden"
-                style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
-              >
-                {item.questionText}
-              </p>
-            </div>
-            <CategoryBadge category={item.category} />
-            <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
-            <div>{item.visibility === "public" ? <PrivacyBadge type="public" /> : <PrivacyBadge type="mentors" />}</div>
-            <div>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-                style={{ backgroundColor: statusStyle[item.status].bg, color: statusStyle[item.status].color }}
-              >
-                {item.status}
-              </span>
-            </div>
-            <button
-              onClick={() => setReviewItem(item)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
-              style={{ backgroundColor: C.primaryLight, color: C.primary }}
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No questions awaiting moderation.</div>
+        )}
+        {filtered.map((item, i) => {
+          const typeLabel =
+            item.type === "any-mentor-question"
+              ? "Any Mentor"
+              : item.type === "anon-question"
+                ? "Anonymous · Public"
+                : "Anonymous · Private";
+          return (
+            <div
+              key={item.id}
+              className="grid items-center px-5 py-3.5 gap-3"
+              style={{
+                gridTemplateColumns: "2.3fr 1.2fr 1fr 1.15fr 1fr 1fr auto",
+                borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
+              }}
             >
-              Review
-            </button>
-          </div>
-        ))}
+              <div className="min-w-0">
+                <p
+                  className="text-xs leading-snug overflow-hidden"
+                  style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
+                >
+                  {item.questionText}
+                </p>
+              </div>               <div className="min-w-0">
+                 <div className="text-xs font-semibold truncate" style={{ color: C.text }}>
+                   {item.submittedBy?.name ?? "Unnamed student"}
+                 </div>
+                 <div className="text-xs truncate" style={{ color: C.textSec }}>
+                   {item.submittedBy?.email ?? ""}
+                 </div>
+               </div>
+
+              <CategoryBadge category={item.category} />
+              <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
+              <div>{item.visibility === "public" ? <PrivacyBadge type="public" /> : <PrivacyBadge type="private" />}</div>
+              <Badge variant="pending">{typeLabel}</Badge>
+              <button
+                onClick={() => setReviewItem(item)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+                style={{ backgroundColor: C.primaryLight, color: C.primary }}
+              >
+                Review
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {reviewItem && (
-        <ModerationReviewPanel
-          item={reviewItem}
-          onClose={() => setReviewItem(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onToast={onToast}
-        />
+        <Modal title="Review question" onClose={() => setReviewItem(null)} width={620}>
+          <p className="text-xs mb-4" style={{ color: C.textSec }}>
+            This question is currently pending approval and is not visible to mentors or other students.
+          </p>
+
+          <div
+            className="rounded-xl p-4 mb-4"
+            style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}
+          >
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <PrivacyBadge type={reviewItem.visibility === "public" ? "public" : "private"} />
+              <Badge variant="pending">Pending approval</Badge>
+            </div>
+            <p className="text-base font-bold mb-2" style={{ color: C.text }}>
+              {reviewItem.questionTitle ?? "Question"}
+            </p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: C.textSec }}>
+              {reviewItem.questionText}
+            </p>
+          </div>
+
+           {reviewItem.submittedBy && (
+             <div
+               className="rounded-xl p-3 mb-4"
+               style={{ backgroundColor: C.primaryLight, border: "1px solid " + C.border }}
+             >
+               <div className="text-xs font-semibold mb-1" style={{ color: C.primary }}>
+                 Submitted by
+               </div>
+               <div className="text-sm font-semibold" style={{ color: C.text }}>
+                 {reviewItem.submittedBy.name ?? "Unnamed student"}
+               </div>
+               <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                 {reviewItem.submittedBy.email}
+               </div>
+             </div>
+           )}
+
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => setReviewItem(null)}>Cancel</Button>
+            <Button variant="danger" onClick={() => void handleReject(reviewItem.id)}>Reject</Button>
+            <Button variant="primary" onClick={() => void handleApprove(reviewItem.id)}>Approve & Publish</Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
 }
 
-// ─── ADMIN REPORTS VIEW ────────────────────────────────────────────────────────
-
 function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const [items, setItems] = useState(MODERATION_ITEMS);
-  const [filterStatus, setFilterStatus] = useState<ModerationStatus | "all">("reported");
-  const [reviewItem, setReviewItem] = useState<ModerationItem | null>(null);
-  const [actionModal, setActionModal] = useState<{ id: number; label: string; desc: string } | null>(null);
+  type ReportItem = Awaited<ReturnType<typeof getAdminReports>>["items"][number];
 
-  function handleApprove(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "approved" } : m));
-    setReviewItem(null);
+  const [items, setItems] = useState<ReportItem[]>([]);
+  const [counts, setCounts] = useState({ PENDING: 0, DISMISSED: 0, ACTION_TAKEN: 0 });
+  const [filterStatus, setFilterStatus] = useState<ReportStatusValue>("PENDING");
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<ReportItem | null>(null);
+  const [acting, setActing] = useState<"DISMISS" | "REMOVE_POST" | null>(null);
+
+  async function loadReports(status: ReportStatusValue = filterStatus) {
+    setLoading(true);
+    try {
+      const response = await getAdminReports({ status, page: 1, limit: 50 });
+      setItems(response.items);
+      setCounts(response.counts);
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to load reports.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleReject(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-    setReviewItem(null);
+  useEffect(() => {
+    void loadReports(filterStatus);
+  }, [filterStatus]);
+
+  async function handleAction(action: "DISMISS" | "REMOVE_POST") {
+    if (!selected || acting) return;
+    setActing(action);
+    try {
+      await updateAdminReport(selected.id, action);
+      setSelected(null);
+      await loadReports(filterStatus);
+      onToast("success", action === "DISMISS" ? "Report dismissed." : "Post removed and related pending reports were actioned.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to update report.");
+    } finally {
+      setActing(null);
+    }
   }
 
-  function handleAction(id: number) {
-    setItems(prev => prev.map(m => m.id === id ? { ...m, status: "rejected" } : m));
-    setActionModal(null);
-    onToast("success", "Action completed.");
-  }
-
-  const filtered = items.filter(m => filterStatus === "all" || m.status === filterStatus);
-
-  const STATUS_TABS: { v: ModerationStatus | "all"; label: string }[] = [
-    { v: "reported", label: `Reported (${items.filter(m => m.status === "reported").length})` },
-    { v: "pending", label: `Pending (${items.filter(m => m.status === "pending").length})` },
-    { v: "approved", label: `Approved (${items.filter(m => m.status === "approved").length})` },
-    { v: "rejected", label: `Rejected (${items.filter(m => m.status === "rejected").length})` },
-    { v: "all", label: "All" },
+  const tabs: Array<{ value: ReportStatusValue; label: string }> = [
+    { value: "PENDING", label: `Pending (${counts.PENDING})` },
+    { value: "DISMISSED", label: `Dismissed (${counts.DISMISSED})` },
+    { value: "ACTION_TAKEN", label: `Action taken (${counts.ACTION_TAKEN})` },
   ];
 
-  const TYPE_LABEL: Record<ModerationItem["type"], string> = {
-    "anon-question": "Anon Question",
-    "reported-question": "Reported Question",
-    "reported-answer": "Reported Answer",
-    "suspicious": "Suspicious Activity",
+  const reasonLabel: Record<ReportReasonValue, string> = {
+    SPAM: "Spam",
+    HARASSMENT: "Harassment",
+    INAPPROPRIATE_CONTENT: "Inappropriate content",
+    MISINFORMATION: "Misinformation",
+    PRIVACY: "Privacy",
+    OFF_TOPIC: "Off-topic",
+    OTHER: "Other",
   };
 
-  const TYPE_COLOR: Record<ModerationItem["type"], { bg: string; color: string }> = {
-    "anon-question": { bg: C.pendingLight, color: C.pending },
-    "reported-question": { bg: C.errorLight, color: C.error },
-    "reported-answer": { bg: C.errorLight, color: C.error },
-    "suspicious": { bg: "#EDE9FE", color: "#7C3AED" },
-  };
-
-  const statusStyle: Record<ModerationStatus, { bg: string; color: string }> = {
-    pending:  { bg: C.pendingLight,  color: C.pending  },
-    approved: { bg: C.successLight,  color: C.success  },
-    rejected: { bg: C.errorLight,    color: C.error    },
-    reported: { bg: C.errorLight,    color: "#DC2626"  },
+  const statusMeta: Record<ReportStatusValue, { label: string; bg: string; color: string }> = {
+    PENDING: { label: "Pending", bg: C.pendingLight, color: C.pending },
+    DISMISSED: { label: "Dismissed", bg: C.borderLight, color: C.textSec },
+    ACTION_TAKEN: { label: "Action taken", bg: C.successLight, color: C.success },
   };
 
   return (
     <div className="fade-in flex flex-col gap-4">
-      <p className="text-sm" style={{ color: C.textSec }}>
-        All reports including flagged questions, reported answers, and suspicious account activity. Confirmation is required for every moderation action.
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-medium" style={{ color: C.text }}>Reported posts</p>
+          <p className="text-xs mt-1" style={{ color: C.textSec }}>
+            Review reports submitted by students and mentors.
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => void loadReports(filterStatus)} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
+      </div>
 
-      {/* Status tabs */}
       <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ backgroundColor: C.borderLight }}>
-        {STATUS_TABS.map(({ v, label }) => (
+        {tabs.map((tab) => (
           <button
-            key={v}
-            onClick={() => setFilterStatus(v)}
+            key={tab.value}
+            type="button"
+            onClick={() => setFilterStatus(tab.value)}
             className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
-              backgroundColor: filterStatus === v ? "#fff" : "transparent",
-              color: filterStatus === v ? C.text : C.textSec,
-              boxShadow: filterStatus === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              backgroundColor: filterStatus === tab.value ? "#fff" : "transparent",
+              color: filterStatus === tab.value ? C.text : C.textSec,
+              boxShadow: filterStatus === tab.value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
             }}
           >
-            {label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div
-          className="grid text-xs font-semibold px-5 py-3"
+          className="grid text-xs font-semibold px-5 py-3 gap-3"
           style={{
-            gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto",
+            gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1fr auto",
             backgroundColor: C.bg,
             borderBottom: `1px solid ${C.border}`,
             color: C.textSec,
           }}
         >
-          <div>CONTENT</div>
-          <div>TYPE</div>
-          <div>FLAGS</div>
-          <div>DATE</div>
-          <div>STATUS</div>
-          <div>ACTIONS</div>
+          <div>POST</div><div>REASON</div><div>REPORTER</div><div>REPORTS</div><div>STATUS</div><div>ACTION</div>
         </div>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No items match this filter.</div>
+
+        {loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading reports…</div>
         )}
-        {filtered.map((item, i) => (
-          <div
-            key={item.id}
-            className="grid items-center px-5 py-3.5 gap-3"
-            style={{
-              gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto",
-              borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
-            }}
-          >
-            <p
-              className="text-xs leading-snug overflow-hidden"
-              style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
+        {!loading && items.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No reports in this tab.</div>
+        )}
+
+        {items.map((item, i) => {
+          const status = statusMeta[item.status];
+          return (
+            <div
+              key={item.id}
+              className="grid items-center px-5 py-3.5 gap-3"
+              style={{
+                gridTemplateColumns: "2fr 1.2fr 1fr 1fr 1fr auto",
+                borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}`,
+              }}
             >
-              {item.questionText}
-            </p>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: TYPE_COLOR[item.type].bg, color: TYPE_COLOR[item.type].color }}
-            >
-              {TYPE_LABEL[item.type]}
-            </span>
-            <div className="text-xs font-semibold" style={{ color: item.flagCount ? C.error : C.textSec }}>
-              {item.flagCount != null ? `${item.flagCount} flag${item.flagCount !== 1 ? "s" : ""}` : "—"}
+              <div className="min-w-0">
+                <p className="text-xs font-medium leading-snug overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  {item.question.title}
+                </p>
+                <p className="text-xs mt-1 truncate" style={{ color: C.textSec }}>
+                  {item.question.isAnonymous ? "Anonymous student" : item.question.student.name ?? item.question.student.email}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <Badge variant="error">{reasonLabel[item.reason as ReportReasonValue] ?? item.reason}</Badge>
+                {item.details && <p className="text-xs mt-1 truncate" style={{ color: C.textSec }}>{item.details}</p>}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs truncate" style={{ color: C.text }}>{item.reporter.name ?? item.reporter.email}</p>
+                <p className="text-xs mt-0.5 capitalize" style={{ color: C.textSec }}>{item.reporter.role.toLowerCase()}</p>
+              </div>
+              <div className="text-xs font-semibold" style={{ color: C.text }}>{item.question._count.reports}</div>
+              <span className="text-xs px-2 py-1 rounded-full font-medium w-fit" style={{ backgroundColor: status.bg, color: status.color }}>{status.label}</span>
+              <button type="button" onClick={() => setSelected(item)} className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80" style={{ backgroundColor: C.primaryLight, color: C.primary }}>Review</button>
             </div>
-            <div className="text-xs" style={{ color: C.textSec }}>{item.submittedDate}</div>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-              style={{ backgroundColor: statusStyle[item.status].bg, color: statusStyle[item.status].color }}
-            >
-              {item.status}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setReviewItem(item)}
-                className="text-xs font-semibold px-2.5 py-1 rounded-xl transition-all hover:opacity-80"
-                style={{ backgroundColor: C.primaryLight, color: C.primary }}
-              >
-                Review
-              </button>
-              {item.status === "reported" && (
-                <button
-                  onClick={() => setActionModal({ id: item.id, label: "Remove Content", desc: `Remove this content permanently. The reporter will not be notified.` })}
-                  className="text-xs font-semibold px-2.5 py-1 rounded-xl transition-all hover:opacity-80"
-                  style={{ backgroundColor: C.errorLight, color: C.error }}
-                >
-                  Remove
-                </button>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <Modal title="Review report" onClose={() => !acting && setSelected(null)} width={650}>
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl p-4" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <Badge variant="info">{selected.question.category.replaceAll("_", " ")}</Badge>
+                <Badge variant={selected.question.isAnonymous ? "pending" : "neutral"}>{selected.question.isAnonymous ? "Anonymous" : "Identified student"}</Badge>
+                <Badge variant="error">{reasonLabel[selected.reason as ReportReasonValue] ?? selected.reason}</Badge>
+              </div>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: C.text }}>{selected.question.title}</h3>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: C.text }}>{selected.question.content}</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-xl p-3" style={{ border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.textSec }}>Reporter</div>
+                <div className="text-sm" style={{ color: C.text }}>{selected.reporter.name ?? "Unnamed"}</div>
+                <div className="text-xs mt-0.5" style={{ color: C.textSec }}>{selected.reporter.email} · {selected.reporter.role.toLowerCase()}</div>
+              </div>
+              <div className="rounded-xl p-3" style={{ border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.textSec }}>Report</div>
+                <div className="text-sm" style={{ color: C.text }}>{reasonLabel[selected.reason as ReportReasonValue] ?? selected.reason}</div>
+                <div className="text-xs mt-0.5" style={{ color: C.textSec }}>{new Date(selected.createdAt).toLocaleString()}</div>
+              </div>
+            </div>
+            {selected.details && (
+              <div className="rounded-xl p-3" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: C.textSec }}>Reporter details</div>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: C.text }}>{selected.details}</p>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button variant="secondary" size="sm" onClick={() => setSelected(null)} disabled={!!acting}>Close</Button>
+              {selected.status === "PENDING" && (
+                <>
+                  <Button variant="secondary" size="sm" onClick={() => void handleAction("DISMISS")} disabled={!!acting}>
+                    {acting === "DISMISS" ? "Dismissing…" : "Dismiss report"}
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => void handleAction("REMOVE_POST")} disabled={!!acting}>
+                    {acting === "REMOVE_POST" ? "Removing…" : "Remove post"}
+                  </Button>
+                </>
               )}
             </div>
           </div>
-        ))}
-      </div>
-
-      {reviewItem && (
-        <ModerationReviewPanel
-          item={reviewItem}
-          onClose={() => setReviewItem(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onToast={onToast}
-        />
-      )}
-      {actionModal && (
-        <ActionModal
-          title={actionModal.label}
-          description={actionModal.desc}
-          confirmLabel="Confirm"
-          confirmVariant="danger"
-          onClose={() => setActionModal(null)}
-          onConfirm={() => handleAction(actionModal.id)}
-        />
+        </Modal>
       )}
     </div>
   );
@@ -7496,17 +8060,68 @@ function AdminReportsView({ onToast }: { onToast: (t: ToastType, msg: string) =>
 
 // ─── ADMIN QUESTIONS VIEW ──────────────────────────────────────────────────────
 
-function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) => void }) {
-  const allQ = [
-    ...MENTOR_WAITING_QUESTIONS,
-    ...MENTOR_ANY_QUESTIONS,
-    ...MENTOR_ANON_QUESTIONS,
-  ];
+function AdminQuestionsView({
+  onToast,
+  onOpenQuestion,
+}: {
+  onToast: (t: ToastType, msg: string) => void;
+  onOpenQuestion: (id: string) => void;
+}) {
+  const [questions, setQuestions] = useState<Array<{
+    id: string;
+    question: string;
+    content: string;
+    category: string;
+    date: string;
+    type: MentorQuestion["type"];
+    asker: { name: string; email: string } | null;
+    moderationStatus: string;
+  }>>([]);
   const [search, setSearch] = useState("");
-  const filtered = allQ.filter(q =>
-    q.question.toLowerCase().includes(search.toLowerCase()) ||
-    q.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const [loading, setLoading] = useState(true);
+
+  async function loadQuestions() {
+    setLoading(true);
+    try {
+      const response = await getAdminQuestions();
+      setQuestions(
+        response.items.map((q) => ({
+          id: q.id,
+          question: q.title,
+          content: q.content,
+          category: q.category.replaceAll("_", " "),
+          date: formatDateTime(q.createdAt),
+          type: q.isAnonymous
+            ? q.visibility === "PUBLIC" ? "anon-public" : "anon-private"
+            : q.visibility === "PUBLIC" ? "any-mentor" : "private",
+          asker: q.student
+            ? { name: q.student.name ?? "Student", email: q.student.email }
+            : null,
+          moderationStatus: q.moderationStatus,
+        }))
+      );
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to load questions.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadQuestions();
+  }, []);
+
+  const needle = search.trim().toLowerCase();
+  const filtered = questions.filter((q) => {
+    if (!needle) return true;
+    return (
+      q.question.toLowerCase().includes(needle) ||
+      q.content.toLowerCase().includes(needle) ||
+      q.category.toLowerCase().includes(needle) ||
+      (q.asker?.name.toLowerCase().includes(needle) ?? false) ||
+      (q.asker?.email.toLowerCase().includes(needle) ?? false)
+    );
+  });
 
   const TYPE_LABEL: Record<MentorQuestion["type"], string> = {
     private: "Private",
@@ -7518,18 +8133,31 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
   return (
     <div className="fade-in flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 max-w-lg">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.textSec }}>
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
-          <input type="text" placeholder="Search questions…" value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-sm bg-white outline-none"
+          <input
+            type="text"
+            placeholder="Search title, student name, or email…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl text-sm bg-white outline-none"
             style={{ border: `1.5px solid ${C.border}`, color: C.text }}
           />
         </div>
-        <span className="text-xs" style={{ color: C.textSec }}>{filtered.length} questions</span>
+        <span className="text-xs whitespace-nowrap" style={{ color: C.textSec }}>
+          {filtered.length} questions
+        </span>
+        <Button variant="secondary" size="sm" onClick={() => void loadQuestions()} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
       </div>
+      <p className="text-[11px] -mt-2" style={{ color: C.textSec }}>
+        Admin search includes the student email for anonymous and non-anonymous posts.
+      </p>
+
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
         <div className="grid text-xs font-semibold px-5 py-3"
           style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", backgroundColor: C.bg, borderBottom: `1px solid ${C.border}`, color: C.textSec }}>
@@ -7537,35 +8165,55 @@ function AdminQuestionsView({ onToast }: { onToast: (t: ToastType, msg: string) 
           <div>TYPE</div>
           <div>CATEGORY</div>
           <div>DATE</div>
-          <div>ACTIONS</div>
+          <div>STATUS</div>
         </div>
-        {filtered.map((q, i) => {
-          const isAnon = q.asker === null;
-          return (
-            <div key={q.id} className="grid items-center px-5 py-3.5 gap-3"
-              style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}` }}>
-              <div className="flex items-start gap-2 min-w-0">
-                {isAnon && <span className="text-base flex-shrink-0">🔒</span>}
-                <div className="min-w-0">
-                  <p className="text-xs overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {q.question}
-                  </p>
-                  {!isAnon && <div className="text-xs mt-0.5" style={{ color: C.textSec }}>{q.asker!.name}</div>}
+        {loading && questions.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>Loading questions…</div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: C.textSec }}>No questions found.</div>
+        )}
+        {filtered.map((q, i) => (
+          <div
+            key={q.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpenQuestion(q.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpenQuestion(q.id);
+              }
+            }}
+            className="grid items-center px-5 py-3.5 gap-3 cursor-pointer transition-colors hover:bg-[#FAF9FE] focus:outline-none focus:bg-[#FAF9FE]"
+            style={{ gridTemplateColumns: "3fr 1fr 1fr 1fr auto", borderTop: i === 0 ? "none" : `1px solid ${C.borderLight}` }}
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              {q.asker === null && <span className="text-base flex-shrink-0">🔒</span>}
+              <div className="min-w-0">
+                <p className="text-xs overflow-hidden" style={{ color: C.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  {q.question}
+                </p>
+                <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                  {q.asker?.name ?? "Anonymous Mentee"}
                 </div>
+                {q.asker?.email && (
+                  <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                    {q.asker.email}
+                  </div>
+                )}
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
-                {TYPE_LABEL[q.type]}
-              </span>
-              <CategoryBadge category={q.category} />
-              <div className="text-xs" style={{ color: C.textSec }}>{q.date}</div>
-              <button onClick={() => onToast("info", "Viewing full question thread…")}
-                className="text-xs font-semibold px-2.5 py-1 rounded-xl transition-all hover:opacity-80"
-                style={{ backgroundColor: C.primaryLight, color: C.primary }}>
-                View
-              </button>
             </div>
-          );
-        })}
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
+              {TYPE_LABEL[q.type]}
+            </span>
+            <CategoryBadge category={q.category} />
+            <div className="text-xs" style={{ color: C.textSec }}>{q.date}</div>
+            <Badge variant={q.moderationStatus === "PENDING" ? "pending" : q.moderationStatus === "REJECTED" ? "error" : "success"}>
+              {q.moderationStatus}
+            </Badge>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -7603,7 +8251,7 @@ function AdminSettingsView({ onToast }: { onToast: (t: ToastType, msg: string) =
     <div className="fade-in max-w-xl flex flex-col gap-5">
       <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${C.border}` }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: C.text }}>Moderation Settings</h3>
-        <Toggle label="Require approval for anonymous questions" desc="All anonymous questions go through admin review before publication." value={anonApproval} onChange={setAnonApproval} />
+        <Toggle label="Require approval for student questions" desc="All questions require admin approval except direct private mentee → assigned mentor questions." value={anonApproval} onChange={setAnonApproval} />
         <Toggle label="Auto-flag suspicious activity" desc="Automatically flag accounts with unusual posting patterns." value={autoFlag} onChange={setAutoFlag} />
         <Toggle label="Email notifications for reports" desc="Send an email alert when new reports are filed." value={emailNotifs} onChange={setEmailNotifs} />
       </div>
@@ -7624,10 +8272,12 @@ function AdminSettingsView({ onToast }: { onToast: (t: ToastType, msg: string) =
 function AdminScreen({
   initialSection,
   onFullNavigate,
+  onOpenQuestion,
   onToast,
 }: {
   initialSection: AdminSection;
   onFullNavigate: (s: Screen) => void;
+  onOpenQuestion: (id: string) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [section, setSection] = useState<AdminSection>(initialSection);
@@ -7641,7 +8291,7 @@ function AdminScreen({
     const map: Record<AdminSection, Screen> = {
       dashboard: "admin-dashboard",
       users: "admin-users",
-      mentors: "admin-users",
+      mentors: "admin-mentors",
       questions: "admin-questions",
       moderation: "admin-moderation",
       reports: "admin-reports",
@@ -7653,8 +8303,9 @@ function AdminScreen({
   return (
     <AdminShell section={section} onNavigate={setSection} onFullNavigate={onFullNavigate}>
       {section === "dashboard" && <AdminDashboardView onNavigate={onFullNavigate} />}
-      {(section === "users" || section === "mentors") && <AdminUsersView onToast={onToast} />}
-      {section === "questions" && <AdminQuestionsView onToast={onToast} />}
+      {section === "users" && <AdminUsersView section="users" onToast={onToast} />}
+       {section === "mentors" && <AdminUsersView section="mentors" onToast={onToast} />}
+       {section === "questions" && <AdminQuestionsView onToast={onToast} onOpenQuestion={onOpenQuestion} />}
       {section === "moderation" && <AdminModerationView onToast={onToast} />}
       {section === "reports" && <AdminReportsView onToast={onToast} />}
       {section === "settings" && <AdminSettingsView onToast={onToast} />}
@@ -8537,12 +9188,21 @@ function MobileNav({
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("login");
-  const [role, setRole] = useState<Role>("mentee");
+  const [role, setRole] = useState<Role>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [selectedQuestionId, setSelectedQuestionId] = useState<number>(101);
-  const [notifReadIds, setNotifReadIds] = useState<number[]>([]);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
   let toastId = 0;
+
+  async function handleLogout() {
+    try {
+      await logout();
+    } finally {
+      setRole(null);
+      setScreen("login");
+    }
+  }
+
 
   function addToast(type: ToastType, message: string) {
     const id = ++toastId;
@@ -8565,7 +9225,7 @@ export default function App() {
     );
   }
 
-  function openQuestion(id: number) {
+  function openQuestion(id: string | number) {
     setSelectedQuestionId(id);
     setScreen("question-detail");
   }
@@ -8575,19 +9235,6 @@ export default function App() {
     setScreen("mentor-answer");
   }
 
-  function markNotifRead(id: number) {
-    setNotifReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  }
-
-  function markAllNotifsRead() {
-    setNotifReadIds(ALL_NOTIFICATIONS.map((n) => n.id));
-  }
-
-  const sharedNotifProps = {
-    notifReadIds,
-    onMarkRead: markNotifRead,
-    onMarkAllRead: markAllNotifsRead,
-  };
 
   const showMobileNav =
     role !== "admin" &&
@@ -8651,7 +9298,6 @@ export default function App() {
           onToast={addToast}
           onNavigate={setScreen}
           onOpenQuestion={openQuestion}
-          {...sharedNotifProps}
         />
       )}
       {screen === "ask-question" && (
@@ -8690,24 +9336,16 @@ export default function App() {
           onBack={() => setScreen("dashboard")}
           onOpenQuestion={openQuestion}
           onNavigate={setScreen}
-          {...sharedNotifProps}
+          onToast={addToast}
         />
       )}
       {screen === "question-detail" && (
         <QuestionDetailScreen
           questionId={selectedQuestionId}
-          onBack={() => setScreen("feed")}
+          onBack={() => setScreen(role === "admin" ? "admin-questions" : "feed")}
           onOpenQuestion={openQuestion}
           onNavigate={setScreen}
           onToast={addToast}
-          {...sharedNotifProps}
-        />
-      )}
-      {screen === "notifications-page" && (
-        <NotificationsPage
-          onBack={() => setScreen("dashboard")}
-          onOpenQuestion={openQuestion}
-          {...sharedNotifProps}
         />
       )}
       {screen === "mentor-dashboard" && (
@@ -8724,18 +9362,20 @@ export default function App() {
           onToast={addToast}
         />
       )}
-      {(screen === "admin-dashboard" || screen === "admin-users" || screen === "admin-questions" || screen === "admin-moderation" || screen === "admin-reports" || screen === "admin-settings") && (
+      {(screen === "admin-dashboard" || screen === "admin-users" || screen === "admin-mentors" || screen === "admin-questions" || screen === "admin-moderation" || screen === "admin-reports" || screen === "admin-settings") && (
         <AdminScreen
           initialSection={
             screen === "admin-dashboard" ? "dashboard"
             : screen === "admin-users" ? "users"
-            : screen === "admin-questions" ? "questions"
+             : screen === "admin-mentors" ? "mentors"
+             : screen === "admin-questions" ? "questions"
             : screen === "admin-moderation" ? "moderation"
             : screen === "admin-reports" ? "reports"
             : "settings"
           }
           onFullNavigate={setScreen}
-          onToast={addToast}
+           onOpenQuestion={openQuestion}
+           onToast={addToast}
         />
       )}
       {screen === "mentee-profile" && (
@@ -8751,13 +9391,27 @@ export default function App() {
         />
       )}
 
+      {role && screen !== "login" && (
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="fixed right-4 z-50 px-3 py-2 rounded-xl text-xs font-semibold bg-white card-shadow hover:opacity-80"
+          style={{
+            bottom: showMobileNav ? "76px" : "16px",
+            border: `1px solid ${C.border}`,
+            color: C.textSec,
+          }}
+        >
+          Sign out
+        </button>
+      )}
+
       {/* Mobile bottom nav */}
       {screen !== "login" && screen !== "verify" && !screen.startsWith("onboarding") && !screen.startsWith("admin") && (
         <MobileNav
           role={role}
           screen={screen}
           onNavigate={setScreen}
-          notifCount={ALL_NOTIFICATIONS.filter(n => !n.read && !notifReadIds.includes(n.id)).length}
         />
       )}
 
