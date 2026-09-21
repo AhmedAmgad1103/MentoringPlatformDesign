@@ -16,7 +16,6 @@ import {
   getAdminQuestions,
   login,
   logout,
-  getMe,
   sendMessage,
   unboostQuestion,
   updateAdminReport,
