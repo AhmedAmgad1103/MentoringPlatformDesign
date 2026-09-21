@@ -531,38 +531,6 @@ export async function rejectQuestion(questionId: string) {
   })
 }
 
-export async function localLogin(email: string, password: string) {
-  await request<{
-    id: string
-    email: string
-    name: string | null
-    role: "STUDENT" | "MENTOR" | "ADMIN"
-    assignedMentorId: string | null
-  }>("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  })
-
-  // The login endpoint sets the session cookie. Verify that the browser
-  // actually has a usable authenticated session before continuing.
-  const session = await request<ApiUser>("/api/me", {
-    method: "GET",
-  })
-
-  if (!session?.email) {
-    throw new Error("Unable to sign in")
-  }
-
-  return session
-}
-
-export async function localLogout() {
-  return request<{ success: true }>("/api/auth/logout", {
-    method: "POST",
-  })
-}
-
-
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
   const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
   const body = new URLSearchParams({
