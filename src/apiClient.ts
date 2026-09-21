@@ -532,7 +532,7 @@ export async function rejectQuestion(questionId: string) {
 }
 
 export async function localLogin(email: string, password: string) {
-  return request<{
+  await request<{
     id: string
     email: string
     name: string | null
@@ -542,6 +542,18 @@ export async function localLogin(email: string, password: string) {
     method: "POST",
     body: JSON.stringify({ email, password }),
   })
+
+  // The login endpoint sets the session cookie. Verify that the browser
+  // actually has a usable authenticated session before continuing.
+  const session = await request<ApiUser>("/api/me", {
+    method: "GET",
+  })
+
+  if (!session?.email) {
+    throw new Error("Unable to sign in")
+  }
+
+  return session
 }
 
 export async function localLogout() {
