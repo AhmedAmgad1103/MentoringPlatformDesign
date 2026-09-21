@@ -1,184 +1,345 @@
-export type Question = {
+import {
+  boostQuestion as boostQuestionApi,
+  createAnswer as createAnswerApi,
+  createQuestion as createQuestionApi,
+  deleteAnswer as deleteAnswerApi,
+  getAnswers as getAnswersApi,
+  getMentorProfile,
+  getMentors as getMentorsApi,
+  getAdminUsers as getAdminUsersApi,
+  getAdminStats as getAdminStatsApi,
+  getAdminMentors as getAdminMentorsApi,
+  assignMentor as assignMentorApi,
+  unassignMentor as unassignMentorApi,
+  getModerationQueue as getModerationQueueApi,
+  approveQuestion as approveQuestionApi,
+  rejectQuestion as rejectQuestionApi,
+  getMentorMentees as getMentorMenteesApi,
+  getMessages as getMessagesApi,
+  getAdminReports as getAdminReportsApi,
+  reportQuestion as reportQuestionApi,
+  updateAdminReport as updateAdminReportApi,
+  getQuestion as getQuestionApi,
+  getQuestions as getQuestionsApi,
+  getMe as getMeApi,
+  sendMessage as sendMessageApi,
+  unboostQuestion as unboostQuestionApi,
+  updateAnswer as updateAnswerApi,
+  updateMe as updateMeApi,
+  updateQuestionStatus as updateQuestionStatusApi,
+  type ApiAnswer,
+  type ApiQuestion,
+  type ApiUser,
+  type QuestionCategory,
+  type ReportReason,
+  type ReportStatus,
+  login as loginApi,
+  logout as logoutApi,
+} from "./apiClient";
+
+export interface DemoQuestion {
   id: string;
   title: string;
-  content: string;
   category: string;
-  visibility: string;
-  isAnonymous: boolean;
   status: string;
-  moderationStatus: string;
+  moderationStatus: ApiQuestion["moderationStatus"];
   createdAt: string;
-  updatedAt: string;
-  studentId?: string;
-  mentorId?: string | null;
-  student?: { id: string; name: string | null; role: string } | null;
-  mentor?: { id: string; name: string | null; role: string } | null;
-  answers?: Array<{
-    id: string;
-    content: string;
-    createdAt: string;
-    mentor: { id: string; name: string | null; role: string };
-  }>;
-  boostCount: number;
-  answerCount: number;
-  boostedByMe: boolean;
-  isMine: boolean;
-};
+  visibility: ApiQuestion["visibility"];
+  isAnonymous: boolean;
+  responses: number;
+}
 
-export type QuestionListResponse = {
-  items: Question[];
-  page: number;
-  limit: number;
-  total: number;
-};
+function mapQuestion(q: ApiQuestion): DemoQuestion {
+  return {
+    id: q.id,
+    title: q.title,
+    category: categoryLabel(q.category),
+    status: q.status,
+    moderationStatus: q.moderationStatus,
+    createdAt: q.createdAt,
+    visibility: q.visibility,
+    isAnonymous: q.isAnonymous,
+    responses: q.answerCount,
+  };
+}
 
-export type CreateQuestionPayload = {
+function categoryValue(category: string): QuestionCategory {
+  const values: Record<string, QuestionCategory> = {
+    "Board Exams": "BOARD_EXAMS",
+    "Wellness & Burnout": "WELLNESS_BURNOUT",
+    "Clinical Rotations": "CLINICAL_ROTATIONS",
+    "Clinical Skills": "CLINICAL_SKILLS",
+    "Residency Match": "RESIDENCY_MATCH",
+    Academics: "ACADEMICS",
+    Career: "CAREER",
+    Research: "RESEARCH",
+    "Study Skills": "STUDY_SKILLS",
+    Other: "OTHER",
+  };
+  return values[category] ?? (category as QuestionCategory) ?? "OTHER";
+}
+
+function categoryLabel(category: QuestionCategory) {
+  const labels: Record<QuestionCategory, string> = {
+    BOARD_EXAMS: "Board Exams",
+    WELLNESS_BURNOUT: "Wellness & Burnout",
+    CLINICAL_ROTATIONS: "Clinical Rotations",
+    CLINICAL_SKILLS: "Clinical Skills",
+    RESIDENCY_MATCH: "Residency Match",
+    ACADEMICS: "Academics",
+    CAREER: "Career",
+    RESEARCH: "Research",
+    STUDY_SKILLS: "Study Skills",
+    OTHER: "Other",
+  };
+  return labels[category];
+}
+
+export async function getQuestions(): Promise<DemoQuestion[]> {
+  const response = await getQuestionsApi({ scope: "mine", limit: 50 });
+  return response.items.map(mapQuestion);
+}
+
+export async function getAdminStats() {
+  return getAdminStatsApi();
+}
+
+export async function getAdminQuestions() {
+  return getQuestionsApi({ scope: "all", limit: 50, sort: "recent" });
+}
+
+export async function createQuestion(input: {
   title: string;
   category: string;
   body: string;
-  privacy: "private" | "any-mentor" | "anon-public" | "anon-private";
-};
+  privacy: string;
+  askType?: "MY_MENTOR" | "ANY_MENTOR" | "ANONYMOUS";
+}): Promise<DemoQuestion> {
+  const askType =
+    input.askType ??
+    (input.privacy === "private"
+      ? "MY_MENTOR"
+      : input.privacy === "any-mentor"
+        ? "ANY_MENTOR"
+        : "ANONYMOUS");
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+  const privacy =
+    input.privacy === "anon-public"
+      ? "PUBLIC"
+      : input.privacy === "anon-private"
+        ? "PRIVATE"
+        : input.privacy === "private"
+          ? "PRIVATE"
+          : undefined;
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+  const created = await createQuestionApi({
+    title: input.title,
+    body: input.body,
+    category: categoryValue(input.category || "Other"),
+    askType,
+    privacy,
   });
+  return mapQuestion(created);
+}
 
-  if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
-    try {
-      const data = await response.json();
-      message = data?.error || data?.message || message;
-    } catch {
-      const text = await response.text().catch(() => "");
-      if (text) message = text;
-    }
-    throw new Error(message);
+export async function sendMessage(input: {
+  recipientId: string | number;
+  body: string;
+}): Promise<{ success: true }> {
+  if (!input.body.trim()) throw new Error("Message cannot be empty.");
+
+  if (typeof input.recipientId !== "string") {
+    throw new Error("A persisted user id is required.");
   }
 
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  await sendMessageApi(input.recipientId, input.body.trim());
+  return { success: true };
 }
 
-export async function getQuestions(params: {
-  scope?: "mine" | "assigned" | "mentor-community" | "public" | "all";
-  sort?: "recent" | "boosted";
-  page?: number;
-  limit?: number;
-} = {}): Promise<Question[]> {
-  const search = new URLSearchParams();
-  if (params.scope) search.set("scope", params.scope);
-  if (params.sort) search.set("sort", params.sort);
-  if (params.page) search.set("page", String(params.page));
-  if (params.limit) search.set("limit", String(params.limit));
-
-  const suffix = search.toString() ? `?${search.toString()}` : "";
-  const result = await request<QuestionListResponse>(`/api/questions${suffix}`);
-  return result.items;
-}
-
-export function createQuestion(payload: CreateQuestionPayload) {
-  return request<Question>("/api/questions", {
-    method: "POST",
-    body: JSON.stringify(payload),
+export async function getFeedQuestions() {
+  const response = await getQuestionsApi({
+    scope: "public",
+    limit: 50,
+    sort: "recent",
   });
+
+  return response.items.map((q) => ({
+    id: q.id,
+    title: q.title,
+    preview: q.content,
+    full: q.content,
+    category: categoryLabel(q.category),
+    date: new Date(q.createdAt).toLocaleString(),
+    createdAtMs: new Date(q.createdAt).getTime(),
+    responses: q.answerCount,
+    helpful: 0,
+    boosted: q.boostCount,
+    tags: [] as string[],
+    boostedByMe: q.boostedByMe,
+    reportedByMe: q.reportedByMe,
+    isMine: q.isMine,
+    isAnonymous: q.isAnonymous,
+    student: q.student,
+  }));
 }
 
-export function getQuestion(id: string | number) {
-  return request<Question>(`/api/questions/${id}`);
+export async function getQuestionDetails(questionId: string) {
+  return getQuestionApi(questionId);
 }
 
-export function boostQuestion(id: string | number) {
-  return request<{ boosted: true; boostCount: number }>(
-    `/api/questions/${id}/boost`,
-    { method: "POST" },
-  );
+export async function getMentorQueue() {
+  const [assigned, community] = await Promise.all([
+    getQuestionsApi({ scope: "assigned", limit: 50, sort: "recent" }),
+    getQuestionsApi({ scope: "mentor-community", limit: 50, sort: "recent" }),
+  ]);
+
+  return [...assigned.items, ...community.items].map((q) => ({
+    id: q.id,
+    type: q.isAnonymous
+      ? q.visibility === "PRIVATE"
+        ? "anon-private"
+        : "anon-public"
+      : q.mentor?.id
+        ? "private"
+        : "any-mentor",
+    question: q.title,
+    content: q.content,
+    category: categoryLabel(q.category),
+    date: new Date(q.createdAt).toLocaleString(),
+    priority: "normal" as const,
+    asker: q.student
+      ? {
+          name: q.student.name ?? "Student",
+        }
+      : null,
+    responses: q.answerCount,
+    isAnonymous: q.isAnonymous,
+    reportedByMe: q.reportedByMe,
+    status: q.status,
+  }));
 }
 
-export function unboostQuestion(id: string | number) {
-  return request<{ boosted: false; boostCount: number }>(
-    `/api/questions/${id}/boost`,
-    { method: "DELETE" },
-  );
+export async function createAnswer(questionId: string, content: string) {
+  return createAnswerApi(questionId, content);
 }
 
-export function answerQuestion(id: string | number, content: string) {
-  return request<Question["answers"] extends Array<infer A> ? A : never>(
-    `/api/questions/${id}/answers`,
-    {
-      method: "POST",
-      body: JSON.stringify({ content }),
-    },
-  );
+export async function updateAnswer(
+  questionId: string,
+  answerId: string,
+  content: string
+) {
+  return updateAnswerApi(questionId, answerId, content);
 }
 
-export function getMentors() {
-  return request<Array<{
-    id: string;
-    name: string | null;
-    role: string;
-    isMyMentor: boolean;
-  }>>("/api/mentors");
+export async function deleteAnswer(questionId: string, answerId: string) {
+  return deleteAnswerApi(questionId, answerId);
 }
 
-// Messaging is intentionally kept behind this helper until the Message model/API
-// is added on the backend. Keeping the call shape here lets the UI integration
-// land without reintroducing mock data.
-export function sendMessage(payload: {
-  recipientId: string;
-  body: string;
-}) {
-  return request<{ id: string; recipientId: string; body: string }>("/api/messages", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+export async function getAnswers(questionId: string) {
+  return getAnswersApi(questionId);
 }
+
+export async function boostQuestion(questionId: string) {
+  return boostQuestionApi(questionId);
+}
+
+export async function unboostQuestion(questionId: string) {
+  return unboostQuestionApi(questionId);
+}
+
+export async function reportQuestion(
+  questionId: string,
+  input: { reason: ReportReason; details?: string }
+) {
+  return reportQuestionApi(questionId, input);
+}
+
+export async function getAdminReports(
+  options: { status?: ReportStatus | "all"; page?: number; limit?: number } = {}
+) {
+  return getAdminReportsApi(options);
+}
+
+export async function updateAdminReport(
+  reportId: string,
+  action: "DISMISS" | "REMOVE_POST"
+) {
+  return updateAdminReportApi(reportId, action);
+}
+
+export async function updateQuestionStatus(
+  questionId: string,
+  status: "CLOSED" | "AWAITING_RESPONSE"
+) {
+  return updateQuestionStatusApi(questionId, status);
+}
+
+export async function getMessages(withUserId: string, before?: string) {
+  return getMessagesApi(withUserId, before);
+}
+
+export async function getMentors() {
+  return getMentorsApi();
+}
+
+export async function getAdminUsers(
+  options: {
+    role?: "STUDENT" | "MENTOR" | "ADMIN";
+    q?: string;
+    page?: number;
+    limit?: number;
+  } = {}
+) {
+  return getAdminUsersApi(options);
+}
+
+export async function getAdminMentors() {
+  return getAdminMentorsApi();
+}
+
+export async function assignMentor(studentId: string, mentorId: string) {
+  return assignMentorApi(studentId, mentorId);
+}
+
+export async function unassignMentor(studentId: string) {
+  return unassignMentorApi(studentId);
+}
+
+export async function getMe(): Promise<ApiUser> {
+  return getMeApi();
+}
+
+export async function updateMe(name: string | null) {
+  return updateMeApi({ name });
+}
+
+export async function getMentorProfileById(id: string) {
+  return getMentorProfile(id);
+}
+
+export type { ApiAnswer };
+
+export async function getMentorMentees() {
+  return getMentorMenteesApi();
+}
+
+export async function getModerationQueue(options: { page?: number; limit?: number } = {}) {
+  return getModerationQueueApi(options);
+}
+
+export async function approveQuestion(questionId: string) {
+  return approveQuestionApi(questionId);
+}
+
+export async function rejectQuestion(questionId: string) {
+  return rejectQuestionApi(questionId);
+}
+
 
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
-  const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", {
-    method: "GET",
-  });
-
-  const body = new URLSearchParams({
-    csrfToken: csrf.csrfToken,
-    email,
-    role,
-    callbackUrl: "http://localhost:8443/",
-    redirect: "false",
-    json: "true",
-  });
-
-  await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    redirect: "manual",
-    body,
-  });
-
-  const session = await request<{ user?: { email?: string; role?: string } }>(
-    "/api/auth/session",
-    { method: "GET" },
-  );
-
-  if (!session.user?.email) {
-    throw new Error("Unable to sign in");
-  }
-
-  return { ok: true, user: session.user };
+  return loginApi(email, role);
 }
 
 export function logout() {
-  return request<void>("/api/auth/signout", { method: "POST" });
+  return logoutApi();
 }
