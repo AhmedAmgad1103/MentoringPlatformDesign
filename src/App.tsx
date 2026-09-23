@@ -3996,16 +3996,6 @@ function QuestionDetailScreen({
                           <span className="font-bold text-sm" style={{ color: C.text }}>
                             {r.mentor.name}
                           </span>
-                          {currentUserId && r.mentorId === currentUserId && (
-                            <button
-                              type="button"
-                              onClick={() => startEditingAnswer(String(r.id), r.answer)}
-                              className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                              style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                            >
-                              Edit
-                            </button>
-                          )}
                         </div>
                         <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
                           {r.mentor.specialty} · {r.timestamp}
