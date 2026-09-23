@@ -4623,8 +4623,8 @@ function AskQuestionScreen({
               <PrivacyBadge type="private" />
               <span className="text-xs" style={{ color: C.textSec }}>Sent just now</span>
             </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "What's the best approach to Step 1 study in a 10-week block?"}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title}</p>
+            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category}</p>
           </Card>
           <div className="flex flex-col gap-2">
             <Button
@@ -4711,139 +4711,24 @@ function AskQuestionScreen({
     );
   }
 
-  // ── SUCCESS: ANY MENTOR (with responses) ──────────────────────────────────
+  // ── SUCCESS: ANY MENTOR ──────────────────────────────────────────────────
   if (step === "success-any-mentor") {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        <AskPageHeader onBack={onBack} title="Question Shared" subtitle="Your question is live" />
-        <div className="max-w-3xl mx-auto px-6 py-8 fade-in">
-          {/* Success banner */}
-          <div
-            className="rounded-2xl p-5 mb-6 flex items-start gap-4"
-            style={{ background: `linear-gradient(135deg, ${C.primaryLight} 0%, #C7D2FE 100%)`, border: `1px solid #A5B4FC` }}
-          >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: C.primary }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M5 10l3.5 3.5L15 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="font-bold text-sm mb-0.5" style={{ color: C.primary }}>Your question has been shared with all mentors.</div>
-              <p className="text-xs leading-relaxed" style={{ color: "#3730A3" }}>
-                {title || "What's the best approach to Step 1 study in a 10-week block?"}
-              </p>
-            </div>
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
+        <div className="w-full max-w-md text-center fade-in">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ backgroundColor: C.successLight }}>
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M10 20l7 7.5L30 12" stroke={C.success} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {[
-              { label: "Mentors Viewed", value: "34" },
-              { label: "Responses", value: "3" },
-              { label: "Helpful Votes", value: String(30 + helpfulVotes.size) },
-            ].map((s) => (
-              <Card key={s.label} className="p-4 text-center">
-                <div className="text-2xl font-bold mb-0.5" style={{ color: C.primary }}>{s.value}</div>
-                <div className="text-xs" style={{ color: C.textSec }}>{s.label}</div>
-              </Card>
-            ))}
-          </div>
-
-          {/* Sort */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>
-              {SAMPLE_RESPONSES.length} Responses
-            </h3>
-            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: C.borderLight }}>
-              {(["helpful", "newest", "relevant"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSort(s)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
-                  style={{
-                    backgroundColor: sort === s ? "#fff" : "transparent",
-                    color: sort === s ? C.text : C.textSec,
-                    boxShadow: sort === s ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                  }}
-                >
-                  {s === "helpful" ? "Most Helpful" : s === "newest" ? "Newest" : "Most Relevant"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Responses */}
-          <div className="flex flex-col gap-4">
-            {sortedResponses.map((r, idx) => {
-              const voted = helpfulVotes.has(r.id);
-              const count = r.helpfulCount + (voted ? 1 : 0);
-              return (
-                <Card key={r.id} className="p-5">
-                  <div className="flex items-start gap-3 mb-3">
-                    <img
-                      src={r.mentor.photo}
-                      alt={r.mentor.name}
-                      className="w-11 h-11 rounded-full object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm" style={{ color: C.text }}>{r.mentor.name}</span>
-                        {idx === 0 && (
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                            style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
-                          >
-                            ⭐ Top Answer
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                        {r.mentor.specialty} · {r.timestamp}
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {r.mentor.expertise.map((e) => (
-                          <span
-                            key={e}
-                            className="text-xs px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                          >
-                            {e}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm leading-relaxed mb-4" style={{ color: C.text }}>
-                    {r.answer}
-                  </p>
-                  <div className="flex items-center justify-between pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
-                    <button
-                      onClick={() => toggleHelpful(r.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
-                      style={{
-                        backgroundColor: voted ? C.successLight : C.borderLight,
-                        color: voted ? C.success : C.textSec,
-                        border: `1px solid ${voted ? "#A7F3D0" : C.border}`,
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill={voted ? C.success : "none"}>
-                        <path d="M2.5 6.5L1 12.5h9l1.5-6H8V3a1.5 1.5 0 00-3 0v3.5H2.5z" stroke={voted ? C.success : C.textSec} strokeWidth="1.2" strokeLinejoin="round" />
-                      </svg>
-                      Helpful · {count}
-                    </button>
-                    <button className="text-xs" style={{ color: C.textSec }}>
-                      Reply to {r.mentor.name.split(" ")[1]}
-                    </button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-
-          <div className="mt-6">
-            <Button variant="secondary" size="md" fullWidth onClick={onBack}>
-              Return to Dashboard
-            </Button>
+          <PrivacyBadge type="public" />
+          <h2 className="text-2xl font-bold mt-3 mb-2" style={{ color: C.text }}>Question shared.</h2>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>Your question is now stored in the database and available to mentors according to its visibility and moderation status.</p>
+          <Card className="p-4 mb-6 text-left">
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title}</p>
+            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category}</p>
+          </Card>
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" size="lg" fullWidth disabled={!submittedQuestionId} onClick={() => submittedQuestionId && onOpenQuestion(submittedQuestionId)}>View Question</Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={onBack}>Return to Dashboard</Button>
           </div>
         </div>
       </div>
