@@ -531,11 +531,15 @@ export async function rejectQuestion(questionId: string) {
   })
 }
 
-export async function getAvailableRoles(email: string): Promise<string[]> {
+export async function mentorSignup(email: string) {
+  return request<{ status: string }>("/api/auth/mentor-signup", { method: "POST", body: JSON.stringify({ email }) })
+}
+
+export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
   const result = await request<{ roles: string[] }>(
     `/api/auth/roles?email=${encodeURIComponent(email.trim().toLowerCase())}`
   )
-  return result.roles
+  return result
 }
 
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
