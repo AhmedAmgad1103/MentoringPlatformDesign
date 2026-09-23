@@ -8422,238 +8422,105 @@ function MenteeProfileScreen({
   onNavigate: (s: Screen) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
-  const [editMode, setEditMode] = useState(false);
-  const [profile, setProfile] = useState(MENTEE_PROFILE_DATA);
-  const [draft, setDraft] = useState(profile);
-  const [interests, setInterests] = useState(profile.interests);
+  const [user, setUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [questions, setQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
+  const [name, setName] = useState("");
 
-  const availYears = ["M1", "M2", "M3", "M4", "Resident", "Fellow"];
-  const availTracks = ["Preclinical", "Clinical Rotations", "Research Year", "Combined"];
+  useEffect(() => {
+    Promise.all([getMe(), getQuestions()])
+      .then(([me, qs]) => {
+        setUser(me);
+        setName(me.name ?? "");
+        setQuestions(qs);
+      })
+      .catch(() => onToast("error", "Unable to load your profile."));
+  }, []);
 
-  function saveEdit() {
-    setProfile({ ...draft, interests });
-    setEditMode(false);
-    onToast("success", "Profile updated successfully.");
+  async function saveName() {
+    try {
+      const updated = await updateMe(name.trim() || null);
+      setUser(updated);
+      onToast("success", "Profile updated successfully.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to update profile.");
+    }
   }
 
-  function cancelEdit() {
-    setDraft(profile);
-    setInterests(profile.interests);
-    setEditMode(false);
-  }
-
-  const QUESTIONS = [
-    { id: 101, text: "How do I approach Step 2 CK study schedule?", status: "answered", date: "Nov 20, 2024" },
-    { id: 102, text: "Best resources for clinical reasoning practice?", status: "answered", date: "Nov 15, 2024" },
-    { id: 103, text: "How do I get research experience as an M2?", status: "pending", date: "Nov 28, 2024" },
-    { id: 104, text: "Tips for surviving third-year rotations?", status: "answered", date: "Oct 30, 2024" },
-  ];
-
-  const header = (
-    <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-        <button
-          onClick={() => onNavigate("dashboard")}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0"
-          style={{ color: C.textSec, backgroundColor: C.borderLight }}
-        >
-          <Icons.ArrowLeft />
-          <span className="hidden sm:inline">Dashboard</span>
-        </button>
-        <Logo size="sm" />
-        <div className="flex-1" />
-        {!editMode ? (
-          <Button variant="secondary" size="sm" onClick={() => setEditMode(true)}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M9 1.5l2.5 2.5-7 7H2V8.5l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-            </svg>
-            Edit Profile
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={cancelEdit}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={saveEdit}>Save Changes</Button>
-          </div>
-        )}
-      </div>
-    </header>
-  );
-
-  if (editMode) {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        {header}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 fade-in flex flex-col gap-5">
-          {/* Avatar edit */}
-          <Card className="p-5 flex items-center gap-4">
-            <div className="relative">
-              <img src={profile.photo} alt={profile.name} className="w-20 h-20 rounded-full object-cover" />
-              <button
-                className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
-                onClick={() => onToast("info", "Photo upload coming soon.")}
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M14 3.5l2.5 2.5-9 9H5V12.5l9-9z" stroke="white" strokeWidth="1.4" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: C.text }}>Profile Photo</p>
-              <p className="text-xs mt-0.5" style={{ color: C.textSec }}>Click the photo to update</p>
-            </div>
-          </Card>
-
-          <Card className="p-5 flex flex-col gap-4">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>Personal Information</h3>
-            <InputField
-              label="Full Name"
-              value={draft.name}
-              onChange={v => setDraft(d => ({ ...d, name: v }))}
-              placeholder="Your full name"
-            />
-            <InputField
-              label="Medical School"
-              value={draft.school}
-              onChange={v => setDraft(d => ({ ...d, school: v }))}
-              placeholder="School name"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <SelectField
-                label="Year"
-                value={draft.year}
-                onChange={v => setDraft(d => ({ ...d, year: v }))}
-                options={availYears.map(y => ({ value: y, label: y }))}
-              />
-              <SelectField
-                label="Track"
-                value={draft.track}
-                onChange={v => setDraft(d => ({ ...d, track: v }))}
-                options={availTracks.map(t => ({ value: t, label: t }))}
-              />
-            </div>
-          </Card>
-
-          <Card className="p-5 flex flex-col gap-4">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>About</h3>
-            <TextAreaField
-              label="Bio"
-              value={draft.bio}
-              onChange={v => setDraft(d => ({ ...d, bio: v }))}
-              placeholder="Tell mentors about yourself and your goals…"
-              rows={4}
-            />
-          </Card>
-
-          <Card className="p-5 flex flex-col gap-3">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>Interests</h3>
-            <TagInput tags={interests} onChange={setInterests} placeholder="Add an interest…" />
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  const answered = questions.filter((q) => q.status === "ANSWERED").length;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      {header}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 fade-in flex flex-col gap-5">
-        {/* Hero card */}
+      <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <button onClick={() => onNavigate("dashboard")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
+            <Icons.ArrowLeft /> <span className="hidden sm:inline">Dashboard</span>
+          </button>
+          <Logo size="sm" />
+        </div>
+      </header>
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
         <Card className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="relative flex-shrink-0">
-              <img src={profile.photo} alt={profile.name} className="w-20 h-20 rounded-2xl object-cover" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold" style={{ color: C.text }}>{profile.name}</h2>
-              <p className="text-sm font-medium mt-0.5" style={{ color: C.textSec }}>
-                {profile.year} · {profile.track} · {profile.school}
-              </p>
-              <p className="text-xs mt-1" style={{ color: C.textSec }}>{profile.email}</p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
-                  Medical Student
-                </span>
-                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.successLight, color: C.success }}>
-                  Member since {profile.memberSince}
-                </span>
-              </div>
+          <div className="flex items-center gap-4">
+            <Avatar name={user?.name || user?.email?.split("@")[0] || "User"} size={80} />
+            <div className="flex-1">
+              <h2 className="text-xl font-bold" style={{ color: C.text }}>{user?.name || "Your Profile"}</h2>
+              <p className="text-sm" style={{ color: C.textSec }}>{user?.email || ""}</p>
+              <span className="inline-flex mt-2 text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>Medical Student</span>
             </div>
           </div>
-          {profile.bio && (
-            <p className="text-sm leading-relaxed mt-4 pt-4" style={{ color: C.textSec, borderTop: `1px solid ${C.borderLight}` }}>
-              {profile.bio}
-            </p>
+          <div className="mt-5 flex gap-2">
+            <InputField label="Name" value={name} onChange={setName} placeholder="Your name" />
+            <div className="pt-6"><Button size="sm" onClick={saveName}>Save</Button></div>
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Questions Asked" value={questions.length} />
+          <StatCard label="Answered" value={answered} />
+          <StatCard label="Pending" value={questions.length - answered} />
+        </div>
+
+        <Card className="p-5">
+          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Assigned Mentor</h3>
+          {user?.assignedMentor ? (
+            <div className="flex items-center gap-3">
+              <Avatar name={user.assignedMentor.name || "Mentor"} size={48} />
+              <div className="flex-1">
+                <div className="text-sm font-semibold" style={{ color: C.text }}>{user.assignedMentor.name || "Mentor"}</div>
+                <div className="text-xs" style={{ color: C.textSec }}>Your assigned mentor</div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => onNavigate("ask-my-mentor")}>Ask a Question</Button>
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: C.textSec }}>No mentor has been assigned yet.</p>
           )}
         </Card>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: "Questions Asked", value: profile.questionsAsked, color: C.primary, bg: C.primaryLight },
-            { label: "Answered", value: profile.questionsAnswered, color: C.success, bg: C.successLight },
-            { label: "Response Rate", value: `${Math.round((profile.questionsAnswered / profile.questionsAsked) * 100)}%`, color: C.pending, bg: C.pendingLight },
-          ].map(s => (
-            <div key={s.label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: s.bg }}>
-              <div className="stat-numeral" style={{ color: s.color }}>{s.value}</div>
-              <div className="text-xs mt-0.5 font-medium" style={{ color: s.color }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Interests */}
-        <Card className="p-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Interests</h3>
-          <div className="flex flex-wrap gap-2">
-            {profile.interests.map(tag => (
-              <span key={tag} className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary, border: `1px solid ${C.primary}33` }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        </Card>
-
-        {/* Assigned mentor */}
-        <Card className="p-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Assigned Mentor</h3>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <img src={profile.mentor.photo} alt={profile.mentor.name} className="w-12 h-12 rounded-xl object-cover" />
-              <StatusDot available />
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-semibold" style={{ color: C.text }}>{profile.mentor.name}</div>
-              <div className="text-xs" style={{ color: C.textSec }}>{profile.mentor.specialty}</div>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => onNavigate("ask-question")}>
-              Ask a Question
-            </Button>
-          </div>
-        </Card>
-
-        {/* Questions history */}
         <Card className="p-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Questions Asked</h3>
-          <div className="flex flex-col gap-2">
-            {QUESTIONS.map(q => (
-              <div key={q.id} className="flex items-start gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium leading-snug" style={{ color: C.text }}>{q.text}</p>
-                  <p className="text-xs mt-0.5" style={{ color: C.textSec }}>{q.date}</p>
-                </div>
-                <span
-                  className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                  style={{
-                    backgroundColor: q.status === "answered" ? C.successLight : C.pendingLight,
-                    color: q.status === "answered" ? C.success : C.pending,
-                  }}
-                >
-                  {q.status}
-                </span>
-              </div>
-            ))}
-          </div>
+          {questions.length === 0 ? (
+            <p className="text-sm" style={{ color: C.textSec }}>No questions yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {questions.map((q) => (
+                <button key={q.id} type="button" onClick={() => {}} className="text-left px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
+                  <p className="text-xs font-medium" style={{ color: C.text }}>{q.title}</p>
+                  <p className="text-xs mt-1" style={{ color: C.textSec }}>{new Date(q.createdAt).toLocaleString()} · {q.status}</p>
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
-      </div>
+      </main>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: C.primaryLight }}>
+      <div className="stat-numeral" style={{ color: C.primary }}>{value}</div>
+      <div className="text-xs mt-0.5 font-medium" style={{ color: C.primary }}>{label}</div>
     </div>
   );
 }
@@ -8673,315 +8540,62 @@ function MentorProfileScreen({
   onNavigate: (s: Screen) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
-  const [editMode, setEditMode] = useState(false);
-  const [profile, setProfile] = useState(MENTOR_PROFILE_DATA);
-  const [draft, setDraft] = useState(profile);
-  const [expertise, setExpertise] = useState(profile.expertise);
+  const [user, setUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [mentees, setMentees] = useState<Awaited<ReturnType<typeof getMentorMentees>>["items"]>([]);
+  const [questions, setQuestions] = useState<Awaited<ReturnType<typeof getMentorQueue>>>([]);
 
-  function saveEdit() {
-    setProfile({ ...draft, expertise });
-    setEditMode(false);
-    onToast("success", "Profile updated successfully.");
-  }
-  function cancelEdit() {
-    setDraft(profile);
-    setExpertise(profile.expertise);
-    setEditMode(false);
-  }
+  useEffect(() => {
+    Promise.all([getMe(), getMentorMentees(), getMentorQueue()])
+      .then(([me, ms, qs]) => {
+        setUser(me);
+        setMentees(ms.items);
+        setQuestions(qs);
+      })
+      .catch(() => onToast("error", "Unable to load your mentor profile."));
+  }, []);
 
-  const avail = AVAIL_OPTIONS.find(o => o.v === profile.availability)!;
-
-  const header = (
-    <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-        <button
-          onClick={() => onNavigate("mentor-dashboard")}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0"
-          style={{ color: C.textSec, backgroundColor: C.borderLight }}
-        >
-          <Icons.ArrowLeft />
-          <span className="hidden sm:inline">Dashboard</span>
-        </button>
-        <Logo size="sm" />
-        <div className="flex-1" />
-        {!editMode ? (
-          <Button variant="secondary" size="sm" onClick={() => setEditMode(true)}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M9 1.5l2.5 2.5-7 7H2V8.5l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-            </svg>
-            Edit Profile
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={cancelEdit}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={saveEdit}>Save Changes</Button>
-          </div>
-        )}
-      </div>
-    </header>
-  );
-
-  if (editMode) {
-    return (
-      <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-        {header}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 fade-in flex flex-col gap-5">
-          {/* Avatar + availability */}
-          <Card className="p-5">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative">
-                <img src={profile.photo} alt={profile.name} className="w-20 h-20 rounded-full object-cover" />
-                <button
-                  className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
-                  onClick={() => onToast("info", "Photo upload coming soon.")}
-                >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M14 3.5l2.5 2.5-9 9H5V12.5l9-9z" stroke="white" strokeWidth="1.4" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: C.text }}>Profile Photo</p>
-                <p className="text-xs mt-0.5" style={{ color: C.textSec }}>Click to update</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold mb-2" style={{ color: C.textSec }}>AVAILABILITY</p>
-              <div className="flex gap-2">
-                {AVAIL_OPTIONS.map(o => (
-                  <button
-                    key={o.v}
-                    onClick={() => setDraft(d => ({ ...d, availability: o.v }))}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-                    style={{
-                      backgroundColor: draft.availability === o.v ? o.bg : C.borderLight,
-                      color: draft.availability === o.v ? o.color : C.textSec,
-                      border: `1.5px solid ${draft.availability === o.v ? o.dot : "transparent"}`,
-                    }}
-                  >
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: o.dot }} />
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-5 flex flex-col gap-4">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>Professional Information</h3>
-            <InputField label="Full Name" value={draft.name} onChange={v => setDraft(d => ({ ...d, name: v }))} placeholder="Dr. Full Name" />
-            <InputField label="Institution" value={draft.school} onChange={v => setDraft(d => ({ ...d, school: v }))} placeholder="Hospital or university" />
-            <div className="grid grid-cols-2 gap-3">
-              <InputField label="Specialty" value={draft.specialty} onChange={v => setDraft(d => ({ ...d, specialty: v }))} placeholder="e.g. Internal Medicine" />
-              <InputField label="Subspecialty" value={draft.subspecialty} onChange={v => setDraft(d => ({ ...d, subspecialty: v }))} placeholder="e.g. Hospital Medicine" />
-            </div>
-            <InputField label="Education" value={draft.education} onChange={v => setDraft(d => ({ ...d, education: v }))} placeholder="MD, School name" />
-            <div className="grid grid-cols-2 gap-3">
-              <InputField
-                label="Years in Practice"
-                value={String(draft.yearsInPractice)}
-                onChange={v => setDraft(d => ({ ...d, yearsInPractice: Number(v) || 0 }))}
-                placeholder="14"
-              />
-              <InputField
-                label="Years Mentoring"
-                value={String(draft.mentoringYears)}
-                onChange={v => setDraft(d => ({ ...d, mentoringYears: Number(v) || 0 }))}
-                placeholder="6"
-              />
-            </div>
-          </Card>
-
-          <Card className="p-5 flex flex-col gap-4">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>About</h3>
-            <TextAreaField
-              label="Biography"
-              value={draft.bio}
-              onChange={v => setDraft(d => ({ ...d, bio: v }))}
-              placeholder="Describe your clinical background, interests, and mentoring philosophy…"
-              rows={5}
-            />
-          </Card>
-
-          <Card className="p-5 flex flex-col gap-3">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>Areas of Expertise</h3>
-            <TagInput tags={expertise} onChange={setExpertise} placeholder="Add expertise area…" />
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  const answered = questions.filter((q) => q.responses > 0).length;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      {header}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 fade-in flex flex-col gap-5">
-        {/* Hero */}
-        <Card className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="relative flex-shrink-0">
-              <img src={profile.photo} alt={profile.name} className="w-20 h-20 rounded-2xl object-cover" />
-              <span
-                className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"
-                style={{ backgroundColor: avail.dot }}
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div>
-                  <h2 className="text-xl font-bold" style={{ color: C.text }}>{profile.name}</h2>
-                  <p className="text-sm font-medium mt-0.5" style={{ color: C.textSec }}>
-                    {profile.specialty} · {profile.subspecialty}
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: C.textSec }}>{profile.school}</p>
-                </div>
-                <span
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0"
-                  style={{ backgroundColor: avail.bg, color: avail.color }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: avail.dot }} />
-                  {avail.label}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.successLight, color: C.success }}>
-                  Verified Mentor
-                </span>
-                <MentorTierBadge points={MENTOR.points} />
-                <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.borderLight, color: C.textSec }}>
-                  Member since {profile.memberSince}
-                </span>
-              </div>
-            </div>
-          </div>
-          <p className="text-sm leading-relaxed mt-4 pt-4" style={{ color: C.textSec, borderTop: `1px solid ${C.borderLight}` }}>
-            {profile.bio}
-          </p>
-          <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.borderLight}` }}>
-            <p className="text-xs" style={{ color: C.textSec }}>
-              <strong style={{ color: C.text }}>Education:</strong> {profile.education}
-            </p>
-          </div>
-        </Card>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Years in Practice", value: profile.yearsInPractice, color: C.primary, bg: C.primaryLight },
-            { label: "Years Mentoring", value: profile.mentoringYears, color: "#7C3AED", bg: "#EDE9FE" },
-            { label: "Active Mentees", value: profile.menteesActive, color: C.success, bg: C.successLight },
-            { label: "Total Mentored", value: profile.totalMentored, color: C.pending, bg: C.pendingLight },
-          ].map(s => (
-            <div key={s.label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: s.bg }}>
-              <div className="stat-numeral" style={{ color: s.color }}>{s.value}</div>
-              <div className="text-xs mt-0.5 font-medium leading-tight" style={{ color: s.color }}>{s.label}</div>
-            </div>
-          ))}
+      <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <button onClick={() => onNavigate("mentor-dashboard")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
+            <Icons.ArrowLeft /> <span className="hidden sm:inline">Dashboard</span>
+          </button>
+          <Logo size="sm" />
         </div>
-
-        {/* Mentor Rewards */}
-        {(() => {
-          const tier = getMentorTier(MENTOR.points);
-          return (
-            <Card className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold" style={{ color: C.text }}>Mentor Rewards</h3>
-                <button
-                  onClick={() => onNavigate("leaderboard")}
-                  className="text-xs font-semibold"
-                  style={{ color: C.primary }}
-                >
-                  View Leaderboard →
-                </button>
-              </div>
-              <div className="flex items-center gap-4">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-xl flex-shrink-0"
-                  style={{ backgroundColor: tier.bg }}
-                >
-                  {tier.emoji}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="stat-numeral" style={{ color: tier.color }}>{MENTOR.points}</span>
-                    <span className="text-xs font-medium" style={{ color: C.textSec }}>points · {tier.label}</span>
-                  </div>
-                  {tier.next && (
-                    <>
-                      <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${tier.progress}%`, backgroundColor: tier.color, transition: "width 0.4s ease" }}
-                        />
-                      </div>
-                      <p className="text-xs mt-1" style={{ color: C.textSec }}>
-                        {tier.next.min - MENTOR.points} points to {tier.next.emoji} {tier.next.label}
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
-          );
-        })()}
-
-        {/* Availability indicator */}
-        <Card className="p-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Availability</h3>
-          <div className="flex gap-2 flex-wrap">
-            {AVAIL_OPTIONS.map(o => (
-              <div
-                key={o.v}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-                style={{
-                  backgroundColor: profile.availability === o.v ? o.bg : C.borderLight,
-                  color: profile.availability === o.v ? o.color : C.textSec,
-                  border: `1.5px solid ${profile.availability === o.v ? o.dot + "44" : "transparent"}`,
-                  opacity: profile.availability === o.v ? 1 : 0.5,
-                }}
-              >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: o.dot }} />
-                {o.label}
-              </div>
-            ))}
-          </div>
-          <p className="text-xs mt-3" style={{ color: C.textSec }}>
-            Current status: <strong style={{ color: avail.color }}>{avail.label}</strong> — students can see this indicator when browsing mentors.
-          </p>
-        </Card>
-
-        {/* Expertise */}
-        <Card className="p-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Areas of Expertise</h3>
-          <div className="flex flex-wrap gap-2">
-            {profile.expertise.map(tag => (
-              <span key={tag} className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary, border: `1px solid ${C.primary}33` }}>
-                {tag}
-              </span>
-            ))}
+      </header>
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <Avatar name={user?.name || user?.email?.split("@")[0] || "Mentor"} size={80} />
+            <div>
+              <h2 className="text-xl font-bold" style={{ color: C.text }}>{user?.name || "Mentor Profile"}</h2>
+              <p className="text-sm" style={{ color: C.textSec }}>{user?.email || ""}</p>
+              <span className="inline-flex mt-2 text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.successLight, color: C.success }}>Mentor</span>
+            </div>
           </div>
         </Card>
-
-        {/* Current mentees */}
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Mentees" value={mentees.length} />
+          <StatCard label="Questions" value={questions.length} />
+          <StatCard label="Answered" value={answered} />
+        </div>
         <Card className="p-5">
-          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Current Mentees</h3>
-          <div className="flex flex-col gap-2">
-            {MENTOR_MENTEES_DATA.map(m => (
-              <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ backgroundColor: C.bg }}>
-                <div className="relative">
-                  <img src={m.photo} alt={m.name} className="w-9 h-9 rounded-full object-cover" />
-                  <StatusDot available={m.active} />
+          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Assigned Mentees</h3>
+          {mentees.length === 0 ? <p className="text-sm" style={{ color: C.textSec }}>No mentees assigned.</p> : (
+            <div className="flex flex-col gap-2">
+              {mentees.map((m) => (
+                <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: C.bg }}>
+                  <Avatar name={m.name || "Mentee"} size={40} />
+                  <div><div className="text-sm font-semibold" style={{ color: C.text }}>{m.name || "Mentee"}</div><div className="text-xs" style={{ color: C.textSec }}>{m.email}</div></div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold" style={{ color: C.text }}>{m.name}</div>
-                  <div className="text-xs" style={{ color: C.textSec }}>{m.year} · {m.track}</div>
-                </div>
-                <span className="text-xs" style={{ color: C.textSec }}>{m.totalQuestions} Q&amp;As</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
-      </div>
+      </main>
     </div>
   );
 }
