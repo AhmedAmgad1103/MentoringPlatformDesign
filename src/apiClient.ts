@@ -531,6 +531,13 @@ export async function rejectQuestion(questionId: string) {
   })
 }
 
+export async function getAvailableRoles(email: string): Promise<string[]> {
+  const result = await request<{ roles: string[] }>(
+    `/api/auth/roles?email=${encodeURIComponent(email.trim().toLowerCase())}`
+  )
+  return result.roles
+}
+
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
   const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
   const body = new URLSearchParams({
