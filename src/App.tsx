@@ -5296,10 +5296,12 @@ function FormatBtn({
 function MentorAnswerScreen({
   question,
   onBack,
+  onOpenQuestion,
   onToast,
 }: {
   question: MentorQuestion;
   onBack: () => void;
+  onOpenQuestion: (id: string | number) => void;
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [step, setStep] = useState<"form" | "success">("form");
@@ -5469,7 +5471,7 @@ function MentorAnswerScreen({
           )}
 
           <div className="flex flex-col gap-2">
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("form")}>
+            <Button variant="primary" size="lg" fullWidth onClick={() => onOpenQuestion(String(question.id))}>
               View Response
             </Button>
             <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
@@ -5868,6 +5870,7 @@ function MentorDashboardScreen({
   type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & { id: string | number };
   const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [messageSending, setMessageSending] = useState(false);
   const [showAllMentees, setShowAllMentees] = useState(false);
   const [reportingQuestion, setReportingQuestion] = useState<MentorQuestion | null>(null);
   const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<string | number>>(new Set());
@@ -5911,20 +5914,18 @@ function MentorDashboardScreen({
   }, [notifOpen]);
 
   async function sendMentorMessage() {
-    if (!messageTarget || !messageText.trim()) return;
+    if (!messageTarget || !messageText.trim() || messageSending) return;
+    setMessageSending(true);
     try {
       await sendMessage({ recipientId: messageTarget.id, body: messageText.trim() });
       onToast("success", "Message sent to " + messageTarget.name + ".");
+      setMessageTarget(null);
+      setMessageText("");
     } catch (error) {
-      if (DEMO_MODE) {
-        onToast("success", "Message sent to " + messageTarget.name + ".");
-      } else {
-        onToast("error", error instanceof Error ? error.message : "Unable to send the message.");
-        return;
-      }
+      onToast("error", error instanceof Error ? error.message : "Unable to send the message.");
+    } finally {
+      setMessageSending(false);
     }
-    setMessageTarget(null);
-    setMessageText("");
   }
 
   const waitingQuestions =
@@ -6522,18 +6523,13 @@ function MentorDashboardScreen({
                   variant="primary"
                   size="sm"
                   disabled={!messageText.trim()}
-                  onClick={() => {
-                    onToast("success", `Message sent to ${messageTarget.name}.`);
-                    setMessageTarget(null);
-                    setMessageText("");
-                  }}
+                  onClick={sendMentorMessage}
+                  disabled={!messageText.trim() || messageSending}
                 >
-                  Send Message
+                  {messageSending ? "Sending…" : "Send Message"}
                 </Button>
               </div>
-              <p className="text-xs mt-3" style={{ color: C.textSec }}>
-                Demo mode: this opens a working placeholder message composer. Backend messaging can be connected later.
-              </p>
+
             </div>
           </div>
         </div>
@@ -9231,13 +9227,13 @@ export default function App() {
       setRole(r);
       setScreen(
         r === "mentee"
-          ? "onboarding-mentee"
+          ? "dashboard"
           : r === "mentor"
-            ? "onboarding-mentor"
+            ? "mentor-dashboard"
             : "admin-dashboard",
       );
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : "Unable to select role.");
+      addToast("error", error instanceof Error ? error.message : "Unable to sign in.");
     }
   }
 
@@ -9389,6 +9385,7 @@ export default function App() {
         <MentorAnswerScreen
           question={questionToAnswer}
           onBack={() => setScreen("mentor-dashboard")}
+          onOpenQuestion={openQuestion}
           onToast={addToast}
         />
       )}
