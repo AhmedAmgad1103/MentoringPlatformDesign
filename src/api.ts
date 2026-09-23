@@ -23,6 +23,7 @@ import {
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
   getAvailableRoles as getAvailableRolesApi,
+  updateMentorApproval as updateMentorApprovalApi,
   mentorSignup as mentorSignupApi,
   sendMessage as sendMessageApi,
   unboostQuestion as unboostQuestionApi,
@@ -337,6 +338,10 @@ export async function rejectQuestion(questionId: string) {
   return rejectQuestionApi(questionId);
 }
 
+
+export async function updateMentorApproval(id: string, status: "APPROVED" | "REJECTED") {
+  return updateMentorApprovalApi(id, status);
+}
 
 export async function mentorSignup(email: string) {
   return mentorSignupApi(email);
