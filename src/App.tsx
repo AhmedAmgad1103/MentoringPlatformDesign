@@ -4404,10 +4404,6 @@ function AskQuestionScreen({
   }
 
   const sortedResponses: typeof SAMPLE_RESPONSES = [];
-    if (sort === "helpful") return (b.helpfulCount + (helpfulVotes.has(b.id) ? 1 : 0)) - (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0));
-    if (sort === "newest") return a.id - b.id;
-    return b.helpfulCount - a.helpfulCount;
-  });
 
   // ── SELECT ────────────────────────────────────────────────────────────────
   if (step === "select") {
