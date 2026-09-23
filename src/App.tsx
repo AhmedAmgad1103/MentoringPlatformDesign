@@ -3526,6 +3526,7 @@ function QuestionDetailScreen({
   const [reported, setReported] = useState(false);
   const [boosted, setBoosted] = useState(false);
   const [boostCount, setBoostCount] = useState(0);
+  const [boostInFlight, setBoostInFlight] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
   const [editingAnswerContent, setEditingAnswerContent] = useState("");
@@ -3645,12 +3646,14 @@ function QuestionDetailScreen({
   const relatedToShow = related.length >= 2 ? related : fallbackRelated;
 
   async function toggleBoost() {
+    if (boostInFlight) return;
     if (typeof question.id !== "string") {
       setBoosted((prev) => !prev);
       setBoostCount((prev) => prev + (boosted ? -1 : 1));
       return;
     }
 
+    setBoostInFlight(true);
     try {
       if (boosted) {
         const result = await unboostQuestion(question.id);
@@ -3666,6 +3669,8 @@ function QuestionDetailScreen({
         "error",
         error instanceof Error ? error.message : "Unable to update boost."
       );
+    } finally {
+      setBoostInFlight(false);
     }
   }
 
@@ -3875,7 +3880,7 @@ function QuestionDetailScreen({
                 <button
                   type="button"
                   onClick={() => void toggleBoost()}
-                  disabled={Boolean(liveQuestion?.isMine)}
+                  disabled={Boolean(liveQuestion?.isMine) || boostInFlight}
                   className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
                   style={{
                     backgroundColor: boosted ? C.primary : C.primaryLight,
