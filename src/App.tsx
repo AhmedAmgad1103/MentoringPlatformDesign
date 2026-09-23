@@ -4347,11 +4347,13 @@ function QuestionForm({
 function AskQuestionScreen({
   onBack,
   onNavigate,
+  onOpenQuestion,
   onToast,
   initialStep = "select",
 }: {
   onBack: () => void;
   onNavigate: (s: Screen) => void;
+  onOpenQuestion: (id: string | number) => void;
   onToast: (t: ToastType, msg: string) => void;
   initialStep?: AskStep;
 }) {
@@ -4364,6 +4366,7 @@ function AskQuestionScreen({
   const [attachment, setAttachment] = useState<File | null>(null);
   const [sort, setSort] = useState<"helpful" | "newest" | "relevant">("helpful");
   const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
+  const [submittedQuestionId, setSubmittedQuestionId] = useState<string | null>(null);
 
   function resetForm() {
     setTitle("");
@@ -4377,7 +4380,8 @@ function AskQuestionScreen({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      const created = await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      setSubmittedQuestionId(created.id);
       onToast("success", toastMsg);
       setStep(successStep);
     } catch (error) {
@@ -4628,7 +4632,13 @@ function AskQuestionScreen({
             <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
           </Card>
           <div className="flex flex-col gap-2">
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep("my-mentor")}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={!submittedQuestionId}
+              onClick={() => submittedQuestionId && onOpenQuestion(submittedQuestionId)}
+            >
               View Question
             </Button>
             <Button variant="secondary" size="lg" fullWidth onClick={onBack}>
@@ -9329,6 +9339,7 @@ export default function App() {
         <AskQuestionScreen
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
+          onOpenQuestion={openQuestion}
           onToast={addToast}
         />
       )}
@@ -9337,6 +9348,7 @@ export default function App() {
           initialStep="my-mentor"
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
+          onOpenQuestion={openQuestion}
           onToast={addToast}
         />
       )}
@@ -9345,6 +9357,7 @@ export default function App() {
           initialStep="any-mentor"
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
+          onOpenQuestion={openQuestion}
           onToast={addToast}
         />
       )}
@@ -9353,6 +9366,7 @@ export default function App() {
           initialStep="anonymous"
           onBack={() => setScreen("dashboard")}
           onNavigate={setScreen}
+          onOpenQuestion={openQuestion}
           onToast={addToast}
         />
       )}
