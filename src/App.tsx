@@ -3580,12 +3580,7 @@ function QuestionDetailScreen({
     };
   }, [questionId]);
 
-  const unread = ALL_NOTIFICATIONS.filter(
-    (n) => !n.read && !notifReadIds.includes(n.id)
-  ).length;
-
-  const fallbackQuestion =
-    FEED_QUESTIONS.find((q) => q.id === questionId) ?? FEED_QUESTIONS[0];
+  const unread = 0;
 
   const liveCategory =
     typeof liveQuestion?.category === "string"
@@ -3596,31 +3591,31 @@ function QuestionDetailScreen({
     ? liveQuestion.answers
     : [];
 
-  const question: FeedQuestion = liveQuestion
-    ? {
-        id: liveQuestion.id,
-        title: liveQuestion.title ?? "Untitled question",
-        preview: liveQuestion.content ?? "",
-        full: liveQuestion.content ?? "",
-        category: liveCategory,
-        date: liveQuestion.createdAt ? formatDateTime(liveQuestion.createdAt) : "",
-        responses:
-          typeof liveQuestion.answerCount === "number"
-            ? liveQuestion.answerCount
-            : liveAnswers.length,
-        helpful: 0,
-        boosted:
-          typeof liveQuestion.boostCount === "number"
-            ? liveQuestion.boostCount
-            : 0,
-        tags: [],
-        reportedByMe: Boolean(liveQuestion.reportedByMe),
-        isMine: Boolean(liveQuestion.isMine),
-        isAnonymous: Boolean(liveQuestion.isAnonymous),
-      }
-    : fallbackQuestion;
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: C.bg }}><p className="text-sm" style={{ color: C.textSec }}>Loading question…</p></div>;
+  }
 
-  const questionContent = liveQuestion?.content ?? question.full;
+  if (!liveQuestion) {
+    return <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6" style={{ backgroundColor: C.bg }}><p className="text-sm" style={{ color: C.textSec }}>{loadError || "Question not found."}</p><Button variant="secondary" onClick={onBack}>Go back</Button></div>;
+  }
+
+  const question: FeedQuestion = {
+    id: liveQuestion.id,
+    title: liveQuestion.title ?? "Untitled question",
+    preview: liveQuestion.content ?? "",
+    full: liveQuestion.content ?? "",
+    category: liveCategory,
+    date: liveQuestion.createdAt ? formatDateTime(liveQuestion.createdAt) : "",
+    responses: typeof liveQuestion.answerCount === "number" ? liveQuestion.answerCount : liveAnswers.length,
+    helpful: 0,
+    boosted: typeof liveQuestion.boostCount === "number" ? liveQuestion.boostCount : 0,
+    tags: [],
+    reportedByMe: Boolean(liveQuestion.reportedByMe),
+    isMine: Boolean(liveQuestion.isMine),
+    isAnonymous: Boolean(liveQuestion.isAnonymous),
+  };
+
+  const questionContent = liveQuestion.content ?? question.full;
   const isAnonymous = liveQuestion?.isAnonymous ?? question.isAnonymous ?? true;
   const canReport =
     Boolean(liveQuestion) &&
@@ -3658,13 +3653,7 @@ function QuestionDetailScreen({
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
-  const related = FEED_QUESTIONS
-    .filter((q) => q.id !== questionId && q.category === question.category)
-    .slice(0, 3);
-  const fallbackRelated = FEED_QUESTIONS
-    .filter((q) => q.id !== questionId)
-    .slice(0, 3);
-  const relatedToShow = related.length >= 2 ? related : fallbackRelated;
+  const relatedToShow: FeedQuestion[] = [];
 
   async function toggleBoost() {
     if (boostInFlight) return;
