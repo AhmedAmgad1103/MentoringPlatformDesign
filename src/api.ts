@@ -22,6 +22,7 @@ import {
   getQuestion as getQuestionApi,
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
+  getAvailableRoles as getAvailableRolesApi,
   sendMessage as sendMessageApi,
   unboostQuestion as unboostQuestionApi,
   updateAnswer as updateAnswerApi,
@@ -335,6 +336,10 @@ export async function rejectQuestion(questionId: string) {
   return rejectQuestionApi(questionId);
 }
 
+
+export async function getAvailableRoles(email: string): Promise<string[]> {
+  return getAvailableRolesApi(email);
+}
 
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
   return loginApi(email, role);
