@@ -6067,7 +6067,7 @@ function MentorDashboardScreen({
               </button>
               {notifOpen && (
                 <NotificationDropdown
-                  notifications={ALL_NOTIFICATIONS}
+                  notifications={[]}
                   readIds={notifReadIds}
                   onMarkRead={() => {}}
                   onMarkAllRead={() => {}}
@@ -8637,7 +8637,7 @@ function LeaderboardScreen({
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {LEADERBOARD_MENTORS.map((m, idx) => {
+          {([] as typeof LEADERBOARD_MENTORS).map((m, idx) => {
             const tier = getMentorTier(m.points);
             const rank = idx + 1;
             const isTop3 = rank <= 3;
