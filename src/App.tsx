@@ -3556,7 +3556,7 @@ function QuestionDetailScreen({
         setLiveQuestion(item);
         setReported(Boolean(item.reportedByMe));
         setBoosted(Boolean(item.boostedByMe));
-        setBoostCount(item.boostCount);
+        setBoostCount(typeof item.boostCount === "number" ? item.boostCount : 0);
       })
       .catch((error) => {
         if (!active) return;
@@ -3581,21 +3581,36 @@ function QuestionDetailScreen({
   const fallbackQuestion =
     FEED_QUESTIONS.find((q) => q.id === questionId) ?? FEED_QUESTIONS[0];
 
+  const liveCategory =
+    typeof liveQuestion?.category === "string"
+      ? liveQuestion.category.replace(/_/g, " ")
+      : "Other";
+
+  const liveAnswers = Array.isArray(liveQuestion?.answers)
+    ? liveQuestion.answers
+    : [];
+
   const question: FeedQuestion = liveQuestion
     ? {
         id: liveQuestion.id,
-        title: liveQuestion.title,
-        preview: liveQuestion.content,
-        full: liveQuestion.content,
-        category: liveQuestion.category.replaceAll("_", " "),
-        date: formatDateTime(liveQuestion.createdAt),
-        responses: liveQuestion.answerCount,
+        title: liveQuestion.title ?? "Untitled question",
+        preview: liveQuestion.content ?? "",
+        full: liveQuestion.content ?? "",
+        category: liveCategory,
+        date: liveQuestion.createdAt ? formatDateTime(liveQuestion.createdAt) : "",
+        responses:
+          typeof liveQuestion.answerCount === "number"
+            ? liveQuestion.answerCount
+            : liveAnswers.length,
         helpful: 0,
-        boosted: liveQuestion.boostCount,
+        boosted:
+          typeof liveQuestion.boostCount === "number"
+            ? liveQuestion.boostCount
+            : 0,
         tags: [],
-        reportedByMe: liveQuestion.reportedByMe,
-        isMine: liveQuestion.isMine,
-        isAnonymous: liveQuestion.isAnonymous,
+        reportedByMe: Boolean(liveQuestion.reportedByMe),
+        isMine: Boolean(liveQuestion.isMine),
+        isAnonymous: Boolean(liveQuestion.isAnonymous),
       }
     : fallbackQuestion;
 
@@ -3610,7 +3625,7 @@ function QuestionDetailScreen({
     typeof liveQuestion?.id === "string";
 
   const responses = liveQuestion
-    ? (Array.isArray(liveQuestion.answers) ? liveQuestion.answers : []).map((a) => ({
+    ? liveAnswers.map((a) => ({
         id: a.id,
         mentor: {
           name: a.mentor?.name ?? "Mentor",
