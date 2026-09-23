@@ -3141,7 +3141,7 @@ function FeedQuestionCard({
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
               </svg>
-              {question.boosted + (isBoosted ? 1 : 0)}
+              {question.boosted}
             </button>
 
             {!question.isMine && typeof question.id === "string" && (
@@ -3308,7 +3308,7 @@ function FeedScreen({
     if (sort === "helpful") return b.helpful - a.helpful;
     if (sort === "answered") return b.responses - a.responses;
     if (sort === "boosted")
-      return (b.boosted + (boostedIds.has(b.id) ? 1 : 0)) - (a.boosted + (boostedIds.has(a.id) ? 1 : 0));
+      return b.boosted - a.boosted;
     if (b.createdAtMs !== undefined && a.createdAtMs !== undefined)
       return b.createdAtMs - a.createdAtMs;
     if (typeof b.id === "number" && typeof a.id === "number")
@@ -3890,7 +3890,7 @@ function QuestionDetailScreen({
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                     <path d="M5 1.5L8.5 6.5H1.5L5 1.5Z" fill="currentColor" />
                   </svg>
-                  {boostCount || question.boosted}
+                  {boostCount}
                 </button>
 
                 {canReport && (
