@@ -1308,7 +1308,7 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 // ─── SCREEN: LOGIN ────────────────────────────────────────────────────────────
 
-function LoginScreen({ onNext, onDemoLogin }: { onNext: (email: string) => void; onDemoLogin: (role: Exclude<Role, null>) => void }) {
+function LoginScreen({ onNext }: { onNext: (email: string) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -1511,49 +1511,7 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: (email: string) => void;
               Continue with School Email (SSO)
             </Button>
 
-            <div
-              className="rounded-2xl p-4 mt-2"
-              style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}
-            >
-              <div className="flex items-center justify-between gap-3 mb-1">
-                <p className="text-sm font-semibold" style={{ color: C.text }}>Demo / Placeholder Accounts</p>
-                <span
-                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
-                  style={{ backgroundColor: "#fff", color: C.primary }}
-                >
-                  Frontend only
-                </span>
-              </div>
-              <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
-                These buttons skip verification and onboarding so you can test each dashboard with placeholder data.
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onDemoLogin("mentee")}
-                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ backgroundColor: "#fff", color: C.primary, border: `1px solid ${C.border}` }}
-                >
-                  Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDemoLogin("mentor")}
-                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ backgroundColor: "#fff", color: C.success, border: `1px solid ${C.border}` }}
-                >
-                  Mentor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDemoLogin("admin")}
-                  className="rounded-xl px-2 py-2.5 text-xs font-semibold transition-all hover:opacity-80"
-                  style={{ backgroundColor: "#fff", color: "#92400E", border: `1px solid ${C.border}` }}
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
+
 
             <p className="text-center text-sm" style={{ color: C.textSec }}>
               Don't have an account?{" "}
