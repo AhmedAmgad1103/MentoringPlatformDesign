@@ -2671,7 +2671,7 @@ function DashboardScreen({
                 ].map((m) => (
                   <Card key={m.name} className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedSuggestedMentor(m)}>
                     <div className="relative flex-shrink-0">
-                      <img src={m.photo} alt={m.name} className="w-10 h-10 rounded-full object-cover" />
+                      <Avatar name={m.name} size={40} />
                       <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={m.available} /></span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -4566,11 +4566,7 @@ function AskQuestionScreen({
           {/* Mentor preview */}
           <Card className="p-4 mb-6 flex items-center gap-3">
             <div className="relative">
-              <img
-                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=80&h=80&fit=crop"
-                alt="Dr. Khaled"
-                className="w-12 h-12 rounded-full object-cover"
-              />
+              <Avatar name={currentUser?.assignedMentor?.name || "Assigned mentor"} size={48} />
               <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available /></span>
             </div>
             <div className="flex-1">
