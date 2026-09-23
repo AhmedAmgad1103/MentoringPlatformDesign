@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import
+
+        <button type="button" onClick={onSignup} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.primary, backgroundColor: "#fff" }}>Sign up as a mentor</button> { useState, useRef, useEffect } from "react";
 import {
   boostQuestion,
   createAnswer,
@@ -15,6 +17,7 @@ import {
   getQuestions,
   getMe,
   getAvailableRoles,
+  mentorSignup,
   getAdminQuestions,
   login,
   logout,
@@ -1528,6 +1531,24 @@ function LoginScreen({ onNext }: { onNext: (email: string) => void }) {
 
 // ─── SCREEN: EMAIL VERIFICATION ───────────────────────────────────────────────
 
+function MentorSignupScreen({ onBack, onSubmitted }: { onBack: () => void; onSubmitted: (email: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  async function submit() {
+    setError("");
+    if (!email.endsWith(".edu")) { setError("Please use your official medical school email address."); return; }
+    try {
+      await mentorSignup(email);
+      setSubmitted(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to submit mentor signup.");
+    }
+  }
+  if (submitted) return <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}><Card className="p-8 w-full max-w-md text-center"><h1 className="text-xl font-bold mb-2" style={{ color: C.text }}>Mentor signup submitted</h1><p className="text-sm mb-6" style={{ color: C.textSec }}>Your mentor account is pending admin approval. You can sign in as a mentor after it is approved.</p><Button variant="primary" fullWidth onClick={() => onSubmitted(email.trim())}>Continue</Button></Card></div>;
+  return <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}><Card className="p-8 w-full max-w-md"><button onClick={onBack} className="text-sm mb-6" style={{ color: C.primary }}>← Back</button><h1 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Mentor sign up</h1><p className="text-sm mb-6" style={{ color: C.textSec }}>Create a mentor account. It will remain pending until an admin approves it.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@medicalschool.edu" className="w-full px-3 py-2.5 rounded-xl text-sm mb-2 outline-none" style={{ border: `1px solid ${C.border}` }}/>{error && <p className="text-xs mb-3" style={{ color: C.error }}>{error}</p>}<Button variant="primary" fullWidth onClick={() => void submit()}>Submit mentor application</Button></Card></div>;
+}
+ 
 function VerifyScreen({ onNext }: { onNext: () => void }) {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [resent, setResent] = useState(false);
@@ -8651,6 +8672,7 @@ export default function App() {
   const [role, setRole] = useState<Role>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [mentorPending, setMentorPending] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
@@ -8733,12 +8755,14 @@ export default function App() {
             try {
               const roles = await getAvailableRoles(email);
               setAuthEmail(email);
-              setAvailableRoles(roles.length ? roles : ["STUDENT", "MENTOR"]);
+              setAvailableRoles(roles.roles.length ? roles.roles : ["STUDENT", "MENTOR"]);
+              setMentorPending(roles.mentorPending);
               setScreen("verify");
             } catch (error) {
               addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
             }
           }}
+          onSignup={() => setScreen("mentor-signup")}
           onDemoLogin={async (demoRole) => {
             try {
               // The admin demo must create a real NextAuth session so protected
@@ -8768,6 +8792,7 @@ export default function App() {
           }}
         />
       )}
+      {screen === "mentor-signup" && <MentorSignupScreen onBack={() => setScreen("login")} onSubmitted={(email) => { setAuthEmail(email); setScreen("login"); }} />}
       {screen === "verify" && (
         <VerifyScreen
           onNext={() => {
