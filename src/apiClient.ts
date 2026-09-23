@@ -292,6 +292,13 @@ export async function getAdminUsers(
   }>(`/api/admin/users${query ? `?${query}` : ""}`)
 }
 
+export async function updateMentorApproval(id: string, status: "APPROVED" | "REJECTED") {
+  return request<{ id: string; email: string; mentorStatus: string }>("/api/auth/mentor-signup", {
+    method: "PATCH",
+    body: JSON.stringify({ id, status }),
+  })
+}
+
 export async function assignMentor(studentId: string, mentorId: string) {
   return request<{ item: ApiUser }>(
     `/api/admin/students/${encodeURIComponent(studentId)}/mentor`,
