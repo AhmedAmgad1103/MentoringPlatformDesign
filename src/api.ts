@@ -23,6 +23,7 @@ import {
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
   getAvailableRoles as getAvailableRolesApi,
+  mentorSignup as mentorSignupApi,
   sendMessage as sendMessageApi,
   unboostQuestion as unboostQuestionApi,
   updateAnswer as updateAnswerApi,
@@ -337,7 +338,11 @@ export async function rejectQuestion(questionId: string) {
 }
 
 
-export async function getAvailableRoles(email: string): Promise<string[]> {
+export async function mentorSignup(email: string) {
+  return mentorSignupApi(email);
+}
+
+export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
   return getAvailableRolesApi(email);
 }
 
