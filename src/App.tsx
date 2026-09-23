@@ -1338,10 +1338,11 @@ function LoginScreen({ onNext, onDemoLogin }: { onNext: (email: string) => void;
     if (err || !email || !password) return;
 
     try {
-      await login(email, "mentee");
+      // Authentication happens after role selection so a new mentor/admin account
+      // is not accidentally created as a student.
       onNext(email.trim());
     } catch (error) {
-      setEmailError(error instanceof Error ? error.message : "Unable to sign in. Please try again.");
+      setEmailError(error instanceof Error ? error.message : "Unable to continue. Please try again.");
     }
   }
 
@@ -9243,11 +9244,16 @@ export default function App() {
     if (!r || !authEmail) return;
     try {
       await login(authEmail, r);
-      setRole(r);
+      const me = await getMe();
+      const actualRole: Role =
+        me.role === "STUDENT" ? "mentee" :
+        me.role === "MENTOR" ? "mentor" :
+        "admin";
+      setRole(actualRole);
       setScreen(
-        r === "mentee"
+        actualRole === "mentee"
           ? "dashboard"
-          : r === "mentor"
+          : actualRole === "mentor"
             ? "mentor-dashboard"
             : "admin-dashboard",
       );
