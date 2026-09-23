@@ -2155,6 +2155,7 @@ function DashboardScreen({
   const [backendQuestionCount, setBackendQuestionCount] = useState<number | null>(null);
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
+  const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -2163,6 +2164,10 @@ function DashboardScreen({
   const markAllRead = onMarkAllRead ?? (() => {});
   const unreadCount = 0;
   const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
+
+  useEffect(() => {
+    getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -2210,7 +2215,7 @@ function DashboardScreen({
       sub: "Ask your assigned mentor a private question",
       color: C.primaryLight,
       border: "#C7D2FE",
-      badge: "Dr. Khaled",
+      badge: currentUser?.assignedMentor?.name || "Not assigned",
     },
     {
       icon: (
@@ -2224,7 +2229,7 @@ function DashboardScreen({
       sub: "Get perspectives from mentors across the school",
       color: C.successLight,
       border: "#A7F3D0",
-      badge: "2,400+ mentors",
+      badge: "Available mentors",
     },
     {
       icon: (
@@ -2238,7 +2243,7 @@ function DashboardScreen({
       sub: "Ask without revealing your identity",
       color: C.pendingLight,
       border: "#FDE68A",
-      badge: "100% private",
+      badge: "Identity protected",
     },
     {
       icon: (
@@ -2251,7 +2256,7 @@ function DashboardScreen({
       sub: "Learn from questions other students have asked",
       color: "#EDE9FE",
       border: "#C4B5FD",
-      badge: "847 questions",
+      badge: "Live database",
     },
   ];
 
@@ -2315,8 +2320,7 @@ function DashboardScreen({
             </div>
             <button onClick={() => onNavigate("mentee-profile")} className="rounded-full hover:opacity-80 transition-opacity">
               <Avatar
-                src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop"
-                name="Alex Johnson"
+                name={currentUser?.name || currentUser?.email?.split("@")[0] || "User"}
                 size={36}
               />
             </button>
@@ -2328,7 +2332,7 @@ function DashboardScreen({
         {/* Greeting */}
         <div className="mb-6 sm:mb-8 fade-in">
           <h1 className="text-xl sm:text-2xl font-bold mb-1" style={{ color: C.text }}>
-            Good morning, Alex 👋
+            Good morning, {currentUser?.name || currentUser?.email?.split("@")[0] || "there"} 👋
           </h1>
           <p style={{ color: C.textSec }} className="text-sm">
             How can we help you today?
@@ -4367,6 +4371,11 @@ function AskQuestionScreen({
   const [sort, setSort] = useState<"helpful" | "newest" | "relevant">("helpful");
   const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
   const [submittedQuestionId, setSubmittedQuestionId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+
+  useEffect(() => {
+    getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
+  }, []);
 
   function resetForm() {
     setTitle("");
@@ -4454,7 +4463,7 @@ function AskQuestionScreen({
                   <div className="flex items-center gap-2">
                     <img
                       src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-                      alt="Dr. Khaled"
+                      alt={currentUser?.assignedMentor?.name || "Assigned mentor"}
                       className="w-7 h-7 rounded-full object-cover"
                     />
                     <span className="text-xs font-medium" style={{ color: C.text }}>Dr. Mariam Khaled · Internal Medicine</span>
@@ -4551,7 +4560,7 @@ function AskQuestionScreen({
         <AskPageHeader
           onBack={onBack}
           title="Ask My Mentor"
-          subtitle="Private question to Dr. Mariam Khaled"
+          subtitle={`Private question to ${currentUser?.assignedMentor?.name || "your assigned mentor"}`}
         />
         <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
           {/* Mentor preview */}
@@ -4565,8 +4574,8 @@ function AskQuestionScreen({
               <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available /></span>
             </div>
             <div className="flex-1">
-              <div className="font-semibold text-sm" style={{ color: C.text }}>Dr. Mariam Khaled</div>
-              <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · Available now</div>
+              <div className="font-semibold text-sm" style={{ color: C.text }}>{currentUser?.assignedMentor?.name || "Assigned mentor"}</div>
+              <div className="text-xs" style={{ color: C.textSec }}>Assigned mentor</div>
             </div>
             <PrivacyBadge type="private" />
           </Card>
@@ -4594,12 +4603,12 @@ function AskQuestionScreen({
                   <circle cx="9" cy="11.5" r="1" fill={C.textSec} />
                 </svg>
                 <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
-                  <strong style={{ color: C.text }}>Privacy notice:</strong> Only you and your assigned mentor, Dr. Mariam Khaled, will be able to see this question and any responses. It will never appear in the public feed.
+                  <strong style={{ color: C.text }}>Privacy notice:</strong> Only you and your assigned mentor will be able to see this question and any responses. It will never appear in the public feed.
                 </p>
               </div>
             }
-            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to Dr. Khaled!", "private")}
-            submitLabel="Send to Dr. Khaled"
+            onSubmit={() => handleSubmit("success-my-mentor", "Question sent to your mentor!", "private")}
+            submitLabel="Send to your mentor"
           />
         </div>
       </div>
@@ -4621,7 +4630,7 @@ function AskQuestionScreen({
           </div>
           <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>Your question has been sent.</h2>
           <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>
-            Dr. Mariam Khaled will receive a notification and typically responds within 24–48 hours. You'll be notified by email when she replies.
+            Your assigned mentor will receive a notification and typically responds within 24–48 hours. You'll be notified by email when she replies.
           </p>
           <Card className="p-5 mb-6 text-left">
             <div className="flex items-center gap-2 mb-2">
@@ -5946,12 +5955,17 @@ function MentorDashboardScreen({
     liveMentorQuestions?.filter((q) => q.type === "anon-public" || q.type === "anon-private") ?? [];
 
   const displayMentees = liveMentees
-    ? liveMentees.map((m, index) => ({
-        ...MENTOR_MENTEES_DATA[index % MENTOR_MENTEES_DATA.length],
+    ? liveMentees.map((m) => ({
         id: m.id,
         name: m.name ?? "Mentee",
         email: m.email,
         totalQuestions: m.questionCount,
+        year: "",
+        track: "",
+        photo: undefined,
+        active: false,
+        lastActivity: "",
+        lastQuestion: "",
       }))
     : [];
 
