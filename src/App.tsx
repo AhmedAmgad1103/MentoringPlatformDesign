@@ -18,6 +18,7 @@ import {
   getMe,
   getAvailableRoles,
   mentorSignup,
+  updateMentorApproval,
   getAdminQuestions,
   login,
   logout,
@@ -7434,6 +7435,19 @@ function AdminUsersView({
       </div>
 
       <div className="mb-4">
+        {isMentorsSection && users.some((u) => u.mentorStatus === "PENDING") && (
+          <div className="mb-4 rounded-2xl p-4" style={{ backgroundColor: C.pendingLight, border: `1px solid ${C.pending}30` }}>
+            <div className="text-sm font-bold mb-2" style={{ color: C.text }}>Pending mentor applications</div>
+            {users.filter((u) => u.mentorStatus === "PENDING").map((user) => (
+              <div key={user.id} className="flex items-center gap-3 py-2">
+                <Avatar name={user.name ?? user.email} size={32} />
+                <div className="flex-1 min-w-0"><div className="text-xs font-semibold">{user.name ?? "Unnamed user"}</div><div className="text-xs" style={{ color: C.textSec }}>{user.email}</div></div>
+                <button className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ backgroundColor: C.success, color: "#fff" }} onClick={async () => { try { await updateMentorApproval(user.id, "APPROVED"); setUsers(prev => prev.filter(u => u.id !== user.id)); onToast("success", "Mentor approved."); } catch(e) { onToast("error", e instanceof Error ? e.message : "Unable to approve mentor."); } }}>Approve</button>
+                <button className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ backgroundColor: C.error, color: "#fff" }} onClick={async () => { try { await updateMentorApproval(user.id, "REJECTED"); setUsers(prev => prev.filter(u => u.id !== user.id)); onToast("success", "Mentor application rejected."); } catch(e) { onToast("error", e instanceof Error ? e.message : "Unable to reject mentor."); } }}>Reject</button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="relative max-w-xl">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.textSec }}>
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
