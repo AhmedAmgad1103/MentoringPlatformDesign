@@ -2161,7 +2161,7 @@ function DashboardScreen({
   const readIds = notifReadIds ?? [];
   const markRead = onMarkRead ?? (() => {});
   const markAllRead = onMarkAllRead ?? (() => {});
-  const unreadCount = ALL_NOTIFICATIONS.filter((n) => !n.read && !readIds.includes(n.id)).length;
+  const unreadCount = 0;
   const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
 
   useEffect(() => {
@@ -2298,7 +2298,7 @@ function DashboardScreen({
               </button>
               {notifDropdownOpen && (
                 <NotificationDropdown
-                  notifications={ALL_NOTIFICATIONS}
+                  notifications={[]}
                   readIds={readIds}
                   onMarkRead={markRead}
                   onMarkAllRead={markAllRead}
@@ -3296,7 +3296,7 @@ function FeedScreen({
     "Other",
   ];
 
-  const sourceQuestions = liveQuestions ?? FEED_QUESTIONS;
+  const sourceQuestions = liveQuestions ?? [];
 
   const filtered = sourceQuestions.filter((q) => {
     const matchSearch =
@@ -3374,7 +3374,7 @@ function FeedScreen({
                 Questions from Students
               </h1>
               <p className="text-sm" style={{ color: C.textSec }}>
-                {FEED_QUESTIONS.length} approved anonymous questions — browse, learn, and find answers
+                {liveQuestions?.length ?? 0} approved anonymous questions — browse, learn, and find answers
               </p>
             </div>
             <div className="hidden sm:flex items-center gap-1.5">
@@ -4400,7 +4400,7 @@ function AskQuestionScreen({
     });
   }
 
-  const sortedResponses = [...SAMPLE_RESPONSES].sort((a, b) => {
+  const sortedResponses: typeof SAMPLE_RESPONSES = [];
     if (sort === "helpful") return (b.helpfulCount + (helpfulVotes.has(b.id) ? 1 : 0)) - (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0));
     if (sort === "newest") return a.id - b.id;
     return b.helpfulCount - a.helpfulCount;
@@ -5929,12 +5929,11 @@ function MentorDashboardScreen({
   }
 
   const waitingQuestions =
-    liveMentorQuestions?.filter((q) => q.type === "private") ?? MENTOR_WAITING_QUESTIONS;
+    liveMentorQuestions?.filter((q) => q.type === "private") ?? [];
   const anyQuestions =
-    liveMentorQuestions?.filter((q) => q.type === "any-mentor") ?? MENTOR_ANY_QUESTIONS;
+    liveMentorQuestions?.filter((q) => q.type === "any-mentor") ?? [];
   const anonQuestions =
-    liveMentorQuestions?.filter((q) => q.type === "anon-public" || q.type === "anon-private") ??
-    MENTOR_ANON_QUESTIONS;
+    liveMentorQuestions?.filter((q) => q.type === "anon-public" || q.type === "anon-private") ?? [];
 
   const displayMentees = liveMentees
     ? liveMentees.map((m, index) => ({
@@ -5944,7 +5943,7 @@ function MentorDashboardScreen({
         email: m.email,
         totalQuestions: m.questionCount,
       }))
-    : MENTOR_MENTEES_DATA;
+    : [];
 
   const totalWaiting =
     waitingQuestions.length +
