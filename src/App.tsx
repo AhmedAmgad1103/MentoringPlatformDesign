@@ -14,6 +14,7 @@ import {
   getQuestionDetails,
   getQuestions,
   getMe,
+  getAvailableRoles,
   getAdminQuestions,
   login,
   logout,
@@ -1681,9 +1682,10 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
 
 // ─── SCREEN: ONBOARDING — ROLE ────────────────────────────────────────────────
 
-function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) {
+function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"] }: { onSelect: (role: Role) => void; availableRoles?: string[] }) {
   const [selected, setSelected] = useState<Role>(null);
 
+  const allowed = new Set(availableRoles);
   const roles: { role: Role; icon: React.ReactNode; title: string; sub: string; label: string }[] = [
     {
       role: "mentee",
@@ -1741,7 +1743,7 @@ function OnboardingRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {roles.map(({ role, icon, title, sub, label }) => (
+          {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title, sub, label }) => (
             <div
               key={role}
               className="role-card border-2 rounded-2xl p-6 flex flex-col gap-4"
@@ -7163,6 +7165,7 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
     category: string;
     createdAt: string;
   }>>([]);
+  const [liveRecentUsers, setLiveRecentUsers] = useState<Array<{ id: string; name: string | null; email: string; role: string }>>([]);
   const [liveReports, setLiveReports] = useState<Array<{
     id: string;
     questionText: string;
@@ -7175,15 +7178,17 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
 
     const load = async () => {
       try {
-        const [stats, moderation, reports] = await Promise.all([
+        const [stats, moderation, reports, recentUsers] = await Promise.all([
           getAdminStats(),
           getModerationQueue({ limit: 50 }),
           getAdminReports({ status: "PENDING", limit: 5 }),
+          getAdminUsers({ page: 1, limit: 5 }),
         ]);
 
         if (!active) return;
 
         setLiveStats(stats);
+        setLiveRecentUsers(recentUsers.items);
         setLivePending(moderation.items.map((item) => ({
           id: item.id,
           content: item.content,
@@ -7342,33 +7347,20 @@ function AdminDashboardView({ onNavigate }: { onNavigate: (s: Screen) => void })
           </button>
         </div>
         <div className="flex flex-col gap-1">
-          {ADMIN_USERS.slice(0, 5).map(u => (
-            <div key={u.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:opacity-80 transition-opacity" style={{ backgroundColor: C.bg }}>
-              <Avatar name={u.name} src={u.photo} size={32} />
+          {liveRecentUsers.length > 0 ? liveRecentUsers.map((u) => (
+            <div key={u.id} className="flex items-center gap-3 px-3 py-2 rounded-xl" style={{ backgroundColor: C.bg }}>
+              <Avatar name={u.name ?? u.email} size={32} />
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold" style={{ color: C.text }}>{u.name}</div>
+                <div className="text-xs font-semibold" style={{ color: C.text }}>{u.name ?? "Unnamed user"}</div>
                 <div className="text-xs" style={{ color: C.textSec }}>{u.email}</div>
               </div>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-                style={{
-                  backgroundColor: u.role === "mentor" ? C.successLight : u.role === "pending-mentor" ? C.pendingLight : C.primaryLight,
-                  color: u.role === "mentor" ? C.success : u.role === "pending-mentor" ? C.pending : C.primary,
-                }}
-              >
-                {u.role === "pending-mentor" ? "Pending Mentor" : u.role}
-              </span>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{
-                  backgroundColor: u.status === "active" ? C.successLight : u.status === "suspended" ? C.errorLight : C.pendingLight,
-                  color: u.status === "active" ? C.success : u.status === "suspended" ? C.error : C.pending,
-                }}
-              >
-                {u.status}
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: u.role === "MENTOR" ? C.successLight : C.primaryLight, color: u.role === "MENTOR" ? C.success : C.primary }}>
+                {u.role === "MENTOR" ? "Mentor" : u.role === "STUDENT" ? "Student" : "Admin"}
               </span>
             </div>
-          ))}
+          )) : (
+            <div className="text-sm py-6 text-center" style={{ color: C.textSec }}>No users yet.</div>
+          )}
         </div>
       </div>
     </div>
@@ -8700,6 +8692,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("login");
   const [role, setRole] = useState<Role>(null);
   const [authEmail, setAuthEmail] = useState("");
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
@@ -8746,6 +8739,16 @@ export default function App() {
     }
   }
 
+  async function continueAfterVerification() {
+    const roles = availableRoles;
+    if (roles.length === 1) {
+      const only = roles[0];
+      await handleRoleSelect(only === "STUDENT" ? "mentee" : only === "MENTOR" ? "mentor" : "admin");
+      return;
+    }
+    setScreen("onboarding-role");
+  }
+
   function openQuestion(id: string | number) {
     setSelectedQuestionId(id);
     setScreen("question-detail");
@@ -8768,9 +8771,15 @@ export default function App() {
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
       {screen === "login" && (
         <LoginScreen
-          onNext={(email) => {
-            setAuthEmail(email);
-            setScreen("verify");
+          onNext={async (email) => {
+            try {
+              const roles = await getAvailableRoles(email);
+              setAuthEmail(email);
+              setAvailableRoles(roles.length ? roles : ["STUDENT", "MENTOR"]);
+              setScreen("verify");
+            } catch (error) {
+              addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
+            }
           }}
           onDemoLogin={async (demoRole) => {
             try {
@@ -8805,12 +8814,12 @@ export default function App() {
         <VerifyScreen
           onNext={() => {
             addToast("success", "Email verified successfully!");
-            setScreen("onboarding-role");
+            void continueAfterVerification();
           }}
         />
       )}
       {screen === "onboarding-role" && (
-        <OnboardingRoleScreen onSelect={handleRoleSelect} />
+        <OnboardingRoleScreen onSelect={handleRoleSelect} availableRoles={availableRoles} />
       )}
       {screen === "onboarding-mentee" && (
         <OnboardingMenteeScreen
