@@ -1857,8 +1857,6 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
   );
 }
 
-}
-
 // ─── SCREEN: ONBOARDING — MENTEE ─────────────────────────────────────────────
 
 function OnboardingMenteeScreen({ onNext }: { onNext: () => void }) {
