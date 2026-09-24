@@ -8785,6 +8785,44 @@ export default function App() {
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
   let toastId = 0;
 
+  // Restore an existing Auth.js session after a browser redirect/reload.
+  // This is also what places a user back on the correct dashboard after
+  // the native credentials form completes authentication.
+  useEffect(() => {
+    let active = true;
+
+    getMe()
+      .then((me) => {
+        if (!active) return;
+        const restoredRole: Role =
+          me.role === "STUDENT"
+            ? "mentee"
+            : me.role === "MENTOR"
+              ? "mentor"
+              : me.role === "ADMIN"
+                ? "admin"
+                : null;
+
+        if (!restoredRole) return;
+        setAuthEmail(me.email);
+        setRole(restoredRole);
+        setScreen(
+          restoredRole === "mentee"
+            ? "dashboard"
+            : restoredRole === "mentor"
+              ? "mentor-dashboard"
+              : "admin-dashboard",
+        );
+      })
+      .catch(() => {
+        // No active session is normal on the login screen.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function handleLogout() {
     try {
       await logout();
