@@ -2125,6 +2125,9 @@ function DashboardScreen({
   const markRead = onMarkRead ?? (() => {});
   const markAllRead = onMarkAllRead ?? (() => {});
   const unreadCount = 0;
+  // The mentee dashboard can show the assigned mentor tier without depending on mentor-dashboard state.
+  // Keep the value local until mentor profile points are exposed by the backend.
+  const rewardPoints = 0;
   const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
 
   useEffect(() => {
@@ -2560,7 +2563,7 @@ function DashboardScreen({
                       <Badge variant={MENTOR.available ? "success" : "pending"}>
                         {MENTOR.available ? "Available" : "Busy"}
                       </Badge>
-                      <MentorTierBadge points={0} />
+                      <MentorTierBadge points={rewardPoints} />
                     </div>
                   </div>
                 </div>
