@@ -61,6 +61,8 @@ export type ApiAnswer = {
   createdAt: string
   updatedAt: string
   mentor: { id: string; name: string | null }
+  helpfulCount: number
+  helpfulByMe: boolean
 }
 
 
@@ -235,6 +237,38 @@ export async function getMentors() {
       isMyMentor: boolean
     }>
   >("/api/mentors")
+}
+
+export type MentorLeaderboardEntry = {
+  id: string
+  name: string | null
+  email: string
+  points: number
+  rank: number
+}
+
+export type MentorLeaderboardResponse = {
+  month: string
+  items: MentorLeaderboardEntry[]
+  me: MentorLeaderboardEntry | null
+}
+
+export async function getMentorLeaderboard() {
+  return request<MentorLeaderboardResponse>("/api/mentors/leaderboard")
+}
+
+export async function markAnswerHelpful(questionId: string, answerId: string) {
+  return request<{ helpful: true; helpfulCount: number }>(
+    `/api/questions/${encodeURIComponent(questionId)}/answers/${encodeURIComponent(answerId)}/helpful`,
+    { method: "POST" }
+  )
+}
+
+export async function unmarkAnswerHelpful(questionId: string, answerId: string) {
+  return request<{ helpful: false; helpfulCount: number }>(
+    `/api/questions/${encodeURIComponent(questionId)}/answers/${encodeURIComponent(answerId)}/helpful`,
+    { method: "DELETE" }
+  )
 }
 
 export async function getAdminMentors() {

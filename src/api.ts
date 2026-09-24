@@ -6,6 +6,9 @@ import {
   getAnswers as getAnswersApi,
   getMentorProfile,
   getMentors as getMentorsApi,
+  getMentorLeaderboard as getMentorLeaderboardApi,
+  markAnswerHelpful as markAnswerHelpfulApi,
+  unmarkAnswerHelpful as unmarkAnswerHelpfulApi,
   getAdminUsers as getAdminUsersApi,
   getAdminStats as getAdminStatsApi,
   getAdminMentors as getAdminMentorsApi,
@@ -283,6 +286,18 @@ export async function getMessages(withUserId: string, before?: string) {
 
 export async function getMentors() {
   return getMentorsApi();
+}
+
+export async function getMentorLeaderboard() {
+  return getMentorLeaderboardApi();
+}
+
+export async function markAnswerHelpful(questionId: string, answerId: string) {
+  return markAnswerHelpfulApi(questionId, answerId);
+}
+
+export async function unmarkAnswerHelpful(questionId: string, answerId: string) {
+  return unmarkAnswerHelpfulApi(questionId, answerId);
 }
 
 export async function getAdminUsers(

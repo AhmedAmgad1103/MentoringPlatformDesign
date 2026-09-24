@@ -29,6 +29,9 @@ import {
   getAdminUsers,
   getAdminMentors,
   getAdminStats,
+  getMentorLeaderboard,
+  markAnswerHelpful,
+  unmarkAnswerHelpful,
   assignMentor,
   unassignMentor,
 } from "./api";
@@ -710,7 +713,6 @@ const MENTOR = {
   years: 12,
   hospital: "University Medical Center",
   bio: "Board-certified internist with 12 years of clinical and teaching experience. Passionate about helping students navigate boards and residency applications.",
-  points: 285,
 };
 
 // ─── MENTOR REWARD SYSTEM ────────────────────────────────────────────────────
@@ -748,40 +750,6 @@ function MentorTierBadge({ points, size = "sm" }: { points: number; size?: "sm" 
     </span>
   );
 }
-
-const LEADERBOARD_MENTORS = [
-  { id: 1, name: "Dr. Mariam Khaled", specialty: "Internal Medicine", photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=120&h=120&fit=crop&auto=format", points: 285 },
-  { id: 2, name: "Dr. Amara Osei", specialty: "Family Medicine", photo: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=120&h=120&fit=crop&auto=format", points: 340 },
-  { id: 3, name: "Dr. Priya Patel", specialty: "Neurology", photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=120&h=120&fit=crop&auto=format", points: 198 },
-  { id: 4, name: "Dr. Samuel Chen", specialty: "Surgery", photo: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=120&h=120&fit=crop&auto=format", points: 132 },
-  { id: 5, name: "Dr. Layla Ahmed", specialty: "Pediatrics", photo: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=120&h=120&fit=crop&auto=format", points: 61 },
-  { id: 6, name: "Dr. Omar Hassan", specialty: "Entrepreneurship", photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=120&h=120&fit=crop&auto=format", points: 24 },
-].sort((a, b) => b.points - a.points);
-
-const REWARD_MONTH_KEY = "medmentor_reward_month";
-const CURRENT_REWARD_MONTH = (() => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-})();
-
-const REWARD_RESET_THIS_MONTH = (() => {
-  if (typeof window === "undefined") return false;
-  const stored = window.localStorage.getItem(REWARD_MONTH_KEY);
-
-  if (stored === null) {
-    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
-    return false;
-  }
-
-  if (stored !== CURRENT_REWARD_MONTH) {
-    window.localStorage.setItem(REWARD_MONTH_KEY, CURRENT_REWARD_MONTH);
-    return true;
-  }
-
-  return false;
-})();
-
-const CURRENT_MENTOR_POINTS = REWARD_RESET_THIS_MONTH ? 0 : MENTOR.points;
 
 const QUESTIONS = [
   {
@@ -2589,7 +2557,7 @@ function DashboardScreen({
                       <Badge variant={MENTOR.available ? "success" : "pending"}>
                         {MENTOR.available ? "Available" : "Busy"}
                       </Badge>
-                      <MentorTierBadge points={MENTOR.points} />
+                      <MentorTierBadge points={rewardPoints} />
                     </div>
                   </div>
                 </div>
@@ -3550,6 +3518,7 @@ function QuestionDetailScreen({
       .then((item) => {
         if (!active) return;
         setLiveQuestion(item);
+        setHelpfulVotes(new Set(Array.isArray(item.answers) ? item.answers.filter((answer) => answer.helpfulByMe).map((answer) => answer.id) : []));
         setReported(Boolean(item.reportedByMe));
         setBoosted(Boolean(item.boostedByMe));
         setBoostCount(typeof item.boostCount === "number" ? item.boostCount : 0);
@@ -3627,7 +3596,7 @@ function QuestionDetailScreen({
         },
         answer: a.content,
         timestamp: new Date(a.createdAt).toLocaleString(),
-        helpfulCount: 0,
+        helpfulCount: a.helpfulCount ?? 0,
         mentorId: a.mentor?.id ?? null,
       }))
     : [];
@@ -3635,9 +3604,7 @@ function QuestionDetailScreen({
   const sortedResponses = [...responses].sort((a, b) => {
     if (sort === "helpful") {
       return (
-        b.helpfulCount +
-        (helpfulVotes.has(b.id) ? 1 : 0) -
-        (a.helpfulCount + (helpfulVotes.has(a.id) ? 1 : 0))
+        b.helpfulCount - a.helpfulCount
       );
     }
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
@@ -3674,12 +3641,26 @@ function QuestionDetailScreen({
     }
   }
 
-  function toggleHelpful(id: string | number) {
-    setHelpfulVotes((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  async function toggleHelpful(id: string | number) {
+    if (typeof question.id !== "string" || typeof id !== "string") return;
+    const currentlyVoted = helpfulVotes.has(id);
+    try {
+      const result = currentlyVoted ? await unmarkAnswerHelpful(question.id, id) : await markAnswerHelpful(question.id, id);
+      setHelpfulVotes((prev) => {
+        const next = new Set(prev);
+        if (result.helpful) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      setLiveQuestion((current) => current ? ({
+        ...current,
+        answers: current.answers.map((answer) => answer.id === id
+          ? { ...answer, helpfulCount: result.helpfulCount, helpfulByMe: result.helpful }
+          : answer),
+      }) : current);
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to update helpful vote.");
+    }
   }
 
   function startEditingAnswer(id: string, content: string) {
@@ -3965,7 +3946,7 @@ function QuestionDetailScreen({
                 <div className="flex flex-col gap-4">
                   {sortedResponses.map((r) => {
                     const voted = helpfulVotes.has(r.id);
-                    const count = r.helpfulCount + (voted ? 1 : 0);
+                    const count = r.helpfulCount;
                     return (
                       <Card key={r.id} className="p-5">
                         <div className="flex items-start gap-3 mb-3">
@@ -5752,6 +5733,7 @@ function MentorDashboardScreen({
   const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<string | number>>(new Set());
   const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
   const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
+  const [mentorPoints, setMentorPoints] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -5764,6 +5746,14 @@ function MentorDashboardScreen({
       })
       .catch(() => {
         if (active) setLiveMentorQuestions(null);
+      });
+
+    getMentorLeaderboard()
+      .then((response) => {
+        if (active) setMentorPoints(response.me?.points ?? 0);
+      })
+      .catch(() => {
+        if (active) setMentorPoints(null);
       });
 
     getMentorMentees()
@@ -5970,7 +5960,8 @@ function MentorDashboardScreen({
 
         {/* Rewards banner */}
         {(() => {
-          const tier = getMentorTier(MENTOR.points);
+          const rewardPoints = mentorPoints ?? 0;
+          const tier = getMentorTier(rewardPoints);
           return (
             <Card className="p-5 mb-6 fade-in flex items-end justify-between gap-5 flex-wrap lg:flex-nowrap">
               <div
@@ -5982,17 +5973,17 @@ function MentorDashboardScreen({
               <div className="flex-1 min-w-[180px]">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="stat-numeral" style={{ color: tier.color }}>
-                    {MENTOR.points}
+                    {rewardPoints}
                   </span>
                   <span className="text-xs font-medium" style={{ color: C.textSec }}>
                     reward points
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MentorTierBadge points={MENTOR.points} size="md" />
+                  <MentorTierBadge points={rewardPoints} size="md" />
                   {tier.next && (
                     <span className="text-xs" style={{ color: C.textSec }}>
-                      {tier.next.min - MENTOR.points} points to {tier.next.label}
+                      {tier.next.min - rewardPoints} points to {tier.next.label}
                     </span>
                   )}
                 </div>
@@ -8472,66 +8463,72 @@ function LeaderboardScreen({
   onBack: () => void;
   role: Role;
 }) {
-  const backLabel = role === "mentor" ? "Dashboard" : "Dashboard";
-  const backTarget = () => onBack();
+  const [leaders, setLeaders] = useState<Awaited<ReturnType<typeof getMentorLeaderboard>>["items"]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getMentorLeaderboard()
+      .then((response) => {
+        if (!active) return;
+        setLeaders(response.items);
+        setLoadError(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLoadError(error instanceof Error ? error.message : "Unable to load the mentor leaderboard.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-          <button
-            onClick={backTarget}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0"
-            style={{ color: C.textSec, backgroundColor: C.borderLight }}
-          >
-            <Icons.ArrowLeft />
-            <span className="hidden sm:inline">{backLabel}</span>
+          <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
+            <Icons.ArrowLeft /><span className="hidden sm:inline">Dashboard</span>
           </button>
           <Logo size="sm" />
         </div>
       </header>
-
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 fade-in">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold mb-1" style={{ color: C.text }}>🏆 Top Mentors</h1>
-          <p className="text-sm" style={{ color: C.textSec }}>
-            Ranked by reward points — earned for answering, helpful votes, and fast responses.
-          </p>
+          <p className="text-sm" style={{ color: C.textSec }}>Ranked by reward points — earned for answering, helpful votes, and fast responses.</p>
         </div>
-
-        <div className="flex flex-col gap-2.5">
-          {([] as typeof LEADERBOARD_MENTORS).map((m, idx) => {
-            const tier = getMentorTier(m.points);
-            const rank = idx + 1;
-            const isTop3 = rank <= 3;
-            const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
-            return (
-              <Card
-                key={m.id}
-                className="p-4 flex items-center gap-3"
-                style={isTop3 ? { border: `1.5px solid ${tier.color}55`, backgroundColor: tier.bg } : undefined}
-              >
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm"
-                  style={{ backgroundColor: isTop3 ? "transparent" : C.borderLight, color: C.textSec }}
-                >
-                  {medal ?? rank}
-                </div>
-                <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm truncate" style={{ color: C.text }}>{m.name}</div>
-                  <div className="text-xs" style={{ color: C.textSec }}>{m.specialty}</div>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="stat-numeral" style={{ color: tier.color, fontSize: "1.2rem" }}>
-                    {m.points}
-                  </span>
-                  <MentorTierBadge points={m.points} />
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+        {loading ? (
+          <Card className="p-8 text-center"><p className="text-sm" style={{ color: C.textSec }}>Loading leaderboard…</p></Card>
+        ) : loadError ? (
+          <Card className="p-8 text-center"><p className="text-sm mb-3" style={{ color: C.error }}>{loadError}</p><Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Retry</Button></Card>
+        ) : leaders.length === 0 ? (
+          <Card className="p-8 text-center"><p className="text-sm font-medium mb-1" style={{ color: C.text }}>No mentor rewards yet</p><p className="text-xs" style={{ color: C.textSec }}>Points will appear here as mentors answer questions and receive helpful votes.</p></Card>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {leaders.map((m) => {
+              const tier = getMentorTier(m.points);
+              const isTop3 = m.rank <= 3;
+              const medal = m.rank === 1 ? "🥇" : m.rank === 2 ? "🥈" : m.rank === 3 ? "🥉" : null;
+              return (
+                <Card key={m.id} className="p-4 flex items-center gap-3" style={isTop3 ? { border: `1.5px solid ${tier.color}55`, backgroundColor: tier.bg } : undefined}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm" style={{ backgroundColor: isTop3 ? "transparent" : C.borderLight, color: C.textSec }}>{medal ?? m.rank}</div>
+                  <Avatar name={m.name ?? "Mentor"} size={44} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate" style={{ color: C.text }}>{m.name ?? "Mentor"}</div>
+                    <div className="text-xs" style={{ color: C.textSec }}>Mentor</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="stat-numeral" style={{ color: tier.color, fontSize: "1.2rem" }}>{m.points}</span>
+                    <MentorTierBadge points={m.points} />
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </main>
     </div>
   );
