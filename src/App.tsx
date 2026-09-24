@@ -1325,84 +1325,41 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
   const isValid = email.endsWith(".edu") && password.length >= 1;
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: C.bg }}>
-      {/* Left panel */}
-      <div
-        className="hidden lg:flex flex-col justify-between p-12 w-[44%] flex-shrink-0"
-        style={{ background: `linear-gradient(160deg, #3B2F7A 0%, #5B4EBF 55%, #7B6FD1 100%)` }}
-      >
-        <Logo size="md" />
-        <div className="fade-in">
-          <div className="mb-6">
+    <div
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6"
+      style={{
+        background: `radial-gradient(circle at top, ${C.primaryLight} 0%, ${C.bg} 42%, ${C.bg} 100%)`,
+      }}
+    >
+      <div className="w-full max-w-[460px] fade-in">
+        {/* Brand */}
+        <div className="flex justify-center mb-7">
+          <Logo size="md" />
+        </div>
+
+        {/* Login card */}
+        <Card className="p-7 sm:p-9" style={{ border: `1px solid ${C.border}` }}>
+          <div className="text-center mb-7">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-8"
-              style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+              className="mx-auto mb-4 w-12 h-12 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: C.primaryLight, color: C.primary }}
             >
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <path d="M16 4C9.373 4 4 9.373 4 16s5.373 12 12 12 12-5.373 12-12S22.627 4 16 4z" fill="white" fillOpacity="0.2" />
-                <path d="M11 16l3 3.5 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 3.5l7 3v5.2c0 4.2-2.8 7.7-7 8.8-4.2-1.1-7-4.6-7-8.8V6.5l7-3z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M8.5 12l2.2 2.2 4.8-5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
-            <h2 className="text-3xl font-bold text-white mb-4 leading-tight">
-              Connect with physician mentors who've walked your path
-            </h2>
-            <p className="text-blue-100 text-lg leading-relaxed">
-              MedMentor pairs medical students with experienced physicians for personalized guidance on boards, clinical training, and career planning.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {[
-              { label: "Board Exam Guidance", sub: "Proven strategies from attendings who aced Step 1 & 2" },
-              { label: "Clinical Skills Coaching", sub: "Real feedback on presentations, notes, and procedures" },
-              { label: "Residency Mentorship", sub: "Application reviews, specialty selection, interview prep" },
-            ].map((f) => (
-              <div key={f.label} className="flex items-start gap-3">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                  style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-                >
-                  <Icons.Check />
-                </div>
-                <div>
-                  <div className="text-white font-semibold text-sm">{f.label}</div>
-                  <div className="text-blue-200 text-xs mt-0.5">{f.sub}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex -space-x-2">
-            {[
-              "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop",
-              "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop",
-              "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=40&h=40&fit=crop",
-            ].map((src, i) => (
-              <img
-                key={i}
-                src={src}
-                alt="Mentor"
-                className="w-9 h-9 rounded-full border-2 border-blue-700 object-cover"
-              />
-            ))}
-          </div>
-          <div>
-            <div className="text-white text-sm font-semibold">2,400+ physician mentors</div>
-            <div className="text-blue-200 text-xs">across 180 specialties</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-[420px] fade-in">
-          <div className="lg:hidden mb-8">
-            <Logo size="md" />
-          </div>
-
-          <div className="mb-8">
             <h1 className="text-2xl font-bold mb-1.5" style={{ color: C.text }}>
               Welcome back
             </h1>
@@ -1423,7 +1380,6 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
                 helperText={!emailError ? "Use your official medical school email address to access the mentoring platform." : undefined}
                 icon={<Icons.Mail />}
               />
-              {/* live validation indicator */}
               {email.endsWith(".edu") && !emailError && (
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.successLight }}>
@@ -1453,33 +1409,17 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
               }
             />
 
-            <div className="flex justify-end">
+            <div className="flex justify-end -mt-1">
               <button className="text-sm font-medium" style={{ color: C.primary }}>
                 Forgot password?
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>Sign In</Button>
-              <Button variant="secondary" size="lg" fullWidth onClick={() => setShowSignup(true)}>Sign Up</Button>
-            </div>
-            {showSignup && (
-              <div className="rounded-2xl p-4 mt-1" style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}>
-                <div className="text-sm font-bold mb-3" style={{ color: C.text }}>Create your account</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button onClick={() => { setShowSignup(false); onNext(email.trim()); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
-                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentee</div>
-                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I’m a medical student looking for guidance.</div>
-                  </button>
-                  <button onClick={() => { setShowSignup(false); onSignup(); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
-                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentor</div>
-                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I want to mentor students. Admin approval required.</div>
-                  </button>
-                </div>
-              </div>
-            )}
+            <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>
+              Sign In
+            </Button>
 
-            <div className="flex items-center gap-3 my-1">
+            <div className="flex items-center gap-3 my-0.5">
               <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
               <span className="text-xs" style={{ color: C.textSec }}>or</span>
               <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
@@ -1502,20 +1442,61 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
               Continue with School Email (SSO)
             </Button>
 
+            {showSignup && (
+              <div className="rounded-2xl p-4 mt-1" style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}>
+                <div className="text-sm font-bold mb-3" style={{ color: C.text }}>Create your account</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button onClick={() => { setShowSignup(false); onNext(email.trim()); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
+                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentee</div>
+                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I’m a medical student looking for guidance.</div>
+                  </button>
+                  <button onClick={() => { setShowSignup(false); onSignup(); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
+                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentor</div>
+                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I want to mentor students. Admin approval required.</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
-
-
-            <Button variant="ghost" size="sm" fullWidth onClick={onAdminTest}>
-              Admin Dashboard (Testing)
-            </Button>
-            <p className="text-center text-sm" style={{ color: C.textSec }}>
-              Don't have an account?{" "}
-              <button className="font-semibold" style={{ color: C.primary }} onClick={onSignup}>
-                Create account
+            <div className="pt-1 text-center">
+              <span className="text-sm" style={{ color: C.textSec }}>Don't have an account? </span>
+              <button className="font-semibold text-sm" style={{ color: C.primary }} onClick={() => setShowSignup((v) => !v)}>
+                {showSignup ? "Hide sign up" : "Create account"}
               </button>
-            </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onAdminTest}
+              className="text-xs font-medium pt-2 opacity-60 hover:opacity-100 transition-opacity"
+              style={{ color: C.textSec }}
+            >
+              Admin Dashboard (Testing)
+            </button>
           </div>
+        </Card>
+
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {[
+            "Private mentorship",
+            "Anonymous questions",
+            "Medical-school focused",
+          ].map((item) => (
+            <div key={item} className="flex items-center gap-1.5 text-xs" style={{ color: C.textSec }}>
+              <span
+                className="w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: C.successLight, color: C.success }}
+              >
+                <Icons.Check />
+              </span>
+              {item}
+            </div>
+          ))}
         </div>
+
+        <p className="text-center text-xs mt-5" style={{ color: C.textSec }}>
+          Secure access for your medical-school community
+        </p>
       </div>
     </div>
   );
