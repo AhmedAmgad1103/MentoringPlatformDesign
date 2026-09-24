@@ -614,24 +614,37 @@ export async function login(email: string, role: "mentee" | "mentor" | "admin" =
   const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
   const body = new URLSearchParams({
     csrfToken: csrf.csrfToken,
-    email,
+    email: email.trim().toLowerCase(),
     role,
-    callbackUrl: "http://localhost:8443/",
+    callbackUrl: `${window.location.origin}/`,
     redirect: "false",
     json: "true",
   });
-  await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+
+  const response = await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    redirect: "manual",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    redirect: "follow",
     body,
   });
+
+  if (!response.ok) {
+    throw new ApiError("Unable to sign in", response.status, null);
+  }
+
   const session = await request<{ user?: { email?: string; role?: string } }>(
     "/api/auth/session",
     { method: "GET" },
   );
-  if (!session.user?.email) throw new Error("Unable to sign in");
+
+  if (!session.user?.email) {
+    throw new Error("Login succeeded but no active session was created.");
+  }
+
   return { ok: true, user: session.user };
 }
 
