@@ -8785,11 +8785,8 @@ export default function App() {
               addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
             }
           }}
-          onSignup={() => setScreen("mentor-signup")}
-
         />
       )}
-      {screen === "mentor-signup" && <MentorSignupScreen onBack={() => setScreen("login")} onSubmitted={(email) => { setAuthEmail(email); setScreen("login"); }} />}
       {screen === "mentor-signup" && (
         <MentorSignupScreen
           onBack={() => setScreen("login")}
