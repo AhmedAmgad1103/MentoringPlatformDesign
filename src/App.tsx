@@ -8804,29 +8804,23 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  async function handleRoleSelect(r: Role) {
-    if (!r || !authEmail) return;
+  async function handleRoleSelect(r: Role, emailOverride?: string) {
+    const email = (emailOverride ?? authEmail)?.trim();
+    if (!r || !email) return;
+
     try {
-      // Authenticate first, then use the authenticated session role to route.
-      // This avoids blocking the mentee redirect on a second /api/me request.
-      const result = await login(authEmail.trim(), r);
+      await login(email, r);
 
-      // The role selected in the MedMentor role picker is authoritative.
-      // Auth.js may expose the backend role in a different format during dev,
-      // so do not let that value override the user's selected role.
-      const actualRole: Role = r;
-
-      setRole(actualRole);
+      setRole(r);
       setScreen(
-        actualRole === "mentee"
+        r === "mentee"
           ? "dashboard"
-          : actualRole === "mentor"
+          : r === "mentor"
             ? "mentor-dashboard"
             : "admin-dashboard",
       );
 
-      // Confirm the backend account exists, but don't let a follow-up
-      // profile request prevent the user from reaching their dashboard.
+      // Keep dashboard rendering independent from a secondary profile request.
       void getMe().catch(() => undefined);
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : "Unable to sign in.");
@@ -8908,6 +8902,16 @@ export default function App() {
               setAuthEmail(email);
               setAvailableRoles(roles.roles);
               setMentorPending(roles.mentorPending);
+
+              // Existing student accounts can go straight to the mentee
+              // dashboard after the login form. This removes the fragile
+              // intermediate role/verification state for the normal mentee path.
+              const normalizedRoles = roles.roles.map((value) => String(value).toUpperCase());
+              if (normalizedRoles.length === 1 && normalizedRoles[0] === "STUDENT") {
+                await handleRoleSelect("mentee", email);
+                return;
+              }
+
               setScreen("verify");
             } catch (error) {
               addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
