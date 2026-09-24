@@ -248,7 +248,7 @@ export type MentorLeaderboardEntry = {
 }
 
 export type MentorLeaderboardResponse = {
-  month: string
+  cycle: string
   items: MentorLeaderboardEntry[]
   me: MentorLeaderboardEntry | null
 }
@@ -269,6 +269,32 @@ export async function unmarkAnswerHelpful(questionId: string, answerId: string) 
     `/api/questions/${encodeURIComponent(questionId)}/answers/${encodeURIComponent(answerId)}/helpful`,
     { method: "DELETE" }
   )
+}
+
+export type ApiNotification = {
+  id: string
+  title: string
+  message: string
+  read: boolean
+  createdAt: string
+  kind: string
+}
+
+export type NotificationsResponse = {
+  items: ApiNotification[]
+  unreadCount: number
+}
+
+export async function getNotifications() {
+  return request<NotificationsResponse>("/api/notifications")
+}
+
+export async function markNotificationRead(id: string) {
+  return request<{ ok: true }>("/api/notifications", { method: "PATCH", body: JSON.stringify({ id }) })
+}
+
+export async function markAllNotificationsRead() {
+  return request<{ ok: true }>("/api/notifications", { method: "PATCH", body: JSON.stringify({ readAll: true }) })
 }
 
 export async function getAdminMentors() {

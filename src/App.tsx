@@ -30,6 +30,9 @@ import {
   getAdminMentors,
   getAdminStats,
   getMentorLeaderboard,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
   markAnswerHelpful,
   unmarkAnswerHelpful,
   assignMentor,
@@ -8534,6 +8537,91 @@ function LeaderboardScreen({
   );
 }
 
+function NotificationsPageScreen({
+  role,
+  onBack,
+  onOpenQuestion,
+}: {
+  role: Role;
+  onBack: () => void;
+  onOpenQuestion: (id: string | number) => void;
+}) {
+  const [notifications, setNotifications] = useState<Awaited<ReturnType<typeof getNotifications>>["items"]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      const response = await getNotifications();
+      setNotifications(response.items);
+      setUnreadCount(response.unreadCount);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load notifications.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  async function markRead(id: string) {
+    try {
+      await markNotificationRead(id);
+      setNotifications((items) => items.map((item) => item.id === id ? { ...item, read: true } : item));
+      setUnreadCount((count) => Math.max(0, count - 1));
+    } catch {}
+  }
+
+  async function markAllRead() {
+    try {
+      await markAllNotificationsRead();
+      setNotifications((items) => items.map((item) => ({ ...item, read: true })));
+      setUnreadCount(0);
+    } catch {}
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
+      <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+          <button onClick={onBack} className="p-2 rounded-xl" style={{ color: C.textSec, backgroundColor: C.borderLight }}><Icons.ArrowLeft /></button>
+          <div className="flex-1">
+            <h1 className="font-bold" style={{ color: C.text }}>Notifications</h1>
+            <p className="text-xs" style={{ color: C.textSec }}>{role === "mentor" ? "Updates and mentor reward reminders" : "Your latest MedMentor updates"}</p>
+          </div>
+          {unreadCount > 0 && <Button variant="ghost" size="sm" onClick={() => void markAllRead()}>Mark all read</Button>}
+        </div>
+      </header>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        {loading ? (
+          <Card className="p-8 text-center"><p className="text-sm" style={{ color: C.textSec }}>Loading notifications…</p></Card>
+        ) : error ? (
+          <Card className="p-8 text-center"><p className="text-sm mb-3" style={{ color: C.error }}>{error}</p><Button variant="secondary" size="sm" onClick={() => void load()}>Retry</Button></Card>
+        ) : notifications.length === 0 ? (
+          <Card className="p-8 text-center"><p className="font-semibold text-sm" style={{ color: C.text }}>You're all caught up</p><p className="text-xs mt-1" style={{ color: C.textSec }}>New updates and reminders will appear here.</p></Card>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {notifications.map((notification) => (
+              <Card key={notification.id} className="p-4 flex items-start gap-3 cursor-pointer" style={{ backgroundColor: notification.read ? C.card : "#F5F8FF" }} onClick={() => { if (!notification.read) void markRead(notification.id); }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: notification.kind === "MENTOR_REWARDS_REMINDER" ? C.primaryLight : C.borderLight, color: C.primary }}><Icons.Bell /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: C.text }}>{notification.title}</p>
+                  <p className="text-sm mt-1 leading-relaxed" style={{ color: C.textSec }}>{notification.message}</p>
+                  <p className="text-xs mt-2" style={{ color: C.textSec }}>{formatDateTime(notification.createdAt)}</p>
+                </div>
+                {!notification.read && <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: C.primary }} />}
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
 // ─── MOBILE BOTTOM NAV ────────────────────────────────────────────────────────
 
 function MobileNav({
@@ -8938,6 +9026,10 @@ export default function App() {
       {screen === "mentor-profile" && (
         <MentorProfileScreen onNavigate={setScreen} onToast={addToast} />
       )}
+      {screen === "notifications-page" && (
+        <NotificationsPageScreen role={role} onBack={() => setScreen(role === "mentor" ? "mentor-dashboard" : "dashboard")} onOpenQuestion={openQuestion} />
+      )}
+
       {screen === "leaderboard" && (
         <LeaderboardScreen
           role={role}
