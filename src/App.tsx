@@ -8845,8 +8845,23 @@ export default function App() {
       return;
     }
     if (roles.length === 1) {
-      const only = roles[0];
-      await handleRoleSelect(only === "STUDENT" ? "mentee" : only === "MENTOR" ? "mentor" : "admin");
+      const only = String(roles[0]).toUpperCase();
+      if (only === "STUDENT") {
+        await handleRoleSelect("mentee");
+        return;
+      }
+      if (only === "MENTOR") {
+        await handleRoleSelect("mentor");
+        return;
+      }
+      if (only === "ADMIN") {
+        await handleRoleSelect("admin");
+        return;
+      }
+      // Unknown role: keep the user on the login screen rather than
+      // accidentally routing them to the admin dashboard.
+      addToast("error", "This account has an unsupported role.");
+      setScreen("login");
       return;
     }
     setScreen("onboarding-role");
