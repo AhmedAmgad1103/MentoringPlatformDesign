@@ -610,36 +610,46 @@ export async function getAvailableRoles(email: string): Promise<{ roles: string[
   return result
 }
 
-export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee"): Promise<never> {
+export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
   const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
-
-  // Submit the Auth.js credentials callback as a real browser navigation.
-  // This lets Auth.js set its session cookie and perform its normal redirect,
-  // instead of trying to reproduce that browser redirect/cookie flow with fetch.
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = `${API_BASE_URL}/api/auth/callback/credentials`;
-  form.style.display = "none";
-
-  const fields: Record<string, string> = {
+  const body = new URLSearchParams({
     csrfToken: csrf.csrfToken,
     email: email.trim().toLowerCase(),
     role,
     callbackUrl: `${window.location.origin}/`,
-    redirect: "true",
-  };
+    redirect: "false",
+    json: "true",
+  });
 
-  for (const [name, value] of Object.entries(fields)) {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
+  const response = await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    redirect: "manual",
+    body,
+  });
+
+  // Auth.js returns a non-2xx redirect response when redirect=false is not
+  // honored by a particular version. The session cookie can still be set,
+  // so verify the session explicitly below.
+  if (response.status >= 400) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError("Unable to sign in", response.status, data);
   }
 
-  document.body.appendChild(form);
-  form.submit();
-  await new Promise<never>(() => undefined);
+  const session = await request<{ user?: { email?: string; role?: string } }>(
+    "/api/auth/session",
+    { method: "GET" },
+  );
+
+  if (!session.user?.email) {
+    throw new Error("Unable to sign in. No active session was created.");
+  }
+
+  return { ok: true, user: session.user };
 }
 
 export function logout() {
