@@ -1670,60 +1670,110 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
   ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
+    <div
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6"
+      style={{
+        background: `radial-gradient(circle at top, ${C.primaryLight} 0%, ${C.bg} 42%, ${C.bg} 100%)`,
+      }}
+    >
       <div className="w-full max-w-3xl fade-in">
-        <div className="text-center mb-10">
+        {/* Brand */}
+        <div className="flex justify-center mb-8">
           <Logo size="md" />
-          <h1 className="text-2xl font-bold mt-6 mb-2" style={{ color: C.text }}>
-            Choose how you want to use MedMentor
+        </div>
+
+        {/* Heading */}
+        <div className="text-center mb-8">
+          <div
+            className="mx-auto mb-4 w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: C.primaryLight, color: C.primary }}
+          >
+            <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
+              <path
+                d="M5 11.5a7.5 7.5 0 1114.2 3.4L21 19l-4.1-.8A7.5 7.5 0 015 11.5z"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9 11.5h7M9 14.5h4"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: C.text }}>
+            How will you use MedMentor?
           </h1>
-          <p style={{ color: C.textSec }} className="text-sm">
-            Select the option that matches how you’ll use the platform.
+          <p style={{ color: C.textSec }} className="text-sm sm:text-base">
+            Choose the role that best matches how you’ll use the platform.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title, sub, label }) => (
-            <div
-              key={role}
-              className="role-card border-2 rounded-2xl p-6 flex flex-col gap-4"
-              style={{
-                borderColor: selected === role ? C.primary : C.border,
-                backgroundColor: selected === role ? C.primaryLight : "#fff",
-              }}
-              onClick={() => setSelected(role)}
-            >
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: selected === role ? "#fff" : C.primaryLight }}
+        {/* Role cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title, sub, label }) => {
+            const isSelected = selected === role;
+            return (
+              <button
+                key={role}
+                type="button"
+                className="text-left rounded-2xl p-6 sm:p-7 transition-all duration-200"
+                style={{
+                  border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                  backgroundColor: isSelected ? C.primaryLight : "#fff",
+                  boxShadow: isSelected ? `0 8px 24px rgba(91,78,191,0.12)` : "0 2px 8px rgba(24,59,86,0.04)",
+                  transform: isSelected ? "translateY(-2px)" : "translateY(0)",
+                }}
+                onClick={() => setSelected(role)}
               >
-                {icon}
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: C.textSec }}>
-                  {label}
+                <div className="flex items-start justify-between gap-4">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: isSelected ? "#fff" : C.primaryLight }}
+                  >
+                    {icon}
+                  </div>
+
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{
+                      border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                      backgroundColor: isSelected ? C.primary : "#fff",
+                    }}
+                  >
+                    {isSelected && (
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                        <path d="M2 5.5l2.1 2.1L9 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
                 </div>
-                <div className="font-bold text-base mb-1.5" style={{ color: C.text }}>
-                  {title}
+
+                <div className="mt-6">
+                  <div
+                    className="text-[11px] font-semibold uppercase tracking-[0.08em] mb-2"
+                    style={{ color: C.textSec }}
+                  >
+                    {label}
+                  </div>
+                  <div className="font-bold text-lg mb-2" style={{ color: C.text }}>
+                    {title}
+                  </div>
+                  <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
+                    {role === "mentee"
+                      ? "Ask your assigned mentor, connect with other mentors, and get private or anonymous guidance on your medical education and career."
+                      : "Answer student questions, share your clinical experience, support assigned mentees, and help the next generation of medical professionals."
+                    }
+                  </p>
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
-                  {sub}
-                </p>
-              </div>
-              {selected === role && (
-                <div className="self-start flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.primary }}>
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.primary }}>
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                      <path d="M1.5 4l1.5 1.5 3.5-3" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                  Selected
-                </div>
-              )}
-            </div>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
+        {/* Continue */}
         <Button
           variant="primary"
           size="lg"
@@ -1734,6 +1784,10 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
           Continue
           <Icons.ChevronRight />
         </Button>
+
+        <p className="text-center text-xs mt-4" style={{ color: C.textSec }}>
+          You can use MedMentor according to the role associated with your account.
+        </p>
       </div>
     </div>
   );
