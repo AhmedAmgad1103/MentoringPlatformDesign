@@ -8786,33 +8786,7 @@ export default function App() {
             }
           }}
           onSignup={() => setScreen("mentor-signup")}
-          onDemoLogin={async (demoRole) => {
-            try {
-              // The admin demo must create a real NextAuth session so protected
-              // admin API routes recognize the demo user as an ADMIN.
-              if (demoRole === "admin") {
-                await login("admin@demo.medmentor.edu", "admin");
-              }
 
-              setRole(demoRole);
-              setScreen(
-                demoRole === "mentee"
-                  ? "dashboard"
-                  : demoRole === "mentor"
-                    ? "mentor-dashboard"
-                    : "admin-dashboard",
-              );
-              addToast(
-                "info",
-                `Demo mode: signed in as ${demoRole === "mentee" ? "student" : demoRole} with placeholder data.`,
-              );
-            } catch (error) {
-              addToast(
-                "error",
-                error instanceof Error ? error.message : "Unable to start the admin demo session.",
-              );
-            }
-          }}
         />
       )}
       {screen === "mentor-signup" && <MentorSignupScreen onBack={() => setScreen("login")} onSubmitted={(email) => { setAuthEmail(email); setScreen("login"); }} />}
