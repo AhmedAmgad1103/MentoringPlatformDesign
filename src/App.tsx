@@ -1696,9 +1696,9 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
           <path d="M22 14l2 2-3 3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
-      title: "I am looking for guidance",
-      sub: "Connect with physician mentors, ask questions, and get support on your medical education journey.",
-      label: "Medical Student",
+      title: "I want to find a mentor",
+      sub: "Connect with physician mentors, ask questions, and get guidance throughout your medical education.",
+      label: "Mentee · Medical Student",
     },
     {
       role: "mentor",
@@ -1711,9 +1711,9 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
           <path d="M22 9.5v2.5l1.5 1" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
-      title: "I want to become a mentor",
-      sub: "Share your clinical expertise and guide the next generation of medical professionals.",
-      label: "Physician / Resident",
+      title: "I want to mentor students",
+      sub: "Share your clinical expertise, answer questions, and guide the next generation of medical professionals.",
+      label: "Mentor · Physician / Resident",
     },
   ];
 
@@ -1723,10 +1723,10 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
         <div className="text-center mb-10">
           <Logo size="md" />
           <h1 className="text-2xl font-bold mt-6 mb-2" style={{ color: C.text }}>
-            How would you like to use MedMentor?
+            Choose how you want to use MedMentor
           </h1>
           <p style={{ color: C.textSec }} className="text-sm">
-            Choose whether you want to receive guidance as a medical student or mentor the next generation of medical professionals.
+            Select the option that matches how you’ll use the platform.
           </p>
         </div>
 
