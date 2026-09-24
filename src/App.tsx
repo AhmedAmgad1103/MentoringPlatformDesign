@@ -8807,12 +8807,20 @@ export default function App() {
   async function handleRoleSelect(r: Role) {
     if (!r || !authEmail) return;
     try {
-      await login(authEmail, r);
-      const me = await getMe();
+      // Authenticate first, then use the authenticated session role to route.
+      // This avoids blocking the mentee redirect on a second /api/me request.
+      const result = await login(authEmail.trim(), r);
+
+      const sessionRole = String(result.user?.role ?? "").toLowerCase();
       const actualRole: Role =
-        me.role === "STUDENT" ? "mentee" :
-        me.role === "MENTOR" ? "mentor" :
-        "admin";
+        sessionRole === "mentee" || sessionRole === "student"
+          ? "mentee"
+          : sessionRole === "mentor"
+            ? "mentor"
+            : sessionRole === "admin"
+              ? "admin"
+              : r;
+
       setRole(actualRole);
       setScreen(
         actualRole === "mentee"
@@ -8821,6 +8829,10 @@ export default function App() {
             ? "mentor-dashboard"
             : "admin-dashboard",
       );
+
+      // Confirm the backend account exists, but don't let a follow-up
+      // profile request prevent the user from reaching their dashboard.
+      void getMe().catch(() => undefined);
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : "Unable to sign in.");
     }
