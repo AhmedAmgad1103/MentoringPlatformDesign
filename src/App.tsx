@@ -8804,23 +8804,34 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  async function handleRoleSelect(r: Role, emailOverride?: string) {
-    const email = (emailOverride ?? authEmail)?.trim();
-    if (!r || !email) return;
-
+  async function handleRoleSelect(r: Role) {
+    if (!r || !authEmail) return;
     try {
-      await login(email, r);
+      // Authenticate first, then use the authenticated session role to route.
+      // This avoids blocking the mentee redirect on a second /api/me request.
+      const result = await login(authEmail.trim(), r);
 
-      setRole(r);
+      const sessionRole = String(result.user?.role ?? "").toLowerCase();
+      const actualRole: Role =
+        sessionRole === "mentee" || sessionRole === "student"
+          ? "mentee"
+          : sessionRole === "mentor"
+            ? "mentor"
+            : sessionRole === "admin"
+              ? "admin"
+              : r;
+
+      setRole(actualRole);
       setScreen(
-        r === "mentee"
+        actualRole === "mentee"
           ? "dashboard"
-          : r === "mentor"
+          : actualRole === "mentor"
             ? "mentor-dashboard"
             : "admin-dashboard",
       );
 
-      // Keep dashboard rendering independent from a secondary profile request.
+      // Confirm the backend account exists, but don't let a follow-up
+      // profile request prevent the user from reaching their dashboard.
       void getMe().catch(() => undefined);
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : "Unable to sign in.");
@@ -8839,23 +8850,8 @@ export default function App() {
       return;
     }
     if (roles.length === 1) {
-      const only = String(roles[0]).toUpperCase();
-      if (only === "STUDENT") {
-        await handleRoleSelect("mentee");
-        return;
-      }
-      if (only === "MENTOR") {
-        await handleRoleSelect("mentor");
-        return;
-      }
-      if (only === "ADMIN") {
-        await handleRoleSelect("admin");
-        return;
-      }
-      // Unknown role: keep the user on the login screen rather than
-      // accidentally routing them to the admin dashboard.
-      addToast("error", "This account has an unsupported role.");
-      setScreen("login");
+      const only = roles[0];
+      await handleRoleSelect(only === "STUDENT" ? "mentee" : only === "MENTOR" ? "mentor" : "admin");
       return;
     }
     setScreen("onboarding-role");
@@ -8902,16 +8898,6 @@ export default function App() {
               setAuthEmail(email);
               setAvailableRoles(roles.roles);
               setMentorPending(roles.mentorPending);
-
-              // Existing student accounts can go straight to the mentee
-              // dashboard after the login form. This removes the fragile
-              // intermediate role/verification state for the normal mentee path.
-              const normalizedRoles = roles.roles.map((value) => String(value).toUpperCase());
-              if (normalizedRoles.length === 1 && normalizedRoles[0] === "STUDENT") {
-                await handleRoleSelect("mentee", email);
-                return;
-              }
-
               setScreen("verify");
             } catch (error) {
               addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
