@@ -1311,7 +1311,7 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 // ─── SCREEN: LOGIN ────────────────────────────────────────────────────────────
 
-function LoginScreen({ onNext, onSignup }: { onNext: (email: string) => void; onSignup: () => void }) {
+function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string) => void; onSignup: () => void; onAdminTest: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showSignup, setShowSignup] = useState(false);
@@ -1534,11 +1534,7 @@ function LoginScreen({ onNext, onSignup }: { onNext: (email: string) => void; on
 
 
 
-            <Button variant="ghost" size="sm" fullWidth onClick={() => {
-              setEmail("admin@demo.medmentor.edu");
-              setPassword("admin");
-              setTimeout(() => { void login("admin@demo.medmentor.edu", "admin").then(() => { window.location.reload(); }).catch(() => {}); }, 0);
-            }}>
+            <Button variant="ghost" size="sm" fullWidth onClick={onAdminTest}>
               Admin Dashboard (Testing)
             </Button>
             <p className="text-center text-sm" style={{ color: C.textSec }}>
@@ -8799,6 +8795,18 @@ export default function App() {
       {screen === "login" && (
         <LoginScreen
           onSignup={() => setScreen("mentor-signup")}
+          onAdminTest={async () => {
+            try {
+              await login("admin@demo.medmentor.edu", "admin");
+              const me = await getMe();
+              if (me.role !== "ADMIN") throw new Error("Admin test login did not return an admin account.");
+              setAuthEmail("admin@demo.medmentor.edu");
+              setRole("admin");
+              setScreen("admin-dashboard");
+            } catch (error) {
+              addToast("error", error instanceof Error ? error.message : "Unable to open the admin dashboard.");
+            }
+          }}
           onNext={async (email) => {
             try {
               const roles = await getAvailableRoles(email);
