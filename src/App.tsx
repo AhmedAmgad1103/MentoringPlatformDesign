@@ -1502,7 +1502,6 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
     </div>
   );
 }
-}
 
 // ─── SCREEN: EMAIL VERIFICATION ───────────────────────────────────────────────
 
