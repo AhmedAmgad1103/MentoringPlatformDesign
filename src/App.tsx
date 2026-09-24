@@ -8811,15 +8811,10 @@ export default function App() {
       // This avoids blocking the mentee redirect on a second /api/me request.
       const result = await login(authEmail.trim(), r);
 
-      const sessionRole = String(result.user?.role ?? "").toLowerCase();
-      const actualRole: Role =
-        sessionRole === "mentee" || sessionRole === "student"
-          ? "mentee"
-          : sessionRole === "mentor"
-            ? "mentor"
-            : sessionRole === "admin"
-              ? "admin"
-              : r;
+      // The role selected in the MedMentor role picker is authoritative.
+      // Auth.js may expose the backend role in a different format during dev,
+      // so do not let that value override the user's selected role.
+      const actualRole: Role = r;
 
       setRole(actualRole);
       setScreen(
