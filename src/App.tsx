@@ -8810,15 +8810,10 @@ export default function App() {
       // This avoids blocking the mentee redirect on a second /api/me request.
       const result = await login(authEmail.trim(), r);
 
-      const sessionRole = String(result.user?.role ?? "").toLowerCase();
-      const actualRole: Role =
-        sessionRole === "mentee" || sessionRole === "student"
-          ? "mentee"
-          : sessionRole === "mentor"
-            ? "mentor"
-            : sessionRole === "admin"
-              ? "admin"
-              : r;
+      // Route from the role the user explicitly selected. The backend
+      // session is still established above, but a stale/session role should
+      // never send a selected mentee away from the mentee dashboard.
+      const actualRole: Role = r;
 
       setRole(actualRole);
       setScreen(
