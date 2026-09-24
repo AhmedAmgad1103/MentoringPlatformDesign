@@ -8734,6 +8734,15 @@ export default function App() {
 
   async function continueAfterVerification() {
     const roles = availableRoles;
+    if (roles.length === 0) {
+      if (mentorPending) {
+        addToast("info", "Your mentor application is still pending admin approval. Mentor access will be available after approval.");
+        setScreen("login");
+        return;
+      }
+      await handleRoleSelect("mentee");
+      return;
+    }
     if (roles.length === 1) {
       const only = roles[0];
       await handleRoleSelect(only === "STUDENT" ? "mentee" : only === "MENTOR" ? "mentor" : "admin");
@@ -8769,7 +8778,7 @@ export default function App() {
             try {
               const roles = await getAvailableRoles(email);
               setAuthEmail(email);
-              setAvailableRoles(roles.roles.length ? roles.roles : ["STUDENT", "MENTOR"]);
+              setAvailableRoles(roles.roles);
               setMentorPending(roles.mentorPending);
               setScreen("verify");
             } catch (error) {
