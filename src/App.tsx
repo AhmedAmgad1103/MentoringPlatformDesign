@@ -6396,7 +6396,6 @@ function MentorDashboardScreen({
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={!messageText.trim()}
                   onClick={sendMentorMessage}
                   disabled={!messageText.trim() || messageSending}
                 >
@@ -9070,6 +9069,7 @@ export default function App() {
           role={role}
           screen={screen}
           onNavigate={setScreen}
+          notifCount={0}
         />
       )}
 
