@@ -610,42 +610,36 @@ export async function getAvailableRoles(email: string): Promise<{ roles: string[
   return result
 }
 
-export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
+export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee"): Promise<never> {
   const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
-  const body = new URLSearchParams({
+
+  // Submit the Auth.js credentials callback as a real browser navigation.
+  // This lets Auth.js set its session cookie and perform its normal redirect,
+  // instead of trying to reproduce that browser redirect/cookie flow with fetch.
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = `${API_BASE_URL}/api/auth/callback/credentials`;
+  form.style.display = "none";
+
+  const fields: Record<string, string> = {
     csrfToken: csrf.csrfToken,
     email: email.trim().toLowerCase(),
     role,
     callbackUrl: `${window.location.origin}/`,
-    redirect: "false",
-    json: "true",
-  });
+    redirect: "true",
+  };
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    redirect: "follow",
-    body,
-  });
-
-  if (!response.ok) {
-    throw new ApiError("Unable to sign in", response.status, null);
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
   }
 
-  const session = await request<{ user?: { email?: string; role?: string } }>(
-    "/api/auth/session",
-    { method: "GET" },
-  );
-
-  if (!session.user?.email) {
-    throw new Error("Login succeeded but no active session was created.");
-  }
-
-  return { ok: true, user: session.user };
+  document.body.appendChild(form);
+  form.submit();
+  await new Promise<never>(() => undefined);
 }
 
 export function logout() {
