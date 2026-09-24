@@ -44,6 +44,7 @@ import {
 type Screen =
   | "login"
   | "mentor-signup"
+  | "signup-role"
   | "verify"
   | "onboarding-role"
   | "onboarding-mentee"
@@ -1634,38 +1635,35 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
 
 // ─── SCREEN: ONBOARDING — ROLE ────────────────────────────────────────────────
 
-function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"] }: { onSelect: (role: Role) => void; availableRoles?: string[] }) {
+function SignupRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) {
   const [selected, setSelected] = useState<Role>(null);
 
-  const allowed = new Set(availableRoles);
-  const roles: { role: Role; icon: React.ReactNode; title: string; sub: string; label: string }[] = [
+  const roles: { role: "mentee" | "mentor"; icon: React.ReactNode; title: string; label: string; sub: string }[] = [
     {
       role: "mentee",
       icon: (
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
           <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
           <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M22 14l2 2-3 3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
       title: "I want to find a mentor",
-      sub: "Connect with physician mentors, ask questions, and get guidance throughout your medical education.",
       label: "Mentee · Medical Student",
+      sub: "Connect with mentors, ask questions, and get guidance throughout your medical education and career.",
     },
     {
       role: "mentor",
       icon: (
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
           <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
-          <path d="M4 26c0-4.418 3.582-7 8-7s8 3.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M4 26c0-4.418 3.582-7 8-7s8 2.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
           <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
           <path d="M19.5 18.5c1-.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M22 9.5v2.5l1.5 1" stroke={C.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
       title: "I want to mentor students",
-      sub: "Share your clinical expertise, answer questions, and guide the next generation of medical professionals.",
       label: "Mentor · Physician / Resident",
+      sub: "Share your clinical experience, answer questions, and support the next generation of medical professionals.",
     },
   ];
 
@@ -1677,43 +1675,30 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
       }}
     >
       <div className="w-full max-w-3xl fade-in">
-        {/* Brand */}
         <div className="flex justify-center mb-8">
           <Logo size="md" />
         </div>
 
-        {/* Heading */}
         <div className="text-center mb-8">
           <div
             className="mx-auto mb-4 w-12 h-12 rounded-2xl flex items-center justify-center"
             style={{ backgroundColor: C.primaryLight, color: C.primary }}
           >
             <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-              <path
-                d="M5 11.5a7.5 7.5 0 1114.2 3.4L21 19l-4.1-.8A7.5 7.5 0 015 11.5z"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M9 11.5h7M9 14.5h4"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
+              <path d="M5 11.5a7.5 7.5 0 1114.2 3.4L21 19l-4.1-.8A7.5 7.5 0 015 11.5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M9 11.5h7M9 14.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: C.text }}>
-            How will you use MedMentor?
+            Create your MedMentor account
           </h1>
           <p style={{ color: C.textSec }} className="text-sm sm:text-base">
-            Choose the role that best matches how you’ll use the platform.
+            Choose how you’ll use MedMentor to get started.
           </p>
         </div>
 
-        {/* Role cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title, sub, label }) => {
+          {roles.map(({ role, icon, title, sub, label }) => {
             const isSelected = selected === role;
             return (
               <button
@@ -1723,7 +1708,7 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
                 style={{
                   border: `1.5px solid ${isSelected ? C.primary : C.border}`,
                   backgroundColor: isSelected ? C.primaryLight : "#fff",
-                  boxShadow: isSelected ? `0 8px 24px rgba(91,78,191,0.12)` : "0 2px 8px rgba(24,59,86,0.04)",
+                  boxShadow: isSelected ? "0 8px 24px rgba(91,78,191,0.12)" : "0 2px 8px rgba(24,59,86,0.04)",
                   transform: isSelected ? "translateY(-2px)" : "translateY(0)",
                 }}
                 onClick={() => setSelected(role)}
@@ -1735,7 +1720,6 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
                   >
                     {icon}
                   </div>
-
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                     style={{
@@ -1750,47 +1734,129 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
                     )}
                   </div>
                 </div>
-
                 <div className="mt-6">
-                  <div
-                    className="text-[11px] font-semibold uppercase tracking-[0.08em] mb-2"
-                    style={{ color: C.textSec }}
-                  >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] mb-2" style={{ color: C.textSec }}>
                     {label}
                   </div>
-                  <div className="font-bold text-lg mb-2" style={{ color: C.text }}>
-                    {title}
-                  </div>
-                  <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
-                    {role === "mentee"
-                      ? "Ask your assigned mentor, connect with other mentors, and get private or anonymous guidance on your medical education and career."
-                      : "Answer student questions, share your clinical experience, support assigned mentees, and help the next generation of medical professionals."
-                    }
-                  </p>
+                  <div className="font-bold text-lg mb-2" style={{ color: C.text }}>{title}</div>
+                  <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>{sub}</p>
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Continue */}
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          onClick={() => selected && onSelect(selected)}
-          disabled={!selected}
-        >
+        <Button variant="primary" size="lg" fullWidth onClick={() => selected && onSelect(selected)} disabled={!selected}>
           Continue
           <Icons.ChevronRight />
         </Button>
 
         <p className="text-center text-xs mt-4" style={{ color: C.textSec }}>
-          You can use MedMentor according to the role associated with your account.
+          You can complete your profile after choosing your role.
         </p>
       </div>
     </div>
   );
+}
+
+function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"] }: { onSelect: (role: Role) => void; availableRoles?: string[] }) {
+  const [selected, setSelected] = useState<Role>(null);
+  const allowed = new Set(availableRoles);
+
+  const roles: { role: "mentee" | "mentor"; icon: React.ReactNode; title: string }[] = [
+    {
+      role: "mentee",
+      icon: (
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
+          <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      ),
+      title: "Mentee",
+    },
+    {
+      role: "mentor",
+      icon: (
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+          <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
+          <path d="M4 26c0-4.418 3.582-7 8-7s8 2.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
+        </svg>
+      ),
+      title: "Mentor",
+    },
+  ];
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6"
+      style={{
+        background: `radial-gradient(circle at top, ${C.primaryLight} 0%, ${C.bg} 42%, ${C.bg} 100%)`,
+      }}
+    >
+      <div className="w-full max-w-xl fade-in">
+        <div className="flex justify-center mb-8">
+          <Logo size="md" />
+        </div>
+
+        <div className="text-center mb-7">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: C.text }}>
+            Choose your role
+          </h1>
+          <p style={{ color: C.textSec }} className="text-sm">
+            Select how you want to continue.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title }) => {
+            const isSelected = selected === role;
+            return (
+              <button
+                key={role}
+                type="button"
+                className="rounded-2xl p-5 text-center transition-all duration-200"
+                style={{
+                  border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                  backgroundColor: isSelected ? C.primaryLight : "#fff",
+                  boxShadow: isSelected ? "0 6px 18px rgba(91,78,191,0.10)" : "0 2px 8px rgba(24,59,86,0.04)",
+                }}
+                onClick={() => setSelected(role)}
+              >
+                <div
+                  className="mx-auto w-12 h-12 rounded-xl flex items-center justify-center mb-3"
+                  style={{ backgroundColor: isSelected ? "#fff" : C.primaryLight }}
+                >
+                  {icon}
+                </div>
+                <div className="font-bold text-base" style={{ color: C.text }}>{title}</div>
+                <div
+                  className="mx-auto mt-3 w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{
+                    border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                    backgroundColor: isSelected ? C.primary : "#fff",
+                  }}
+                >
+                  {isSelected && (
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                      <path d="M1.5 4.5l1.7 1.7L7.5 2.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <Button variant="primary" size="lg" fullWidth onClick={() => selected && onSelect(selected)} disabled={!selected}>
+          Continue
+          <Icons.ChevronRight />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 }
 
 // ─── SCREEN: ONBOARDING — MENTEE ─────────────────────────────────────────────
@@ -8911,7 +8977,7 @@ export default function App() {
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
       {screen === "login" && (
         <LoginScreen
-          onSignup={() => setScreen("mentor-signup")}
+          onSignup={() => setScreen("signup-role")}
           onAdminTest={async () => {
             try {
               await login("admin@demo.medmentor.edu", "admin");
@@ -8933,6 +8999,18 @@ export default function App() {
               setScreen("verify");
             } catch (error) {
               addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
+            }
+          }}
+        />
+      )}
+      {screen === "signup-role" && (
+        <SignupRoleScreen
+          onSelect={(selectedRole) => {
+            if (selectedRole === "mentor") {
+              setScreen("mentor-signup");
+            } else {
+              setRole("mentee");
+              setScreen("onboarding-mentee");
             }
           }}
         />
