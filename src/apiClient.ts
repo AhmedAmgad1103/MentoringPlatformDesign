@@ -79,6 +79,7 @@ export type ApiUser = {
   email: string
   name: string | null
   role: "STUDENT" | "MENTOR" | "ADMIN"
+  mentorStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
   assignedMentor: { id: string; name: string | null } | null
 }
 
@@ -543,7 +544,7 @@ export async function mentorSignup(email: string) {
 }
 
 export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
-  const result = await request<{ roles: string[] }>(
+  const result = await request<{ roles: string[]; mentorPending: boolean }>(
     `/api/auth/roles?email=${encodeURIComponent(email.trim().toLowerCase())}`
   )
   return result
