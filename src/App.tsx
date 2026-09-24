@@ -1286,7 +1286,6 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string) => void; onSignup: () => void; onAdminTest: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showSignup, setShowSignup] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [touched, setTouched] = useState(false);
@@ -1303,11 +1302,6 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
     if (touched) setEmailError(validateEmail(v));
   }
 
-  function handleEmailBlur() {
-    setTouched(true);
-    setEmailError(validateEmail(email));
-  }
-
   async function handleSubmit() {
     setTouched(true);
     const err = validateEmail(email);
@@ -1315,8 +1309,6 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
     if (err || !email || !password) return;
 
     try {
-      // Authentication happens after role selection so a new mentor/admin account
-      // is not accidentally created as a student.
       onNext(email.trim());
     } catch (error) {
       setEmailError(error instanceof Error ? error.message : "Unable to continue. Please try again.");
@@ -1327,180 +1319,189 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6"
-      style={{
-        background: `radial-gradient(circle at top, ${C.primaryLight} 0%, ${C.bg} 42%, ${C.bg} 100%)`,
-      }}
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 relative overflow-hidden"
+      style={{ backgroundColor: C.bg }}
     >
-      <div className="w-full max-w-[460px] fade-in">
-        {/* Brand */}
-        <div className="flex justify-center mb-7">
-          <Logo size="md" />
-        </div>
+      {/* Subtle decorative background */}
+      <div
+        className="absolute -top-28 -right-28 w-80 h-80 rounded-full opacity-60 pointer-events-none"
+        style={{ background: C.primaryLight, filter: "blur(2px)" }}
+      />
+      <div
+        className="absolute -bottom-36 -left-28 w-96 h-96 rounded-full opacity-40 pointer-events-none"
+        style={{ background: C.primaryLight, filter: "blur(8px)" }}
+      />
 
-        {/* Login card */}
-        <Card className="p-7 sm:p-9" style={{ border: `1px solid ${C.border}` }}>
-          <div className="text-center mb-7">
+      <div className="w-full max-w-[1040px] grid grid-cols-1 lg:grid-cols-[0.78fr_1.22fr] gap-6 lg:gap-8 items-center relative z-10 fade-in">
+        {/* Compact brand / value area — no large side panel */}
+        <div className="hidden lg:block px-5">
+          <Logo size="md" />
+
+          <div className="mt-10 max-w-sm">
             <div
-              className="mx-auto mb-4 w-12 h-12 rounded-2xl flex items-center justify-center"
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold mb-5"
               style={{ backgroundColor: C.primaryLight, color: C.primary }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 3.5l7 3v5.2c0 4.2-2.8 7.7-7 8.8-4.2-1.1-7-4.6-7-8.8V6.5l7-3z"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M8.5 12l2.2 2.2 4.8-5"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.primary }} />
+              Clinical Education Network
             </div>
-            <h1 className="text-2xl font-bold mb-1.5" style={{ color: C.text }}>
-              Welcome back
-            </h1>
-            <p style={{ color: C.textSec }} className="text-sm">
-              Sign in to your MedMentor account
-            </p>
-          </div>
 
-          <div className="flex flex-col gap-4">
-            <div>
-              <InputField
-                label="Medical School Email"
-                type="email"
-                placeholder="you@university.edu"
-                value={email}
-                onChange={handleEmailChange}
-                error={emailError}
-                helperText={!emailError ? "Use your official medical school email address to access the mentoring platform." : undefined}
-                icon={<Icons.Mail />}
-              />
-              {email.endsWith(".edu") && !emailError && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.successLight }}>
+            <h1 className="text-3xl xl:text-4xl font-bold leading-tight mb-4" style={{ color: C.text }}>
+              Your questions deserve the right guidance.
+            </h1>
+            <p className="text-sm leading-6" style={{ color: C.textSec }}>
+              Connect with physician mentors, ask questions privately or anonymously, and get guidance throughout medical school and your career.
+            </p>
+
+            <div className="mt-7 flex flex-col gap-3">
+              {[
+                "Ask your assigned mentor or any mentor",
+                "Private and anonymous question options",
+                "Guidance for education, clinical training, and careers",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2.5">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: C.successLight, color: C.success }}
+                  >
                     <Icons.Check />
                   </span>
-                  <span className="text-xs font-medium" style={{ color: C.success }}>Valid school email</span>
+                  <span className="text-xs font-medium" style={{ color: C.textSec }}>{item}</span>
                 </div>
-              )}
+              ))}
             </div>
-
-            <InputField
-              label="Password"
-              type={showPw ? "text" : "password"}
-              placeholder="Enter your password"
-              value={password}
-              onChange={setPassword}
-              icon={<Icons.Lock />}
-              rightElement={
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  className="p-1 rounded"
-                  style={{ color: C.textSec }}
-                >
-                  <Icons.Eye open={showPw} />
-                </button>
-              }
-            />
-
-            <div className="flex justify-end -mt-1">
-              <button className="text-sm font-medium" style={{ color: C.primary }}>
-                Forgot password?
-              </button>
-            </div>
-
-            <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>
-              Sign In
-            </Button>
-
-            <div className="flex items-center gap-3 my-0.5">
-              <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
-              <span className="text-xs" style={{ color: C.textSec }}>or</span>
-              <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
-            </div>
-
-            <Button
-              variant="secondary"
-              size="lg"
-              fullWidth
-              onClick={() => {
-                setEmail("student@northwestern.edu");
-                setEmailError("");
-                setTouched(false);
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="1" y="1" width="16" height="16" rx="4" fill={C.primary} fillOpacity="0.12" />
-                <path d="M9 4L4 9l5 5 5-5-5-5z" fill={C.primary} />
-              </svg>
-              Continue with School Email (SSO)
-            </Button>
-
-            {showSignup && (
-              <div className="rounded-2xl p-4 mt-1" style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}>
-                <div className="text-sm font-bold mb-3" style={{ color: C.text }}>Create your account</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button onClick={() => { setShowSignup(false); onNext(email.trim()); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
-                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentee</div>
-                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I’m a medical student looking for guidance.</div>
-                  </button>
-                  <button onClick={() => { setShowSignup(false); onSignup(); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
-                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentor</div>
-                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I want to mentor students. Admin approval required.</div>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-1 text-center">
-              <span className="text-sm" style={{ color: C.textSec }}>Don't have an account? </span>
-              <button className="font-semibold text-sm" style={{ color: C.primary }} onClick={() => setShowSignup((v) => !v)}>
-                {showSignup ? "Hide sign up" : "Create account"}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={onAdminTest}
-              className="text-xs font-medium pt-2 opacity-60 hover:opacity-100 transition-opacity"
-              style={{ color: C.textSec }}
-            >
-              Admin Dashboard (Testing)
-            </button>
           </div>
-        </Card>
-
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          {[
-            "Private mentorship",
-            "Anonymous questions",
-            "Medical-school focused",
-          ].map((item) => (
-            <div key={item} className="flex items-center gap-1.5 text-xs" style={{ color: C.textSec }}>
-              <span
-                className="w-4 h-4 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: C.successLight, color: C.success }}
-              >
-                <Icons.Check />
-              </span>
-              {item}
-            </div>
-          ))}
         </div>
 
-        <p className="text-center text-xs mt-5" style={{ color: C.textSec }}>
-          Secure access for your medical-school community
-        </p>
+        {/* Sign-in card */}
+        <div className="w-full max-w-[500px] mx-auto">
+          <div className="lg:hidden flex justify-center mb-6">
+            <Logo size="md" />
+          </div>
+
+          <Card className="p-7 sm:p-9" style={{ border: `1px solid ${C.border}`, boxShadow: "0 18px 45px rgba(24,59,86,0.08)" }}>
+            <div className="text-center mb-7">
+              <div
+                className="mx-auto mb-4 w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ backgroundColor: C.primaryLight, color: C.primary }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3.5l7 3v5.2c0 4.2-2.8 7.7-7 8.8-4.2-1.1-7-4.6-7-8.8V6.5l7-3z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                  <path d="M8.5 12l2.2 2.2 4.8-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold mb-1.5" style={{ color: C.text }}>
+                Welcome back
+              </h2>
+              <p style={{ color: C.textSec }} className="text-sm">
+                Sign in to your MedMentor account
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <InputField
+                  label="Medical School Email"
+                  type="email"
+                  placeholder="you@university.edu"
+                  value={email}
+                  onChange={handleEmailChange}
+                  error={emailError}
+                  helperText={!emailError ? "Use your official medical school email address." : undefined}
+                  icon={<Icons.Mail />}
+                />
+                {email.endsWith(".edu") && !emailError && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.successLight }}>
+                      <Icons.Check />
+                    </span>
+                    <span className="text-xs font-medium" style={{ color: C.success }}>Valid school email</span>
+                  </div>
+                )}
+              </div>
+
+              <InputField
+                label="Password"
+                type={showPw ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={setPassword}
+                icon={<Icons.Lock />}
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="p-1 rounded"
+                    style={{ color: C.textSec }}
+                  >
+                    <Icons.Eye open={showPw} />
+                  </button>
+                }
+              />
+
+              <div className="flex justify-end -mt-1">
+                <button className="text-sm font-medium" style={{ color: C.primary }}>
+                  Forgot password?
+                </button>
+              </div>
+
+              <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>
+                Sign In
+              </Button>
+
+              <div className="flex items-center gap-3 my-0.5">
+                <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
+                <span className="text-xs" style={{ color: C.textSec }}>or</span>
+                <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
+              </div>
+
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={() => {
+                  setEmail("student@northwestern.edu");
+                  setEmailError("");
+                  setTouched(false);
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <rect x="1" y="1" width="16" height="16" rx="4" fill={C.primary} fillOpacity="0.12" />
+                  <path d="M9 4L4 9l5 5-5-5z" fill={C.primary} />
+                </svg>
+                Continue with School Email (SSO)
+              </Button>
+
+              <div className="mt-2 pt-5" style={{ borderTop: `1px solid ${C.borderLight}` }}>
+                <div className="text-center mb-3">
+                  <span className="text-sm" style={{ color: C.textSec }}>New to MedMentor? </span>
+                  <span className="text-sm font-semibold" style={{ color: C.text }}>Create your account</span>
+                </div>
+                <Button variant="secondary" size="lg" fullWidth onClick={onSignup}>
+                  Sign Up
+                </Button>
+              </div>
+
+              <button
+                type="button"
+                onClick={onAdminTest}
+                className="text-xs font-medium pt-1 opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: C.textSec }}
+              >
+                Admin Dashboard (Testing)
+              </button>
+            </div>
+          </Card>
+
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs" style={{ color: C.textSec }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.success }} />
+            Secure access for your medical-school community
+          </div>
+        </div>
       </div>
     </div>
   );
+}
 }
 
 // ─── SCREEN: EMAIL VERIFICATION ───────────────────────────────────────────────
