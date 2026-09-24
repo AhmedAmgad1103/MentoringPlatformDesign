@@ -1715,18 +1715,6 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
       sub: "Share your clinical expertise and guide the next generation of medical professionals.",
       label: "Physician / Resident",
     },
-    {
-      role: "admin",
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <path d="M16 4l9 4v6c0 6-3.8 11.3-9 14-5.2-2.7-9-8-9-14V8l9-4Z" stroke={C.primary} strokeWidth="1.8" strokeLinejoin="round" />
-          <path d="m11.5 15.5 3 3 6-6" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-      title: "I manage the platform",
-      sub: "Manage users, questions, moderation, reports, and platform settings.",
-      label: "Administrator",
-    },
   ];
 
   return (
@@ -1735,14 +1723,14 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
         <div className="text-center mb-10">
           <Logo size="md" />
           <h1 className="text-2xl font-bold mt-6 mb-2" style={{ color: C.text }}>
-            What are you here for?
+            How would you like to use MedMentor?
           </h1>
           <p style={{ color: C.textSec }} className="text-sm">
-            Tell us your goal so we can set up the right experience for you.
+            Choose whether you want to receive guidance as a medical student or mentor the next generation of medical professionals.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title, sub, label }) => (
             <div
               key={role}
