@@ -2560,7 +2560,7 @@ function DashboardScreen({
                       <Badge variant={MENTOR.available ? "success" : "pending"}>
                         {MENTOR.available ? "Available" : "Busy"}
                       </Badge>
-                      <MentorTierBadge points={rewardPoints} />
+                      <MentorTierBadge points={0} />
                     </div>
                   </div>
                 </div>
