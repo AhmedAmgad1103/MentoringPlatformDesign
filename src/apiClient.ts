@@ -614,41 +614,24 @@ export async function login(email: string, role: "mentee" | "mentor" | "admin" =
   const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
   const body = new URLSearchParams({
     csrfToken: csrf.csrfToken,
-    email: email.trim().toLowerCase(),
+    email,
     role,
-    callbackUrl: `${window.location.origin}/`,
+    callbackUrl: "http://localhost:8443/",
     redirect: "false",
     json: "true",
   });
-
-  const response = await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+  await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     redirect: "manual",
     body,
   });
-
-  // Auth.js returns a non-2xx redirect response when redirect=false is not
-  // honored by a particular version. The session cookie can still be set,
-  // so verify the session explicitly below.
-  if (response.status >= 400) {
-    const data = await response.json().catch(() => null);
-    throw new ApiError("Unable to sign in", response.status, data);
-  }
-
   const session = await request<{ user?: { email?: string; role?: string } }>(
     "/api/auth/session",
     { method: "GET" },
   );
-
-  if (!session.user?.email) {
-    throw new Error("Unable to sign in. No active session was created.");
-  }
-
+  if (!session.user?.email) throw new Error("Unable to sign in");
   return { ok: true, user: session.user };
 }
 
