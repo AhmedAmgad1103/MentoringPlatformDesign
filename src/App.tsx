@@ -1,6 +1,4 @@
-import
-
-        <button type="button" onClick={onSignup} className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.primary, backgroundColor: "#fff" }}>Sign up as a mentor</button> { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   boostQuestion,
   createAnswer,
@@ -39,6 +37,7 @@ import {
 
 type Screen =
   | "login"
+  | "mentor-signup"
   | "verify"
   | "onboarding-role"
   | "onboarding-mentee"
@@ -1312,7 +1311,7 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 // ─── SCREEN: LOGIN ────────────────────────────────────────────────────────────
 
-function LoginScreen({ onNext }: { onNext: (email: string) => void }) {
+function LoginScreen({ onNext, onSignup }: { onNext: (email: string) => void; onSignup: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -1519,7 +1518,7 @@ function LoginScreen({ onNext }: { onNext: (email: string) => void }) {
 
             <p className="text-center text-sm" style={{ color: C.textSec }}>
               Don't have an account?{" "}
-              <button className="font-semibold" style={{ color: C.primary }} onClick={onNext}>
+              <button className="font-semibold" style={{ color: C.primary }} onClick={onSignup}>
                 Create account
               </button>
             </p>
@@ -8765,6 +8764,7 @@ export default function App() {
     <div className={`size-full relative${showMobileNav ? " has-mobile-nav" : ""}`}>
       {screen === "login" && (
         <LoginScreen
+          onSignup={() => setScreen("mentor-signup")}
           onNext={async (email) => {
             try {
               const roles = await getAvailableRoles(email);
@@ -8807,6 +8807,16 @@ export default function App() {
         />
       )}
       {screen === "mentor-signup" && <MentorSignupScreen onBack={() => setScreen("login")} onSubmitted={(email) => { setAuthEmail(email); setScreen("login"); }} />}
+      {screen === "mentor-signup" && (
+        <MentorSignupScreen
+          onBack={() => setScreen("login")}
+          onSubmitted={(email) => {
+            setAuthEmail(email);
+            setScreen("login");
+            addToast("success", "Mentor signup submitted. An admin must approve the mentor account before mentor access is enabled.");
+          }}
+        />
+      )}
       {screen === "verify" && (
         <VerifyScreen
           onNext={() => {
