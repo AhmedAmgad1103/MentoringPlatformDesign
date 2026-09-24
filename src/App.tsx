@@ -1314,6 +1314,7 @@ function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 function LoginScreen({ onNext, onSignup }: { onNext: (email: string) => void; onSignup: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showSignup, setShowSignup] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [touched, setTouched] = useState(false);
@@ -1487,9 +1488,25 @@ function LoginScreen({ onNext, onSignup }: { onNext: (email: string) => void; on
               </button>
             </div>
 
-            <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>
-              Sign In
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!isValid}>Sign In</Button>
+              <Button variant="secondary" size="lg" fullWidth onClick={() => setShowSignup(true)}>Sign Up</Button>
+            </div>
+            {showSignup && (
+              <div className="rounded-2xl p-4 mt-1" style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}>
+                <div className="text-sm font-bold mb-3" style={{ color: C.text }}>Create your account</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button onClick={() => { setShowSignup(false); onNext(email.trim()); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
+                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentee</div>
+                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I’m a medical student looking for guidance.</div>
+                  </button>
+                  <button onClick={() => { setShowSignup(false); onSignup(); }} className="text-left rounded-xl p-4 bg-white border" style={{ borderColor: C.border }}>
+                    <div className="font-semibold text-sm" style={{ color: C.text }}>Mentor</div>
+                    <div className="text-xs mt-1" style={{ color: C.textSec }}>I want to mentor students. Admin approval required.</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px" style={{ backgroundColor: C.border }} />
@@ -1516,6 +1533,14 @@ function LoginScreen({ onNext, onSignup }: { onNext: (email: string) => void; on
 
 
 
+
+            <Button variant="ghost" size="sm" fullWidth onClick={() => {
+              setEmail("admin@demo.medmentor.edu");
+              setPassword("admin");
+              setTimeout(() => { void login("admin@demo.medmentor.edu", "admin").then(() => { window.location.reload(); }).catch(() => {}); }, 0);
+            }}>
+              Admin Dashboard (Testing)
+            </Button>
             <p className="text-center text-sm" style={{ color: C.textSec }}>
               Don't have an account?{" "}
               <button className="font-semibold" style={{ color: C.primary }} onClick={onSignup}>
