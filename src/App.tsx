@@ -2385,6 +2385,7 @@ function DashboardScreen({
             </div>
             <button onClick={() => onNavigate("mentee-profile")} className="rounded-full hover:opacity-80 transition-opacity">
               <Avatar
+                src={currentUser?.avatarUrl || undefined}
                 name={currentUser?.name || currentUser?.email?.split("@")[0] || "User"}
                 size={36}
               />
@@ -3075,7 +3076,6 @@ function FeedQuestionCard({
                 {question.date}
               </div>
             </div>
-            <CategoryBadge category={question.category} />
           </div>
 
           {/* Question */}
@@ -3208,7 +3208,6 @@ function FeedScreen({
   onToast: (t: ToastType, msg: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<"recent" | "helpful" | "answered" | "boosted">("recent");
   const [boostedIds, setBoostedIds] = useState<Set<string | number>>(new Set());
   const [liveQuestions, setLiveQuestions] = useState<FeedQuestion[] | null>(null);
@@ -3284,17 +3283,6 @@ function FeedScreen({
     return () => document.removeEventListener("mousedown", h);
   }, [notifOpen]);
 
-  const FEED_CATS = [
-    "Clinical Rotations",
-    "Board Exams",
-    "Residency Match",
-    "Clinical Skills",
-    "Research",
-    "Study Skills",
-    "Wellness & Burnout",
-    "Other",
-  ];
-
   const sourceQuestions = liveQuestions ?? [];
 
   const filtered = sourceQuestions.filter((q) => {
@@ -3302,8 +3290,7 @@ function FeedScreen({
       !search ||
       q.title.toLowerCase().includes(search.toLowerCase()) ||
       q.preview.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !activeCategory || q.category === activeCategory;
-    return matchSearch && matchCat;
+    return matchSearch;
   }).sort((a, b) => {
     if (sort === "helpful") return b.helpful - a.helpful;
     if (sort === "answered") return b.responses - a.responses;
@@ -3383,44 +3370,10 @@ function FeedScreen({
           </div>
         </div>
 
-        {/* Category chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-4 fade-in" style={{ scrollbarWidth: "none" }}>
-          <button
-            onClick={() => setActiveCategory(null)}
-            className="px-4 py-2 rounded-full text-sm font-medium flex-shrink-0 transition-all"
-            style={{
-              backgroundColor: !activeCategory ? C.primary : "#fff",
-              color: !activeCategory ? "#fff" : C.textSec,
-              border: `1.5px solid ${!activeCategory ? C.primary : C.border}`,
-            }}
-          >
-            All questions
-          </button>
-          {FEED_CATS.map((cat) => {
-            const active = activeCategory === cat;
-            const col = CATEGORY_COLORS[cat] || CATEGORY_COLORS["Other"];
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(active ? null : cat)}
-                className="px-3.5 py-2 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-                style={{
-                  backgroundColor: active ? col.color : "#fff",
-                  color: active ? "#fff" : col.color,
-                  border: `1.5px solid ${active ? col.color : col.bg}`,
-                }}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Sort row */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm" style={{ color: C.textSec }}>
             {filtered.length} question{filtered.length !== 1 ? "s" : ""}
-            {activeCategory ? ` in ${activeCategory}` : ""}
             {search ? ` matching "${search}"` : ""}
           </p>
           <div className="flex items-center gap-1 p-1 rounded-xl" style={{ backgroundColor: C.borderLight }}>
@@ -3475,7 +3428,7 @@ function FeedScreen({
                 No questions found
               </p>
               <p className="text-xs" style={{ color: C.textSec }}>
-                Try adjusting your search or category filter
+                Try adjusting your search
               </p>
             </div>
             <Button
@@ -3483,10 +3436,9 @@ function FeedScreen({
               size="sm"
               onClick={() => {
                 setSearch("");
-                setActiveCategory(null);
               }}
             >
-              Clear filters
+              Clear search
             </Button>
           </div>
         )}
@@ -8281,24 +8233,56 @@ function MenteeProfileScreen({
   const [user, setUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
   const [questions, setQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [name, setName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([getMe(), getQuestions()])
       .then(([me, qs]) => {
         setUser(me);
         setName(me.name ?? "");
+        setAvatarUrl(me.avatarUrl ?? null);
         setQuestions(qs);
       })
       .catch(() => onToast("error", "Unable to load your profile."));
   }, []);
 
-  async function saveName() {
+  async function handleAvatarChange(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      onToast("error", "Please select an image file.");
+      return;
+    }
+    if (file.size > 1_500_000) {
+      onToast("error", "Please choose an image smaller than 1.5 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") setAvatarUrl(result);
+    };
+    reader.onerror = () => onToast("error", "Unable to read that image.");
+    reader.readAsDataURL(file);
+  }
+
+  async function saveProfile() {
+    setSavingProfile(true);
     try {
-      const updated = await updateMe(name.trim() || null);
+      const updated = await updateMe({
+        name: name.trim() || null,
+        avatarUrl,
+      });
       setUser(updated);
+      setName(updated.name ?? "");
+      setAvatarUrl(updated.avatarUrl ?? null);
       onToast("success", "Profile updated successfully.");
     } catch (error) {
       onToast("error", error instanceof Error ? error.message : "Unable to update profile.");
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -8317,16 +8301,52 @@ function MenteeProfileScreen({
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
         <Card className="p-6">
           <div className="flex items-center gap-4">
-            <Avatar name={user?.name || user?.email?.split("@")[0] || "User"} size={80} />
+            <div className="flex flex-col items-center gap-2 flex-shrink-0">
+              <Avatar src={avatarUrl || undefined} name={user?.name || user?.email?.split("@")[0] || "User"} size={80} />
+              <button
+                type="button"
+                className="text-xs font-semibold"
+                style={{ color: C.primary }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {avatarUrl ? "Change photo" : "Add photo"}
+              </button>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  className="text-xs"
+                  style={{ color: C.textSec }}
+                  onClick={() => setAvatarUrl(null)}
+                >
+                  Remove
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  void handleAvatarChange(e.target.files?.[0] ?? null);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold" style={{ color: C.text }}>{user?.name || "Your Profile"}</h2>
               <p className="text-sm" style={{ color: C.textSec }}>{user?.email || ""}</p>
               <span className="inline-flex mt-2 text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: C.primaryLight, color: C.primary }}>Medical Student</span>
             </div>
           </div>
-          <div className="mt-5 flex gap-2">
-            <InputField label="Name" value={name} onChange={setName} placeholder="Your name" />
-            <div className="pt-6"><Button size="sm" onClick={saveName}>Save</Button></div>
+          <div className="mt-5 flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <InputField label="Name" value={name} onChange={setName} placeholder="Your name" />
+            </div>
+            <div className="sm:pt-6">
+              <Button size="sm" onClick={() => void saveProfile()} disabled={savingProfile}>
+                {savingProfile ? "Saving…" : "Save Changes"}
+              </Button>
+            </div>
           </div>
         </Card>
 
