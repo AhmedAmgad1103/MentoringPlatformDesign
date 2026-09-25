@@ -5515,7 +5515,7 @@ function MentorDashboardScreen({
       })
       .finally(() => { if (!cancelled) setMenteesLoading(false); });
     return () => { cancelled = true; };
-  }, [onToast]);
+  }, []);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5962,7 +5962,7 @@ function MentorDashboardScreen({
               <div className="flex items-center gap-3">
                 <Avatar src={messageTarget.avatarUrl ?? undefined} name={messageTarget.name || "Student"} size={36} />
                 <div>
-                  <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
+                  <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name || "Student"}</div>
                   <div className="text-xs" style={{ color: C.textSec }}>Assigned mentee</div>
                 </div>
               </div>
