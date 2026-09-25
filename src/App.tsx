@@ -1698,8 +1698,9 @@ function VerifyScreen({
                   <Icons.Mail />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-bold tracking-[0.08em]" style={{ color: C.textSec }}>VERIFICATION EMAIL</div>
+                  <div className="text-[10px] font-bold tracking-[0.08em]" style={{ color: C.textSec }}>TEST MODE</div>
                   <div className="text-sm font-semibold truncate mt-0.5" style={{ color: C.text }}>{email}</div>
+                  <div className="text-[11px] mt-1" style={{ color: C.textSec }}>No code is sent yet. Any 6-digit code works.</div>
                 </div>
                 <div className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: "#fff", color: C.success }}>
                   SENT
