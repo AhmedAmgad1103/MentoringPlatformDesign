@@ -221,6 +221,7 @@ export async function getMentorQueue() {
     asker: q.student
       ? {
           name: q.student.name ?? "Student",
+          photo: q.student.avatarUrl ?? undefined,
         }
       : null,
     responses: q.answerCount,
