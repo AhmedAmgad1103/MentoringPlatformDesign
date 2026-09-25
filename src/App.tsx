@@ -8298,10 +8298,10 @@ function MenteeProfileScreen({
         fileToRead = converted;
       }
 
-      // Normalize the image to a browser-friendly JPEG and keep the stored
-      // profile photo small enough for the Base64 database field.
+      // Normalize the image to a browser-friendly JPEG and keep the
+      // Base64 payload comfortably below the API request size.
       const bitmap = await createImageBitmap(fileToRead);
-      const maxDimension = 1200;
+      const maxDimension = 800;
       const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
@@ -8313,11 +8313,39 @@ function MenteeProfileScreen({
       bitmap.close();
 
       const jpeg = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => (blob ? resolve(blob) : reject(new Error("JPEG conversion failed"))),
-          "image/jpeg",
-          0.82,
-        );
+        const qualities = [0.72, 0.6, 0.5, 0.4];
+        const maxBytes = 700 * 1024;
+        let lastBlob: Blob | null = null;
+
+        const tryQuality = (index: number) => {
+          if (index >= qualities.length) {
+            if (lastBlob) {
+              resolve(lastBlob);
+              return;
+            }
+            reject(new Error("JPEG conversion failed"));
+            return;
+          }
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("JPEG conversion failed"));
+                return;
+              }
+              lastBlob = blob;
+              if (blob.size <= maxBytes) {
+                resolve(blob);
+                return;
+              }
+              tryQuality(index + 1);
+            },
+            "image/jpeg",
+            qualities[index],
+          );
+        };
+
+        tryQuality(0);
       });
 
       const reader = new FileReader();
