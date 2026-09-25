@@ -2955,6 +2955,8 @@ function DashboardScreen({
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [hasMentorAccess, setHasMentorAccess] = useState(false);
+  const [switchingToMentor, setSwitchingToMentor] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -2964,8 +2966,40 @@ function DashboardScreen({
   const unreadCount = 0;
 
   useEffect(() => {
-    getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
+    let active = true;
+    getMe()
+      .then(async (me) => {
+        if (!active) return;
+        setCurrentUser(me);
+        try {
+          const roles = await getAvailableRoles(me.email);
+          if (active) setHasMentorAccess(roles.roles.includes("MENTOR"));
+        } catch {
+          if (active) setHasMentorAccess(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setCurrentUser(null);
+          setHasMentorAccess(false);
+        }
+      });
+    return () => { active = false; };
   }, []);
+
+  async function switchToMentorView() {
+    if (!currentUser?.email || !hasMentorAccess || switchingToMentor) return;
+    setSwitchingToMentor(true);
+    try {
+      await login(currentUser.email, "mentor");
+      onNavigate("mentor-dashboard");
+      onToast("success", "Switched to Mentor View.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to switch to Mentor View.");
+    } finally {
+      setSwitchingToMentor(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -3064,6 +3098,24 @@ function DashboardScreen({
           </div>
 
           <div className="flex items-center gap-2.5">
+            {hasMentorAccess && (
+              <button
+                type="button"
+                onClick={switchToMentorView}
+                disabled={switchingToMentor}
+                className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-[0.98]"
+                style={{
+                  color: C.primary,
+                  backgroundColor: C.primaryLight,
+                  border: `1px solid ${C.border}`,
+                  opacity: switchingToMentor ? 0.65 : 1,
+                }}
+                title="Switch to your approved mentor account"
+              >
+                <Icons.Users />
+                {switchingToMentor ? "Switching…" : "Mentor View"}
+              </button>
+            )}
             <div className="relative" ref={notifDropdownRef}>
               <button
                 aria-label="Notifications"
