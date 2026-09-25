@@ -360,6 +360,21 @@ export async function getAdminStats() {
   return request<AdminStats>("/api/admin/stats")
 }
 
+export type AdminPlatformSettings = {
+  autoApprovePublicNonAnonymous: boolean
+}
+
+export async function getAdminSettings() {
+  return request<AdminPlatformSettings>("/api/admin/settings")
+}
+
+export async function updateAdminSettings(input: AdminPlatformSettings) {
+  return request<AdminPlatformSettings>("/api/admin/settings", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+}
+
 export async function getAdminUsers(
   options: {
     role?: "STUDENT" | "MENTOR" | "ADMIN"
