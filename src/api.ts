@@ -30,6 +30,8 @@ import {
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
   getAvailableRoles as getAvailableRolesApi,
+  startEmailVerification as startEmailVerificationApi,
+  verifyEmailCode as verifyEmailCodeApi,
   updateMentorApproval as updateMentorApprovalApi,
   mentorSignup as mentorSignupApi,
   sendMessage as sendMessageApi,
@@ -374,6 +376,14 @@ export async function mentorSignup(email: string) {
 
 export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
   return getAvailableRolesApi(email);
+}
+
+export async function startEmailVerification(email: string) {
+  return startEmailVerificationApi(email);
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  return verifyEmailCodeApi(email, code);
 }
 
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
