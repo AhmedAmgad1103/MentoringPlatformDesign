@@ -335,9 +335,15 @@ body {
   opacity: 0.72;
 }
 
-/* Avatars should feel crisp and anchored to their surrounding content. */
+/* Avatars should feel crisp and centered in every usage.
+   Keep fallback initials as flex containers; only image avatars need block layout. */
 .ui-avatar {
+  object-position: center;
+}
+
+.ui-avatar img {
   display: block;
+  object-fit: cover;
   object-position: center;
 }
 
