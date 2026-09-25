@@ -15,6 +15,8 @@ import {
   getQuestionDetails,
   getQuestions,
   getMe,
+  getMentors,
+  getMyMentor,
   getAvailableRoles,
   startEmailVerification,
   verifyEmailCode,
@@ -4905,9 +4907,18 @@ function AskQuestionScreen({
   const [helpfulVotes, setHelpfulVotes] = useState<Set<number>>(new Set());
   const [submittedQuestionId, setSubmittedQuestionId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [assignedMentor, setAssignedMentor] = useState<{
+    id: string; name: string | null; email: string; avatarUrl: string | null;
+    mentorStatus: string; answerCount: number; studentCount: number;
+  } | null>(null);
+  const [mentors, setMentors] = useState<Array<{
+    id: string; name: string | null; avatarUrl: string | null; isMyMentor: boolean;
+  }>>([]);
 
   useEffect(() => {
     getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
+    getMyMentor().then((result) => setAssignedMentor(result.mentor)).catch(() => setAssignedMentor(null));
+    getMentors().then(setMentors).catch(() => setMentors([]));
   }, []);
 
   function resetForm() {
@@ -4986,16 +4997,20 @@ function AskQuestionScreen({
                     <PrivacyBadge type="private" />
                   </div>
                   <p className="text-sm leading-relaxed mb-3" style={{ color: C.textSec }}>
-                    Send a private question directly to your assigned mentor. Only you and Dr. Mariam Khaled will see this question.
+                    {assignedMentor
+                      ? `Send a private question directly to ${assignedMentor.name || "your assigned mentor"}. Only you and your assigned mentor will see this question.`
+                      : "You do not have an assigned mentor yet. Contact your administrator to get one assigned."}
                   </p>
                   <div className="flex items-center gap-2">
-                    <img
-                      src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-                      alt={currentUser?.assignedMentor?.name || "Assigned mentor"}
-                      className="w-7 h-7 rounded-full object-cover"
+                    <Avatar
+                      src={assignedMentor?.avatarUrl || undefined}
+                      name={assignedMentor?.name || "Assigned mentor"}
+                      size={28}
                     />
-                    <span className="text-xs font-medium" style={{ color: C.text }}>Dr. Mariam Khaled · Internal Medicine</span>
-                    <StatusDot available />
+                    <span className="text-xs font-medium" style={{ color: C.text }}>
+                      {assignedMentor?.name || "No mentor assigned"}
+                    </span>
+                    {assignedMentor && <StatusDot available={assignedMentor.mentorStatus === "APPROVED"} />}
                   </div>
                 </div>
                 <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
@@ -5031,15 +5046,15 @@ function AskQuestionScreen({
                   </p>
                   <div className="flex items-center gap-1.5">
                     <div className="flex -space-x-1.5">
-                      {[
-                        "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop",
-                        "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=40&h=40&fit=crop",
-                        "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=40&h=40&fit=crop",
-                      ].map((src, i) => (
-                        <img key={i} src={src} alt="" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
+                      {mentors.slice(0, 3).map((mentor) => (
+                        <span key={mentor.id} className="rounded-full border-2 border-white">
+                          <Avatar src={mentor.avatarUrl || undefined} name={mentor.name || "Mentor"} size={24} />
+                        </span>
                       ))}
                     </div>
-                    <span className="text-xs" style={{ color: C.textSec }}>2,400+ mentors available to answer</span>
+                    <span className="text-xs" style={{ color: C.textSec }}>
+                      {mentors.length} {mentors.length === 1 ? "mentor" : "mentors"} in the community
+                    </span>
                   </div>
                 </div>
                 <span style={{ color: C.textSec }} className="mt-1 flex-shrink-0"><Icons.ChevronRight /></span>
