@@ -9649,7 +9649,7 @@ function MobileNav({
     {
       s: "notifications-page" as Screen,
       label: "Questions",
-      badge: liveMentorQuestions?.filter((q) => q.type === "private").length ?? 0,
+      badge: notifCount,
       icon: (active: boolean) => (
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
           <path d="M19 11c0 3.5-3.582 7-8 7-.9 0-1.76-.14-2.53-.4L3 19.5l.8-3.5A7 7 0 014 11c0-3.5 3.582-7 8-7s7 3.5 7 7z"
