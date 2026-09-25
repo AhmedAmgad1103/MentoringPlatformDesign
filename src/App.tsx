@@ -2843,7 +2843,7 @@ function DashboardScreen({
           borderBottom: `1px solid ${C.border}`,
         }}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
           <Logo size="sm" />
 
           <div
@@ -2928,7 +2928,7 @@ function DashboardScreen({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 sm:py-10">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-7 sm:py-10">
         <section className="fade-in mb-7 sm:mb-9">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
             <div>
@@ -3559,7 +3559,7 @@ function PageHeader({
       className="sticky top-0 z-30 bg-white"
       style={{ borderBottom: `1px solid ${C.border}` }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
+      <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center gap-4">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors hover:opacity-80 flex-shrink-0"
@@ -3942,7 +3942,7 @@ function FeedScreen({
         className="sticky top-0 z-30 bg-white"
         style={{ borderBottom: `1px solid ${C.border}` }}
       >
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={onBack}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium flex-shrink-0 hover:opacity-80 transition-opacity"
@@ -3983,7 +3983,7 @@ function FeedScreen({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-[1600px] mx-auto px-6 py-8">
         {/* Page title */}
         <div className="mb-6 fade-in">
           <div className="flex items-end justify-between">
@@ -4332,7 +4332,7 @@ function QuestionDetailScreen({
         className="sticky top-0 z-30 bg-white"
         style={{ borderBottom: `1px solid ${C.border}` }}
       >
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={onBack}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium flex-shrink-0 hover:opacity-80 transition-opacity"
@@ -4370,7 +4370,7 @@ function QuestionDetailScreen({
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 fade-in">
+      <main className="max-w-7xl mx-auto px-6 py-8 fade-in">
         {loading && (
           <Card className="p-10 text-center mb-6">
             <p className="text-sm" style={{ color: C.textSec }}>
@@ -4831,7 +4831,7 @@ function AskPageHeader({
       className="sticky top-0 z-20 bg-white"
       style={{ borderBottom: `1px solid ${C.border}` }}
     >
-      <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
         <button
           onClick={onBack}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-80"
@@ -4988,7 +4988,7 @@ function AskQuestionScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <AskPageHeader onBack={onBack} title="Ask a Question" subtitle="Choose how you want to ask" />
-        <div className="max-w-3xl mx-auto px-6 py-10">
+        <div className="max-w-6xl mx-auto px-6 py-10">
           <div className="text-center mb-10 fade-in">
             <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>
               What would you like to ask?
@@ -5126,7 +5126,7 @@ function AskQuestionScreen({
           title="Ask My Mentor"
           subtitle={`Private question to ${currentUser?.assignedMentor?.name || "your assigned mentor"}`}
         />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+        <div className="max-w-5xl mx-auto px-6 py-8 fade-in">
           {/* Mentor preview */}
           <Card className="p-4 mb-6 flex items-center gap-3">
             <div className="relative">
@@ -5223,7 +5223,7 @@ function AskQuestionScreen({
           title="Ask Any Mentor"
           subtitle="Visible to all physician mentors at the school"
         />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+        <div className="max-w-5xl mx-auto px-6 py-8 fade-in">
           {/* Identity preview - loaded from the authenticated user */}
           <Card className="p-4 mb-6">
             <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: C.textSec }}>
@@ -5312,7 +5312,7 @@ function AskQuestionScreen({
           title="Ask Anonymously"
           subtitle="Your identity is fully protected"
         />
-        <div className="max-w-3xl mx-auto px-6 py-8 fade-in">
+        <div className="max-w-6xl mx-auto px-6 py-8 fade-in">
           {/* Privacy explanation panel */}
           <div
             className="rounded-2xl p-5 mb-8 flex items-start gap-4"
@@ -5447,7 +5447,7 @@ function AskQuestionScreen({
           title="Public Anonymous Question"
           subtitle="Visible to all students after moderator approval"
         />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+        <div className="max-w-5xl mx-auto px-6 py-8 fade-in">
           <Card className="p-4 mb-6 flex items-center gap-3">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
@@ -5505,7 +5505,7 @@ function AskQuestionScreen({
           title="Private Anonymous Question"
           subtitle="Visible only to mentors — your identity is hidden"
         />
-        <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
+        <div className="max-w-5xl mx-auto px-6 py-8 fade-in">
           <Card className="p-4 mb-6 flex items-center gap-3">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
@@ -5885,7 +5885,7 @@ function MentorAnswerScreen({
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
         <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-          <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
             <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
               <Icons.ArrowLeft /> Dashboard
             </button>
@@ -5959,7 +5959,7 @@ function MentorAnswerScreen({
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
             onClick={onBack}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0"
@@ -5980,7 +5980,7 @@ function MentorAnswerScreen({
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-8 fade-in">
+      <main className="max-w-6xl mx-auto px-6 py-8 fade-in">
         {/* Question card */}
         <Card className="p-5 mb-5">
           {/* Asker */}
@@ -6575,7 +6575,7 @@ function MentorDashboardScreen({
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center gap-4">
           <Logo size="sm" />
           <span
             className="px-2.5 py-1 rounded-lg text-xs font-semibold"
@@ -6660,7 +6660,7 @@ function MentorDashboardScreen({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-[1600px] mx-auto px-6 py-8">
         {/* Greeting */}
         <div className="mb-6 fade-in">
           <h1 className="text-2xl font-bold mb-0.5" style={{ color: C.text }}>
@@ -9212,14 +9212,14 @@ function MenteeProfileScreen({
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button onClick={() => onNavigate("dashboard")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
             <Icons.ArrowLeft /> <span className="hidden sm:inline">Dashboard</span>
           </button>
           <Logo size="sm" />
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-center gap-2 flex-shrink-0">
@@ -9356,14 +9356,14 @@ function MentorProfileScreen({
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button onClick={() => onNavigate("mentor-dashboard")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
             <Icons.ArrowLeft /> <span className="hidden sm:inline">Dashboard</span>
           </button>
           <Logo size="sm" />
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <Avatar name={user?.name || user?.email?.split("@")[0] || "Mentor"} size={80} />
@@ -9431,14 +9431,14 @@ function LeaderboardScreen({
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 flex-shrink-0" style={{ color: C.textSec, backgroundColor: C.borderLight }}>
             <Icons.ArrowLeft /><span className="hidden sm:inline">Dashboard</span>
           </button>
           <Logo size="sm" />
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 fade-in">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 fade-in">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold mb-1" style={{ color: C.text }}>🏆 Top Mentors</h1>
           <p className="text-sm" style={{ color: C.textSec }}>Ranked by reward points — earned for answering, helpful votes, and fast responses.</p>
@@ -9526,7 +9526,7 @@ function NotificationsPageScreen({
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <button onClick={onBack} className="p-2 rounded-xl" style={{ color: C.textSec, backgroundColor: C.borderLight }}><Icons.ArrowLeft /></button>
           <div className="flex-1">
             <h1 className="font-bold" style={{ color: C.text }}>Notifications</h1>
@@ -9535,7 +9535,7 @@ function NotificationsPageScreen({
           {unreadCount > 0 && <Button variant="ghost" size="sm" onClick={() => void markAllRead()}>Mark all read</Button>}
         </div>
       </header>
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {loading ? (
           <Card className="p-8 text-center"><p className="text-sm" style={{ color: C.textSec }}>Loading notifications…</p></Card>
         ) : error ? (
