@@ -4599,7 +4599,11 @@ function AskQuestionScreen({
               Your question will appear as:
             </div>
             <div className="flex items-center gap-3">
-              <Avatar name={currentUser?.name || currentUser?.email || "Student"} size={40} />
+              <Avatar
+                src={currentUser?.avatarUrl || undefined}
+                name={currentUser?.name || currentUser?.email || "Student"}
+                size={40}
+              />
               <div className="min-w-0">
                 <div className="font-semibold text-sm truncate" style={{ color: C.text }}>
                   {currentUser?.name || "Student"}
