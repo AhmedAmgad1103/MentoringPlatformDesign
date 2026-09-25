@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { getQuestions, createQuestion, sendMessage } from "./api";
+import { getQuestions, createQuestion, sendMessage, getAssignedMentees, type AssignedMentee } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -5500,9 +5500,22 @@ function MentorDashboardScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const notifReadIds: number[] = [];
-  const [messageTarget, setMessageTarget] = useState<(typeof MENTOR_MENTEES_DATA)[number] | null>(null);
+  const [messageTarget, setMessageTarget] = useState<AssignedMentee | null>(null);
+  const [assignedMentees, setAssignedMentees] = useState<AssignedMentee[]>([]);
+  const [menteesLoading, setMenteesLoading] = useState(true);
   const [messageText, setMessageText] = useState("");
   const [showAllMentees, setShowAllMentees] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAssignedMentees()
+      .then(({ items }) => { if (!cancelled) setAssignedMentees(items); })
+      .catch((error) => {
+        if (!cancelled) onToast("error", error instanceof Error ? error.message : "Unable to load assigned mentees.");
+      })
+      .finally(() => { if (!cancelled) setMenteesLoading(false); });
+    return () => { cancelled = true; };
+  }, [onToast]);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -5539,7 +5552,7 @@ function MentorDashboardScreen({
   const STATS = [
     {
       label: "Assigned Mentees",
-      value: MENTOR_MENTEES_DATA.length,
+      value: assignedMentees.length,
       bg: C.successLight,
       color: C.success,
       icon: (
@@ -5740,45 +5753,22 @@ function MentorDashboardScreen({
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {MENTOR_MENTEES_DATA.map((m) => (
+              {menteesLoading ? (
+                <p className="text-sm" style={{ color: C.textSec }}>Loading assigned mentees…</p>
+              ) : assignedMentees.length === 0 ? (
+                <p className="text-sm" style={{ color: C.textSec }}>No assigned mentees yet.</p>
+              ) : assignedMentees.map((m) => (
                 <Card key={m.id} className="p-4">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="relative flex-shrink-0">
-                      <img
-                        src={m.photo}
-                        alt={m.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <span className="absolute -bottom-0.5 -right-0.5">
-                        <StatusDot available={m.active} />
-                      </span>
+                      <Avatar src={m.avatarUrl ?? undefined} name={m.name || "Student"} size={48} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm" style={{ color: C.text }}>
-                        {m.name}
+                        {m.name || "Student"}
                       </div>
-                      <div className="text-xs" style={{ color: C.textSec }}>
-                        {m.year} · {m.track}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
-                        {m.active ? "● Active now" : `Last active: ${m.lastActivity}`}
-                      </div>
+                      <div className="text-xs" style={{ color: C.textSec }}>Assigned mentee</div>
                     </div>
-                  </div>
-
-                  <div
-                    className="text-xs leading-snug mb-3 px-3 py-2 rounded-lg overflow-hidden"
-                    style={{
-                      backgroundColor: C.bg,
-                      border: `1px solid ${C.border}`,
-                      color: C.textSec,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                    }}
-                  >
-                    <strong style={{ color: C.text }}>Latest: </strong>
-                    {m.lastQuestion}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -5791,7 +5781,7 @@ function MentorDashboardScreen({
                       Message
                     </Button>
                     <span className="text-xs ml-auto" style={{ color: C.textSec }}>
-                      {m.totalQuestions} questions
+                      {m.questionCount} questions
                     </span>
                   </div>
                 </Card>
@@ -5917,7 +5907,7 @@ function MentorDashboardScreen({
               <div>
                 <h3 className="text-base font-bold" style={{ color: C.text }}>All My Mentees</h3>
                 <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
-                  {MENTOR_MENTEES_DATA.length} assigned mentees
+                  {assignedMentees.length} assigned mentees
                 </p>
               </div>
               <button
@@ -5930,27 +5920,21 @@ function MentorDashboardScreen({
               </button>
             </div>
             <div className="p-5 overflow-y-auto flex flex-col gap-3">
-              {MENTOR_MENTEES_DATA.map((m) => (
+              {assignedMentees.map((m) => (
                 <div
                   key={m.id}
                   className="flex items-center gap-3 p-3 rounded-xl"
                   style={{ backgroundColor: C.bg, border: "1px solid " + C.border }}
                 >
                   <div className="relative flex-shrink-0">
-                    <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover" />
-                    <span className="absolute -bottom-0.5 -right-0.5">
-                      <StatusDot available={m.active} />
-                    </span>
+                    <Avatar src={m.avatarUrl ?? undefined} name={m.name || "Student"} size={44} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold" style={{ color: C.text }}>{m.name}</div>
-                    <div className="text-xs" style={{ color: C.textSec }}>{m.year} · {m.track}</div>
-                    <div className="text-xs mt-0.5" style={{ color: m.active ? C.success : C.textSec }}>
-                      {m.active ? "● Active now" : "Last active: " + m.lastActivity}
-                    </div>
+                    <div className="text-sm font-semibold" style={{ color: C.text }}>{m.name || "Student"}</div>
+                    <div className="text-xs" style={{ color: C.textSec }}>Assigned mentee</div>
                   </div>
                   <span className="text-xs" style={{ color: C.textSec }}>
-                    {m.totalQuestions} questions
+                    {m.questionCount} questions
                   </span>
                 </div>
               ))}
@@ -5976,10 +5960,10 @@ function MentorDashboardScreen({
           >
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
               <div className="flex items-center gap-3">
-                <img src={messageTarget.photo} alt={messageTarget.name} className="w-9 h-9 rounded-full object-cover" />
+                <Avatar src={messageTarget.avatarUrl ?? undefined} name={messageTarget.name || "Student"} size={36} />
                 <div>
                   <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
-                  <div className="text-xs" style={{ color: C.textSec }}>{messageTarget.year} · {messageTarget.track}</div>
+                  <div className="text-xs" style={{ color: C.textSec }}>Assigned mentee</div>
                 </div>
               </div>
               <button
