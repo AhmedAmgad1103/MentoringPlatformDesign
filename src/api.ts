@@ -1,3 +1,12 @@
+export type AssignedMentee = {
+  id: string;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  createdAt: string;
+  questionCount: number;
+};
+
 export type Question = {
   id: number;
   title: string;
@@ -47,11 +56,16 @@ export function createQuestion(payload: {
 }
 
 export function sendMessage(payload: {
-  recipientId: number;
+  recipientId: string;
   body: string;
 }) {
   return request<{ id: number; recipientId: number; body: string }>("/api/messages", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+
+export function getAssignedMentees() {
+  return request<{ items: AssignedMentee[] }>("/api/mentors/me/mentees");
 }
