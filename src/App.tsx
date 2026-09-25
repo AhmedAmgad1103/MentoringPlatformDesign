@@ -8256,13 +8256,26 @@ function MenteeProfileScreen({
   async function handleAvatarChange(file: File | null) {
     if (!file) return;
 
-    const extension = file.name.split(".").pop()?.toLowerCase();
+    const fileName = file.name.trim().toLowerCase();
+    const fileType = file.type.trim().toLowerCase();
     const isHeic =
-      extension === "heic" ||
-      extension === "heif" ||
-      file.type === "image/heic" ||
-      file.type === "image/heif";
-    const isImage = file.type.startsWith("image/") || isHeic;
+      /\\.(heic|heif)$/.test(fileName) ||
+      fileType === "image/heic" ||
+      fileType === "image/heif" ||
+      fileType === "image/heic-sequence" ||
+      fileType === "image/heif-sequence";
+    const isImage =
+      isHeic ||
+      fileType.startsWith("image/") ||
+      /\\.(jpe?g|png|gif|webp|bmp|avif)$/.test(fileName);
+
+    console.log("[Profile photo] selected file:", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      isHeic,
+      isImage,
+    });
 
     if (!isImage) {
       onToast("error", "Please select an image file.");
