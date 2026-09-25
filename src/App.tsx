@@ -6776,6 +6776,25 @@ function MentorDashboardScreen({
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <rect x="4" y="8.5" width="10" height="8" rx="2" stroke="currentColor" strokeWidth="1.4" />
           <path d="M6.5 8.5V6.5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="9" cy="12.5" r="1" fill="currentColor" />
+        </svg>
+      ),
+    },
+    {
+      label: "Activity Today",
+      value: 5,
+      bg: "#EDE9FE",
+      color: "#7C3AED",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M2 9h2.5l2-5 3 10 2-7 1.5 4H16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
