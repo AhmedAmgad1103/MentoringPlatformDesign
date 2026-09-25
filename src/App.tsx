@@ -14,7 +14,6 @@ import {
   getQuestionDetails,
   getQuestions,
   getMe,
-  getMyMentor,
   getAvailableRoles,
   mentorSignup,
   updateMentorApproval,
@@ -2218,7 +2217,6 @@ function DashboardScreen({
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
-  const [myMentor, setMyMentor] = useState<Awaited<ReturnType<typeof getMyMentor>>["mentor"]>(null);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -2233,7 +2231,6 @@ function DashboardScreen({
 
   useEffect(() => {
     getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
-    getMyMentor().then(({ mentor }) => setMyMentor(mentor)).catch(() => setMyMentor(null));
   }, []);
 
   useEffect(() => {
@@ -2645,33 +2642,23 @@ function DashboardScreen({
                 MY MENTOR
               </h2>
               <Card className="p-5">
-                {myMentor ? (
+                {currentUser?.assignedMentor ? (
                   <>
                     <div className="flex items-start gap-3 mb-4">
                       <div className="relative">
-                        <Avatar name={myMentor.name || "Mentor"} size={56} />
+                        <Avatar name={currentUser.assignedMentor.name || "Mentor"} size={56} />
                         <span className="absolute -bottom-0.5 -right-0.5">
-                          <StatusDot available={myMentor.mentorStatus === "APPROVED"} />
+                          <StatusDot available />
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-sm leading-tight" style={{ color: C.text }}>
-                          {myMentor.name || "Assigned Mentor"}
+                          {currentUser.assignedMentor.name || "Assigned Mentor"}
                         </div>
                         <div className="text-xs mt-0.5 mb-1.5" style={{ color: C.textSec }}>
                           Physician Mentor
                         </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge variant={myMentor.mentorStatus === "APPROVED" ? "success" : "pending"}>
-                            {myMentor.mentorStatus === "APPROVED" ? "Available" : "Pending"}
-                          </Badge>
-                          <span
-                            className="text-xs px-2 py-0.5 rounded-full font-medium"
-                            style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                          >
-                            {myMentor.answerCount} answers
-                          </span>
-                        </div>
+                        <Badge variant="success">Available</Badge>
                       </div>
                     </div>
 
@@ -2690,12 +2677,6 @@ function DashboardScreen({
                   </>
                 ) : (
                   <div className="text-center py-3">
-                    <div
-                      className="mx-auto mb-3 w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: C.primaryLight, color: C.primary }}
-                    >
-                      <Icons.User />
-                    </div>
                     <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
                       No mentor assigned yet
                     </div>
