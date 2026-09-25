@@ -2869,7 +2869,7 @@ function DashboardScreen({
     try {
       await markNotificationRead(String(id));
       setDashboardNotifications((items) => items.map((item) => item.id === id ? { ...item, read: true } : item));
-      onMarkRead?.(Number(id));
+      if (typeof id === "number") onMarkRead?.(id);
     } catch (error) {
       onToast("error", error instanceof Error ? error.message : "Unable to mark notification as read.");
     }
