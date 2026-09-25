@@ -3240,7 +3240,7 @@ function DashboardScreen({
                   <>
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <Avatar name={currentUser.assignedMentor.name || "Mentor"} size={52} />
+                        <Avatar src={currentUser.assignedMentor.avatarUrl || undefined} name={currentUser.assignedMentor.name || "Mentor"} size={52} />
                         <span className="absolute -bottom-0.5 -right-0.5">
                           <StatusDot available />
                         </span>
