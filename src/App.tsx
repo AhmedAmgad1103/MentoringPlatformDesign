@@ -806,26 +806,7 @@ const QUESTIONS = [
   },
 ];
 
-const NOTIFICATIONS = [
-  {
-    id: 1,
-    message: "Dr. Mariam Khaled answered your question about PE management",
-    time: "2 hours ago",
-    read: false,
-  },
-  {
-    id: 2,
-    message: "Your anonymous question received 2 new responses",
-    time: "Yesterday",
-    read: false,
-  },
-  {
-    id: 3,
-    message: "Reminder: Your mentoring session is tomorrow at 3:00 PM",
-    time: "2 days ago",
-    read: true,
-  },
-];
+
 
 const ASK_CATEGORIES = [
   "Clinical Rotations",
@@ -900,104 +881,7 @@ interface FeedQuestion {
   moderationStatus?: "NOT_REQUIRED" | "PENDING" | "APPROVED" | "REJECTED";
 }
 
-const FEED_QUESTIONS: FeedQuestion[] = [
-  {
-    id: 101,
-    title: "How did you prepare for Step 2 CK?",
-    preview: "I'm an M3 starting my dedicated study period and feeling overwhelmed by the breadth of clinical material. What resources did you use and how did you structure your days?",
-    full: "I'm an M3 entering my dedicated Step 2 CK study period and feeling genuinely overwhelmed by how different it feels from Step 1. My school recommends Amboss and UWorld but I've heard very mixed things. I have about 8 weeks before my exam. What resources and day-structure strategies actually worked for you? And how do you handle weak subjects when time is running out?",
-    category: "Board Exams",
-    date: "Aug 29, 2026",
-    responses: 4,
-    helpful: 23,
-    boosted: 15,
-    tags: ["Step 2 CK", "Boards", "Study Schedule"],
-  },
-  {
-    id: 102,
-    title: "What should I expect during my first surgery rotation?",
-    preview: "Starting my surgery clerkship next week. I've heard everything from 'best rotation ever' to 'make sure you eat.' What should I realistically prepare for?",
-    full: "Starting my surgery clerkship next week. I'm M3 with no prior surgical exposure outside the skills lab. I've heard wildly different accounts from upperclassmen — some say it was transformative, others say it nearly broke them. What should I realistically prepare for? How early should I arrive? What's the quickest way to build trust with residents and attendings? And is the culture really as intense as it's made out to be?",
-    category: "Clinical Rotations",
-    date: "Aug 27, 2026",
-    responses: 6,
-    helpful: 31,
-    boosted: 24,
-    tags: ["Surgery", "Clerkship", "M3"],
-  },
-  {
-    id: 103,
-    title: "How do I balance research with clinical rotations?",
-    preview: "I have an ongoing faculty project and I'm entering my clinical year. How do you find time for both without burning out?",
-    full: "I have an ongoing research project with a faculty mentor that I started during M2. Now that I'm starting rotations, I'm not sure how to keep the project moving alongside lab meetings, data analysis, and manuscript revisions. Has anyone navigated this successfully? Did the concurrent research ultimately help or hurt your clinical performance? And how much does it actually add to a residency application when completed?",
-    category: "Research",
-    date: "Aug 25, 2026",
-    responses: 3,
-    helpful: 18,
-    boosted: 9,
-    tags: ["Research", "M3", "Residency"],
-  },
-  {
-    id: 104,
-    title: "Dealing with imposter syndrome as an M1 — is this normal?",
-    preview: "Three months in and I constantly feel like I don't belong. My classmates all seem so confident. Is this imposter syndrome, and when does it get better?",
-    full: "Three months into M1 and I still feel like I don't belong here. My classmates seem confident in PBL, in the hallways, in every conversation about medicine. I feel like I'm perpetually catching up. I studied hard to get here but it sometimes feels like a mistake. Is this common? How did you get through it during your own training? When does it start to feel like you actually belong?",
-    category: "Wellness & Burnout",
-    date: "Aug 24, 2026",
-    responses: 8,
-    helpful: 47,
-    boosted: 33,
-    tags: ["Wellness", "M1", "Mental Health"],
-  },
-  {
-    id: 105,
-    title: "How early should I start thinking about residency specialty?",
-    preview: "I'm M2 and already feel pressure to know my specialty. Some classmates seem completely certain. How did you decide, and when is undecided actually okay?",
-    full: "I'm M2 and there's enormous pressure to already know what specialty I want to pursue. Some classmates seem certain — already doing sub-specialty research and networking. I genuinely don't know what I want, and I feel behind. How did you actually decide on your specialty? When is it truly okay to go into M3 without an answer? And will being undecided hurt me in the match if I don't lock in early?",
-    category: "Residency Match",
-    date: "Aug 22, 2026",
-    responses: 5,
-    helpful: 29,
-    boosted: 19,
-    tags: ["Specialty", "M2", "Career"],
-  },
-  {
-    id: 106,
-    title: "Tips for writing a strong research abstract as a medical student?",
-    preview: "First abstract submission coming up for a regional conference. I've never written one. What makes a student abstract compelling enough to get accepted?",
-    full: "I have my first abstract deadline coming up for a regional internal medicine conference. My PI is giving me a lot of creative latitude, which is exciting but also terrifying. What makes a medical student abstract strong enough to get accepted? What are the most common mistakes first-time submitters make? How do I write compellingly when I'm working with preliminary and not final data?",
-    category: "Research",
-    date: "Aug 20, 2026",
-    responses: 2,
-    helpful: 11,
-    boosted: 6,
-    tags: ["Abstract", "Conference", "Writing"],
-  },
-  {
-    id: 107,
-    title: "Practical strategies for managing burnout during dedicated Step 1?",
-    preview: "Six weeks into dedicated and I'm hitting a wall. Motivation is gone, I'm crying over question blocks. How do you push through without falling apart?",
-    full: "Six weeks into Step 1 dedicated and I'm hitting a serious wall. My motivation has evaporated. I'm making careless mistakes on blocks where I know the material. I had a breakdown after a bad NBME. I know burnout during dedicated is common — knowing that doesn't help me get through it. What practical strategies actually worked for you in the last stretch? How do you maintain performance when you're emotionally depleted?",
-    category: "Wellness & Burnout",
-    date: "Aug 18, 2026",
-    responses: 7,
-    helpful: 38,
-    boosted: 27,
-    tags: ["Burnout", "Step 1", "Mental Health"],
-  },
-  {
-    id: 108,
-    title: "How do I approach a difficult patient conversation on rounds?",
-    preview: "My attending asked me to tell a patient their biopsy came back positive. I've never done this in real life. How do I prepare and what do I actually say?",
-    full: "On my oncology rotation, my attending asked me to lead a conversation with a patient receiving positive biopsy results. I've practiced breaking bad news in standardized patient sessions but this is completely real and I'm terrified of saying the wrong thing. How do you prepare mentally and practically? What frameworks actually hold up under pressure? And honestly — what happens if I freeze mid-conversation?",
-    category: "Clinical Skills",
-    date: "Aug 16, 2026",
-    responses: 4,
-    helpful: 22,
-    boosted: 14,
-    tags: ["Communication", "Oncology", "Clinical"],
-  },
-];
+
 
 interface NotificationItem {
   id: string | number;
@@ -1028,53 +912,7 @@ interface MentorQuestion {
   reportedByMe?: boolean;
 }
 
-const MENTOR_WAITING_QUESTIONS: MentorQuestion[] = [
-  {
-    id: 1001,
-    type: "private",
-    question: "How do I approach a patient presenting with chest pain in the outpatient setting? When do I refer to cardiology versus manage independently?",
-    category: "Clinical Skills",
-    date: "Aug 29, 2026",
-    priority: "high",
-    asker: {
-      name: "Alex Johnson",
-      year: "M2",
-      track: "Preclinical",
-      photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&h=80&fit=crop&auto=format",
-    },
-    responses: 0,
-  },
-  {
-    id: 1002,
-    type: "private",
-    question: "Can you review my personal statement before I submit to ERAS? I'm applying primarily to internal medicine programs — I've attached a draft.",
-    category: "Residency Match",
-    date: "Aug 28, 2026",
-    priority: "normal",
-    asker: {
-      name: "Sarah Chen",
-      year: "M3",
-      track: "Clinical Rotations",
-      photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format",
-    },
-    responses: 0,
-  },
-  {
-    id: 1003,
-    type: "private",
-    question: "I'm struggling with renal physiology — the tubular transport concepts aren't clicking. Are there any frameworks or analogies that helped you understand them?",
-    category: "Study Skills",
-    date: "Aug 27, 2026",
-    priority: "normal",
-    asker: {
-      name: "Marcus Williams",
-      year: "M1",
-      track: "Preclinical",
-      photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&auto=format",
-    },
-    responses: 0,
-  },
-];
+
 
 const MENTOR_ANY_QUESTIONS: MentorQuestion[] = [
   {
@@ -9811,7 +9649,7 @@ function MobileNav({
     {
       s: "notifications-page" as Screen,
       label: "Questions",
-      badge: MENTOR_WAITING_QUESTIONS.length,
+      badge: liveMentorQuestions?.filter((q) => q.type === "private").length ?? 0,
       icon: (active: boolean) => (
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
           <path d="M19 11c0 3.5-3.582 7-8 7-.9 0-1.76-.14-2.53-.4L3 19.5l.8-3.5A7 7 0 014 11c0-3.5 3.582-7 8-7s7 3.5 7 7z"
