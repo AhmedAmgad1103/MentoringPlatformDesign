@@ -15,6 +15,7 @@ import {
   getQuestionDetails,
   getQuestions,
   getMe,
+  getMessages,
   getMentors,
   getMyMentor,
   getAvailableRoles,
@@ -2699,6 +2700,8 @@ function DashboardScreen({
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [mentorMessages, setMentorMessages] = useState<Awaited<ReturnType<typeof getMessages>>["items"]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [dashboardNotifications, setDashboardNotifications] = useState<NotificationItem[]>([]);
   const [switchingToMentor, setSwitchingToMentor] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -2783,6 +2786,34 @@ function DashboardScreen({
       });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const mentorId = currentUser?.assignedMentor?.id;
+    if (!mentorId) {
+      setMentorMessages([]);
+      return;
+    }
+
+    let active = true;
+    const refreshMessages = async () => {
+      try {
+        const response = await getMessages(mentorId);
+        if (active) setMentorMessages(response.items);
+      } catch {
+        if (active) setMentorMessages([]);
+      } finally {
+        if (active) setMessagesLoading(false);
+      }
+    };
+
+    setMessagesLoading(true);
+    void refreshMessages();
+    const timer = window.setInterval(() => { void refreshMessages(); }, 10000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [currentUser?.assignedMentor?.id]);
 
   useEffect(() => {
     if (!notifDropdownOpen) return;
@@ -3301,6 +3332,50 @@ function DashboardScreen({
                 )}
               </Card>
             </div>
+
+            {currentUser?.assignedMentor && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold" style={{ color: C.text }}>Messages from your mentor</h2>
+                  {mentorMessages.some((message) => message.senderId === currentUser.assignedMentor?.id) && (
+                    <span className="text-[10px] font-semibold" style={{ color: C.primary }}>New messages</span>
+                  )}
+                </div>
+                <Card className="p-4">
+                  {messagesLoading && mentorMessages.length === 0 ? (
+                    <p className="text-xs" style={{ color: C.textSec }}>Loading messages…</p>
+                  ) : mentorMessages.length === 0 ? (
+                    <div className="py-2">
+                      <p className="text-sm font-medium" style={{ color: C.text }}>No messages yet</p>
+                      <p className="text-xs mt-1" style={{ color: C.textSec }}>Messages from {currentUser.assignedMentor.name || "your mentor"} will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {mentorMessages.slice(-3).map((message) => (
+                        <div key={message.id} className="rounded-xl p-3" style={{ backgroundColor: C.bg }}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Avatar
+                              src={currentUser.assignedMentor?.avatarUrl || undefined}
+                              name={currentUser.assignedMentor?.name || "Mentor"}
+                              size={28}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold" style={{ color: C.text }}>
+                                {message.senderId === currentUser.assignedMentor?.id
+                                  ? currentUser.assignedMentor?.name || "Your mentor"
+                                  : "You"}
+                              </p>
+                              <p className="text-[10px]" style={{ color: C.textSec }}>{formatDateTime(message.createdAt)}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap break-words" style={{ color: C.text }}>{message.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
 
             <div>
               <div className="flex items-center justify-between mb-3">
