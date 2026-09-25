@@ -8362,7 +8362,7 @@ function MenteeProfileScreen({
               <Avatar src={avatarUrl || undefined} name={user?.name || user?.email?.split("@")[0] || "User"} size={80} />
               <button
                 type="button"
-                className="text-xs font-semibold"
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors hover:bg-[#F0EDFF]"
                 style={{ color: C.primary }}
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -8381,7 +8381,7 @@ function MenteeProfileScreen({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,.heic,.heif"
+                accept="image/*,.heic,.heif,.HEIC,.HEIF"
                 className="hidden"
                 onChange={(e) => {
                   void handleAvatarChange(e.target.files?.[0] ?? null);
