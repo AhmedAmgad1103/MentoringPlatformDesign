@@ -9723,7 +9723,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | number>(101);
   const [questionToAnswer, setQuestionToAnswer] = useState<MentorQuestion | null>(null);
-  let toastId = 0;
+  const toastId = useRef(0);
 
   async function handleLogout() {
     try {
@@ -9736,7 +9736,7 @@ export default function App() {
 
 
   function addToast(type: ToastType, message: string) {
-    const id = ++toastId;
+    const id = ++toastId.current;
     setToasts((prev) => [...prev, { id, type, message }]);
   }
 
