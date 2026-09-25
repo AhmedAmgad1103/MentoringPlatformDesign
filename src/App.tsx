@@ -6793,7 +6793,7 @@ function MentorDashboardScreen({
         {/* Greeting */}
         <div className="mb-6 fade-in">
           <h1 className="text-2xl font-bold mb-0.5" style={{ color: C.text }}>
-            Good morning, Dr. Khaled. 👋
+            Good morning, {mentorProfile?.name?.trim().split(/\s+/)[0] || "there"}. 👋
           </h1>
           <p className="text-sm" style={{ color: C.textSec }}>
             You have <strong style={{ color: C.error }}>{totalWaiting} questions</strong> waiting for your response today.
@@ -6881,8 +6881,8 @@ function MentorDashboardScreen({
           </Card>
         </section>
 
-        {savedDrafts.length > 0 && (
-          <Card className="p-4 mb-6 fade-in">
+        <Card className="p-4 mb-6 fade-in">
+
             <button
               className="w-full flex items-center justify-between text-left"
               onClick={() => setDraftsOpen((open) => !open)}
@@ -6890,7 +6890,7 @@ function MentorDashboardScreen({
               <div>
                 <h3 className="text-sm font-bold" style={{ color: C.text }}>Saved drafts</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: C.textSec }}>
-                  {savedDrafts.length} response{savedDrafts.length === 1 ? "" : "s"} waiting to be finished
+                  {savedDrafts.length === 0 ? "No unfinished responses saved" : `${savedDrafts.length} response${savedDrafts.length === 1 ? "" : "s"} waiting to be finished`}
                 </p>
               </div>
               <span className="px-2 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
@@ -6911,7 +6911,6 @@ function MentorDashboardScreen({
               </div>
             )}
           </Card>
-        )}
 
         {/* Dashboard filters */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
