@@ -707,6 +707,11 @@ const Icons = {
       <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   ),
+  Trash: () => (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3.5 4.5h9M6 4.5V3h4v1.5M5 6.5v5.5M8 6.5v5.5M11 6.5v5.5M4.5 4.5l.5 9h6l.5-9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 };
 
 // ─── SAMPLE DATA ─────────────────────────────────────────────────────────────
