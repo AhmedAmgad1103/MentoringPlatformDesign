@@ -2955,7 +2955,6 @@ function DashboardScreen({
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
-  const [hasMentorAccess, setHasMentorAccess] = useState(false);
   const [switchingToMentor, setSwitchingToMentor] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
@@ -2968,27 +2967,17 @@ function DashboardScreen({
   useEffect(() => {
     let active = true;
     getMe()
-      .then(async (me) => {
-        if (!active) return;
-        setCurrentUser(me);
-        try {
-          const roles = await getAvailableRoles(me.email);
-          if (active) setHasMentorAccess(roles.roles.includes("MENTOR"));
-        } catch {
-          if (active) setHasMentorAccess(false);
-        }
+      .then((me) => {
+        if (active) setCurrentUser(me);
       })
       .catch(() => {
-        if (active) {
-          setCurrentUser(null);
-          setHasMentorAccess(false);
-        }
+        if (active) setCurrentUser(null);
       });
     return () => { active = false; };
   }, []);
 
   async function switchToMentorView() {
-    if (!currentUser?.email || !hasMentorAccess || switchingToMentor) return;
+    if (!currentUser?.email || !currentUser.hasApprovedMentorAccount || switchingToMentor) return;
     setSwitchingToMentor(true);
     try {
       await login(currentUser.email, "mentor");
@@ -3098,7 +3087,7 @@ function DashboardScreen({
           </div>
 
           <div className="flex items-center gap-2.5">
-            {hasMentorAccess && (
+            {currentUser?.hasApprovedMentorAccount && (
               <button
                 type="button"
                 onClick={switchToMentorView}
