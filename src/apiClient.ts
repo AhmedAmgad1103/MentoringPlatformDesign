@@ -236,6 +236,7 @@ export type MyMentorResponse = {
     id: string
     name: string | null
     email: string
+    avatarUrl: string | null
     mentorStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
     answerCount: number
     studentCount: number
@@ -251,6 +252,7 @@ export async function getMentors() {
     Array<{
       id: string
       name: string | null
+      avatarUrl: string | null
       isMyMentor: boolean
     }>
   >("/api/mentors")
