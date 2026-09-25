@@ -337,8 +337,8 @@ export async function getMe(): Promise<ApiUser> {
   return getMeApi();
 }
 
-export async function updateMe(name: string | null) {
-  return updateMeApi({ name });
+export async function updateMe(input: { name?: string | null; avatarUrl?: string | null }) {
+  return updateMeApi(input);
 }
 
 export async function getMentorProfileById(id: string) {
