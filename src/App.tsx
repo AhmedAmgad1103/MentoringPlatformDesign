@@ -1681,7 +1681,7 @@ function VerifyScreen({
                 Check your school email
               </h1>
               <p className="text-sm leading-6 mt-2 max-w-md" style={{ color: C.textSec }}>
-                Enter the 6-digit code we sent to{" "}
+                Enter any 6-digit code to continue{" "}
                 <span className="font-semibold" style={{ color: C.text }}>{email}</span>
               </p>
             </div>
@@ -1698,7 +1698,7 @@ function VerifyScreen({
                   <Icons.Mail />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-bold tracking-[0.08em]" style={{ color: C.textSec }}>CODE SENT TO</div>
+                  <div className="text-[10px] font-bold tracking-[0.08em]" style={{ color: C.textSec }}>VERIFICATION EMAIL</div>
                   <div className="text-sm font-semibold truncate mt-0.5" style={{ color: C.text }}>{email}</div>
                 </div>
                 <div className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: "#fff", color: C.success }}>
