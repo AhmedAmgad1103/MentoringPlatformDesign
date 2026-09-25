@@ -6882,21 +6882,6 @@ function MentorDashboardScreen({
         </div>
       </header>
 
-           <span className="absolute -bottom-0.5 -right-0.5">
-                  <StatusDot available />
-                </span>
-              </div>
-              <div className="hidden sm:block text-left">
-                <div className="text-xs font-semibold" style={{ color: C.text }}>
-                  {mentorProfile?.name || "Mentor"}
-                </div>
-                <div className="text-xs" style={{ color: C.textSec }}>Mentor</div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-6xl mx-auto px-6 py-8">
         {/* Greeting */}
         <div className="mb-6 fade-in">
