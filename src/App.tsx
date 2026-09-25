@@ -6488,7 +6488,6 @@ function MentorDashboardScreen({
   const [activeSection, setActiveSection] = useState<"all" | "mentees" | "waiting" | "any" | "anon">("all");
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  const notifReadIds: Array<string | number> = mentorNotifications.filter((n) => !n.read).map((n) => n.id);
   type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & { id: string | number };
   const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
@@ -6510,6 +6509,8 @@ function MentorDashboardScreen({
     answer: string;
     savedAt: string;
   }>>([]);
+
+  const notifReadIds: Array<string | number> = mentorNotifications.filter((n) => !n.read).map((n) => n.id);
 
   useEffect(() => {
     let active = true;
