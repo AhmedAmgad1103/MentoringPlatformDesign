@@ -1296,7 +1296,9 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
   function validateEmail(v: string) {
     if (!v) return "";
     if (!v.includes("@")) return "";
-    if (!v.endsWith(".edu")) return "Please use your official medical school email address.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())) {
+      return "Please enter a valid email address.";
+    }
     return "";
   }
 
@@ -1318,7 +1320,7 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
     }
   }
 
-  const isValid = email.endsWith(".edu") && password.length >= 1;
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && password.length >= 1;
 
   return (
     <div
@@ -1451,7 +1453,7 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
                     value={email}
                     onChange={handleEmailChange}
                     error={emailError}
-                    helperText={!emailError ? "Use your official medical school email address." : undefined}
+                    helperText={!emailError ? "Use the email address you want to use for MedMentor." : undefined}
                     icon={<Icons.Mail />}
                   />
                   {email.endsWith(".edu") && !emailError && (
@@ -1459,7 +1461,7 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
                       <span className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: C.successLight }}>
                         <Icons.Check />
                       </span>
-                      <span className="text-xs font-medium" style={{ color: C.success }}>Valid school email</span>
+                      <span className="text-xs font-medium" style={{ color: C.success }}>Valid email</span>
                     </div>
                   )}
                 </div>
