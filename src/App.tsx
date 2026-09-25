@@ -5415,7 +5415,6 @@ function AskQuestionScreen({
               <span className="text-xs" style={{ color: C.textSec }}>Sent just now</span>
             </div>
             <p className="text-sm font-medium" style={{ color: C.text }}>{title}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category}</p>
           </Card>
           <div className="flex flex-col gap-2">
             <Button
@@ -5515,7 +5514,6 @@ function AskQuestionScreen({
           <p className="text-sm mb-6 leading-relaxed" style={{ color: C.textSec }}>Your question is now stored in the database and available to mentors according to its visibility and moderation status.</p>
           <Card className="p-4 mb-6 text-left">
             <p className="text-sm font-medium" style={{ color: C.text }}>{title}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category}</p>
           </Card>
           <div className="flex flex-col gap-2">
             <Button variant="primary" size="lg" fullWidth disabled={!submittedQuestionId} onClick={() => submittedQuestionId && onOpenQuestion(submittedQuestionId)}>View Question</Button>
