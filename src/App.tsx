@@ -8258,8 +8258,8 @@ function MenteeProfileScreen({
       onToast("error", "Please select an image file.");
       return;
     }
-    if (file.size > 1_500_000) {
-      onToast("error", "Please choose an image smaller than 1.5 MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      onToast("error", "Please choose an image smaller than 5 MB.");
       return;
     }
 
