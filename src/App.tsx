@@ -6158,10 +6158,10 @@ function MentorAnswerScreen({
                 </svg>
               </div>
             ) : question.asker ? (
-              <img
-                src={question.asker.photo}
-                alt={question.asker.name}
-                className="w-11 h-11 rounded-full object-cover flex-shrink-0"
+              <Avatar
+                src={question.asker.photo || undefined}
+                name={question.asker.name}
+                size={44}
               />
             ) : (
               <div
