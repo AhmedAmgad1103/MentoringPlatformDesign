@@ -84,6 +84,7 @@ export type ApiUser = {
   role: "STUDENT" | "MENTOR" | "ADMIN"
   mentorStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
   assignedMentor: { id: string; name: string | null } | null
+  hasApprovedMentorAccount?: boolean
 }
 
 type QuestionListResponse = {
