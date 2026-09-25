@@ -14,6 +14,7 @@ import {
   getQuestionDetails,
   getQuestions,
   getMe,
+  getMyMentor,
   getAvailableRoles,
   mentorSignup,
   updateMentorApproval,
@@ -2217,6 +2218,7 @@ function DashboardScreen({
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [myMentor, setMyMentor] = useState<Awaited<ReturnType<typeof getMyMentor>>["mentor"]>(null);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -2231,6 +2233,7 @@ function DashboardScreen({
 
   useEffect(() => {
     getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
+    getMyMentor().then(({ mentor }) => setMyMentor(mentor)).catch(() => setMyMentor(null));
   }, []);
 
   useEffect(() => {
@@ -2276,10 +2279,12 @@ function DashboardScreen({
         </svg>
       ),
       title: "Ask My Mentor",
-      sub: "Ask your assigned mentor a private question",
+      sub: myMentor
+        ? `Send a private question directly to ${myMentor.name || "your assigned mentor"}.`
+        : "You don't have an assigned mentor yet.",
       color: C.primaryLight,
       border: "#C7D2FE",
-      badge: currentUser?.assignedMentor?.name || "Not assigned",
+      badge: myMentor?.name || "No mentor assigned",
     },
     {
       icon: (
@@ -2420,7 +2425,7 @@ function DashboardScreen({
               key={qa.title}
               className="quick-action-card rounded-2xl p-5 cursor-pointer card-shadow"
               style={{ backgroundColor: qa.color, border: `1.5px solid ${qa.border}` }}
-              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? onNavigate("ask-my-mentor") : qa.title === "Ask Any Mentor" ? onNavigate("ask-any-mentor") : qa.title === "Ask Anonymously" ? onNavigate("ask-anonymous") : onNavigate("ask-question")}
+              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? (myMentor ? onNavigate("ask-my-mentor") : onToast("info", "You do not have an assigned mentor yet.")) : qa.title === "Ask Any Mentor" ? onNavigate("ask-any-mentor") : qa.title === "Ask Anonymously" ? onNavigate("ask-anonymous") : onNavigate("ask-question")}
             >
               <div className="mb-3">{qa.icon}</div>
               <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
