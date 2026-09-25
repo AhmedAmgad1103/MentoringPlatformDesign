@@ -3092,7 +3092,7 @@ function DashboardScreen({
                 type="button"
                 onClick={switchToMentorView}
                 disabled={switchingToMentor}
-                className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-[0.98]"
+                className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-[0.98]"
                 style={{
                   color: C.primary,
                   backgroundColor: C.primaryLight,
@@ -6571,6 +6571,7 @@ function MentorDashboardScreen({
   const [rewardHistory, setRewardHistory] = useState<Awaited<ReturnType<typeof getMentorRewardHistory>>["items"]>([]);
   const [mentorNotifications, setMentorNotifications] = useState<NotificationItem[]>([]);
   const [mentorUnreadCount, setMentorUnreadCount] = useState(0);
+  const [switchingToStudent, setSwitchingToStudent] = useState(false);
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [savedDrafts, setSavedDrafts] = useState<Array<{
     id: string;
@@ -6578,6 +6579,20 @@ function MentorDashboardScreen({
     answer: string;
     savedAt: string;
   }>>([]);
+
+  async function switchToStudentView() {
+    if (!mentorProfile?.email || switchingToStudent) return;
+    setSwitchingToStudent(true);
+    try {
+      await login(mentorProfile.email, "mentee");
+      onNavigate("dashboard");
+      onToast("success", "Switched to Student View.");
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to switch to Student View.");
+    } finally {
+      setSwitchingToStudent(false);
+    }
+  }
 
   const notifReadIds: Array<string | number> = mentorNotifications.filter((n) => !n.read).map((n) => n.id);
 
@@ -6760,27 +6775,7 @@ function MentorDashboardScreen({
       icon: (
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <rect x="4" y="8.5" width="10" height="8" rx="2" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M6.5 8.5V6.5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          <circle cx="9" cy="12.5" r="1" fill="currentColor" />
-        </svg>
-      ),
-    },
-    {
-      label: "Activity Today",
-      value: 5,
-      bg: "#EDE9FE",
-      color: "#7C3AED",
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M2 9h2.5l2-5 3 10 2-7 1.5 4H16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-  ];
-
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      {/* Header */}
+          <path d="M6.5 8.5V6.5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="rou      {/* Header */}
       <header className="sticky top-0 z-30 bg-white" style={{ borderBottom: `1px solid ${C.border}` }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <Logo size="sm" />
@@ -6793,11 +6788,20 @@ function MentorDashboardScreen({
           <div className="flex-1" />
           <div className="flex items-center gap-3">
             <button
-              onClick={() => onNavigate("dashboard")}
-              className="text-xs font-medium px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
-              style={{ color: C.textSec, backgroundColor: C.borderLight }}
+              type="button"
+              onClick={switchToStudentView}
+              disabled={switchingToStudent}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all active:scale-[0.98]"
+              style={{
+                color: C.primary,
+                backgroundColor: C.primaryLight,
+                border: `1px solid ${C.border}`,
+                opacity: switchingToStudent ? 0.65 : 1,
+              }}
+              title="Switch to your student account"
             >
-              Switch to Student View
+              <Icons.User />
+              {switchingToStudent ? "Switching…" : "Student View"}
             </button>
             <div className="relative" ref={notifRef}>
               <button
@@ -6844,6 +6848,21 @@ function MentorDashboardScreen({
                   size={36}
                 />
                 <span className="absolute -bottom-0.5 -right-0.5">
+                  <StatusDot available />
+                </span>
+              </div>
+              <div className="hidden sm:block text-left">
+                <div className="text-xs font-semibold" style={{ color: C.text }}>
+                  {mentorProfile?.name || "Mentor"}
+                </div>
+                <div className="text-xs" style={{ color: C.textSec }}>Mentor</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </header>
+
+           <span className="absolute -bottom-0.5 -right-0.5">
                   <StatusDot available />
                 </span>
               </div>
