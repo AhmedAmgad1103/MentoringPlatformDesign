@@ -2225,188 +2225,409 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
 
 // ─── SCREEN: ONBOARDING — MENTEE ─────────────────────────────────────────────
 
-function OnboardingMenteeScreen({ onNext }: { onNext: () => void }) {
+function OnboardingMenteeScreen({
+  onNext,
+  onToast,
+}: {
+  onNext: (profile?: { name: string; avatarUrl: string | null }) => void;
+  onToast?: (t: ToastType, msg: string) => void;
+}) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [year, setYear] = useState("");
-  const [track, setTrack] = useState("");
-  const [topics, setTopics] = useState<string[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [photoProcessing, setPhotoProcessing] = useState(false);
 
-  const total = 3;
+  async function handleAvatarChange(file: File | null) {
+    if (!file) return;
 
-  function toggleTopic(t: string) {
-    setTopics((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+    const fileName = file.name.trim().toLowerCase();
+    const fileType = file.type.trim().toLowerCase();
+    const isHeic =
+      /\.(heic|heif)$/.test(fileName) ||
+      fileType === "image/heic" ||
+      fileType === "image/heif" ||
+      fileType === "image/heic-sequence" ||
+      fileType === "image/heif-sequence";
+    const isImage =
+      isHeic ||
+      fileType.startsWith("image/") ||
+      /\.(jpe?g|png|gif|webp|bmp|avif)$/.test(fileName);
+
+    if (!isImage) {
+      onToast?.("error", "Please select an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      onToast?.("error", "Please choose an image smaller than 5 MB.");
+      return;
+    }
+
+    setPhotoProcessing(true);
+
+    try {
+      let fileToRead: Blob = file;
+
+      if (isHeic) {
+        fileToRead = await heicTo({
+          blob: file,
+          type: "image/jpeg",
+          quality: 0.85,
+        });
+      }
+
+      const bitmap = await createImageBitmap(fileToRead);
+      const maxDimension = 800;
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas is not supported");
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+
+      const jpeg = await new Promise<Blob>((resolve, reject) => {
+        const qualities = [0.72, 0.6, 0.5, 0.4];
+        const maxBytes = 700 * 1024;
+        let lastBlob: Blob | null = null;
+
+        const tryQuality = (index: number) => {
+          if (index >= qualities.length) {
+            if (lastBlob) return resolve(lastBlob);
+            return reject(new Error("JPEG conversion failed"));
+          }
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error("JPEG conversion failed"));
+              lastBlob = blob;
+              if (blob.size <= maxBytes) return resolve(blob);
+              tryQuality(index + 1);
+            },
+            "image/jpeg",
+            qualities[index],
+          );
+        };
+
+        tryQuality(0);
+      });
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setAvatarUrl(reader.result);
+        }
+      };
+      reader.onerror = () => onToast?.("error", "Unable to read that image.");
+      reader.readAsDataURL(jpeg);
+    } catch (error) {
+      console.error("Onboarding photo processing failed:", error);
+      onToast?.(
+        "error",
+        isHeic
+          ? "This HEIC photo could not be converted. Try another photo or convert it to JPG first."
+          : "Unable to process that image. Please try another photo.",
+      );
+    } finally {
+      setPhotoProcessing(false);
+    }
+  }
+
+  async function finishOnboarding() {
+    // If the user is already authenticated, persist the profile immediately.
+    // Signup can still complete while the account/session is being established elsewhere.
+    try {
+      await updateMe({
+        name: name.trim() || null,
+        avatarUrl,
+      });
+    } catch {
+      // Don't block onboarding if this is the pre-auth signup flow.
+    }
+
+    onNext({ name: name.trim(), avatarUrl });
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: C.bg }}>
-      <div className="w-full max-w-lg fade-in">
-        <div className="flex items-center justify-between mb-2">
+    <div
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 relative overflow-hidden"
+      style={{ backgroundColor: C.bg }}
+    >
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <div
+          className="absolute -top-36 -right-28 w-[32rem] h-[32rem] rounded-full opacity-45"
+          style={{ background: C.primaryLight, filter: "blur(8px)" }}
+        />
+        <div
+          className="absolute -bottom-44 -left-28 w-[30rem] h-[30rem] rounded-full opacity-30"
+          style={{ background: C.primaryLight, filter: "blur(12px)" }}
+        />
+        <div
+          className="absolute top-[18%] left-[9%] w-44 h-44 rounded-full opacity-10"
+          style={{ border: `1px solid ${C.primary}` }}
+        />
+        <div
+          className="absolute bottom-[15%] right-[8%] w-56 h-56 rounded-full opacity-10"
+          style={{ border: `1px solid ${C.primary}` }}
+        />
+        <div className="absolute top-[28%] left-[14%] w-2 h-2 rounded-full opacity-35" style={{ backgroundColor: C.primary }} />
+        <div className="absolute bottom-[27%] right-[14%] w-2 h-2 rounded-full opacity-35" style={{ backgroundColor: C.primary }} />
+      </div>
+
+      <div className="w-full max-w-[760px] relative z-10 fade-in">
+        <div className="flex items-center justify-between mb-3">
           {step > 1 ? (
             <button
-              onClick={() => setStep(step - 1)}
-              className="flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-xl transition-opacity hover:opacity-70"
+              onClick={() => setStep(1)}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl transition-opacity hover:opacity-70"
               style={{ color: C.textSec, backgroundColor: C.borderLight }}
             >
               <Icons.ArrowLeft />
-              {step === 2 ? "Your Profile" : "Interests"}
+              Your profile
             </button>
-          ) : <div />}
-          <div className="text-sm font-medium" style={{ color: C.textSec }}>
-            Step {step} of {total}
+          ) : (
+            <div />
+          )}
+
+          <div className="text-xs font-semibold" style={{ color: C.textSec }}>
+            Step {step} of 2
           </div>
         </div>
-        <ProgressBar step={step} total={total} />
+
+        <div className="h-1 rounded-full mb-8 overflow-hidden" style={{ backgroundColor: C.borderLight }}>
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{ width: step === 1 ? "50%" : "100%", backgroundColor: C.primary }}
+          />
+        </div>
 
         {step === 1 && (
-          <div className="flex flex-col gap-6 fade-in">
-            <div>
-              <h2 className="text-xl font-bold mb-1" style={{ color: C.text }}>
-                Tell us about yourself
-              </h2>
-              <p className="text-sm" style={{ color: C.textSec }}>
-                This helps us match you with the right mentors.
+          <div
+            className="rounded-[28px] bg-white p-7 sm:p-9 lg:p-10"
+            style={{
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 24px 70px rgba(30,27,58,0.09), 0 4px 16px rgba(30,27,58,0.04)",
+            }}
+          >
+            <div className="mb-8">
+              <div className="text-[10px] font-bold tracking-[0.09em] mb-2" style={{ color: C.textSec }}>
+                YOUR PROFILE
+              </div>
+              <h1 className="text-2xl sm:text-[1.9rem] font-bold tracking-[-0.035em]" style={{ color: C.text }}>
+                Let’s get your profile ready.
+              </h1>
+              <p className="text-sm leading-6 mt-2 max-w-lg" style={{ color: C.textSec }}>
+                Just the essentials for now. You can add or change more details later.
               </p>
             </div>
 
-            {/* Avatar upload */}
-            <div className="flex flex-col items-center gap-3">
-              <div
-                className="avatar-upload w-24 h-24 rounded-full flex flex-col items-center justify-center cursor-pointer"
-                style={{ backgroundColor: C.borderLight }}
-              >
-                <span style={{ color: C.textSec }}><Icons.Camera /></span>
-                <span className="text-xs mt-1" style={{ color: C.textSec }}>Add photo</span>
+            <div
+              className="rounded-2xl p-5 sm:p-6 mb-7 flex flex-col sm:flex-row items-center sm:items-start gap-5"
+              style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}
+            >
+              <div className="relative flex-shrink-0">
+                <div
+                  className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center"
+                  style={{
+                    backgroundColor: "#fff",
+                    border: `2px solid ${avatarUrl ? C.primary : C.border}`,
+                    boxShadow: avatarUrl ? "0 6px 18px rgba(91,78,191,0.12)" : "none",
+                  }}
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Profile preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1" style={{ color: C.textSec }}>
+                      <Icons.Camera />
+                      <span className="text-[10px] font-semibold">Photo</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("mentee-onboarding-photo")?.click()}
+                  disabled={photoProcessing}
+                  className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-95"
+                  style={{ backgroundColor: C.primary, color: "#fff", border: "3px solid #fff" }}
+                  aria-label={avatarUrl ? "Change profile photo" : "Add profile photo"}
+                >
+                  {photoProcessing ? "…" : <Icons.Camera />}
+                </button>
+
+                <input
+                  id="mentee-onboarding-photo"
+                  type="file"
+                  accept="image/*,.heic,.heif,.HEIC,.HEIF"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarChange(e.target.files?.[0] ?? null);
+                    e.currentTarget.value = "";
+                  }}
+                />
               </div>
-              <span className="text-xs" style={{ color: C.textSec }}>Optional — helps mentors recognize you</span>
+
+              <div className="text-center sm:text-left">
+                <div className="font-bold text-sm" style={{ color: C.text }}>
+                  Add a profile photo
+                </div>
+                <p className="text-xs leading-5 mt-1 max-w-sm" style={{ color: C.textSec }}>
+                  Optional, but it helps mentors recognize you and makes conversations feel more personal.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("mentee-onboarding-photo")?.click()}
+                  className="text-xs font-semibold mt-3 hover:opacity-75 transition-opacity"
+                  style={{ color: C.primary }}
+                >
+                  {avatarUrl ? "Change photo" : "Choose photo"}
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl(null)}
+                    className="text-xs font-medium ml-4 hover:opacity-75 transition-opacity"
+                    style={{ color: C.textSec }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
 
-            <InputField
-              label="Full Name"
-              placeholder="Your full name"
-              value={name}
-              onChange={setName}
-              icon={<Icons.User />}
-            />
+            <div className="flex flex-col gap-4">
+              <InputField
+                label="Full Name"
+                placeholder="Your full name"
+                value={name}
+                onChange={setName}
+                icon={<Icons.User />}
+              />
 
-            <SelectField
-              label="Year of Study"
-              value={year}
-              onChange={setYear}
-              placeholder="Select your year"
-              options={[
-                { value: "M1", label: "M1 — First Year" },
-                { value: "M2", label: "M2 — Second Year" },
-                { value: "M3", label: "M3 — Third Year" },
-                { value: "M4", label: "M4 — Fourth Year" },
-              ]}
-            />
+              <SelectField
+                label="Year of Study"
+                value={year}
+                onChange={setYear}
+                placeholder="Select your year"
+                options={[
+                  { value: "M1", label: "M1 — First Year" },
+                  { value: "M2", label: "M2 — Second Year" },
+                  { value: "M3", label: "M3 — Third Year" },
+                  { value: "M4", label: "M4 — Fourth Year" },
+                  { value: "M5", label: "M5 — Fifth Year" },
+                ]}
+              />
+            </div>
 
-            <SelectField
-              label="Current Track"
-              value={track}
-              onChange={setTrack}
-              placeholder="Select your track"
-              options={[
-                { value: "preclinical", label: "Preclinical" },
-                { value: "clinical", label: "Clinical Rotations" },
-              ]}
-            />
-
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(2)}
-              disabled={!name || !year || !track}
-            >
-              Continue
-              <Icons.ChevronRight />
-            </Button>
+            <div className="mt-7">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={() => setStep(2)}
+                disabled={!name.trim() || !year || photoProcessing}
+                className="h-12"
+              >
+                Continue
+                <Icons.ChevronRight />
+              </Button>
+              <p className="text-center text-[11px] mt-3" style={{ color: C.textSec }}>
+                You can update your profile information later.
+              </p>
+            </div>
           </div>
         )}
 
         {step === 2 && (
-          <div className="flex flex-col gap-6 fade-in">
-            <div>
-              <h2 className="text-xl font-bold mb-1" style={{ color: C.text }}>
-                What do you want help with?
+          <div
+            className="rounded-[28px] bg-white p-7 sm:p-9 lg:p-10"
+            style={{
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 24px 70px rgba(30,27,58,0.09), 0 4px 16px rgba(30,27,58,0.04)",
+            }}
+          >
+            <div className="text-center mb-8">
+              <div
+                className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5"
+                style={{ backgroundColor: C.primaryLight, color: C.primary }}
+              >
+                <svg width="27" height="27" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+                  <path d="M14 3.5a10.5 10.5 0 100 21 10.5 10.5 0 000-21z" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="M9 14.2l3.2 3.2L19.5 10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="text-[10px] font-bold tracking-[0.09em] mb-2" style={{ color: C.textSec }}>
+                YOU’RE READY
+              </div>
+              <h2 className="text-2xl sm:text-[1.9rem] font-bold tracking-[-0.035em]" style={{ color: C.text }}>
+                Here’s what you can do next.
               </h2>
-              <p className="text-sm" style={{ color: C.textSec }}>
-                Select all topics that apply — you can change these later.
+              <p className="text-sm leading-6 mt-2 max-w-md mx-auto" style={{ color: C.textSec }}>
+                Your MedMentor experience starts with the things that matter most: finding guidance, asking questions, and learning from the community.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {MENTEE_TOPICS.map((t) => (
-                <TopicChip
-                  key={t}
-                  label={t}
-                  selected={topics.includes(t)}
-                  onClick={() => toggleTopic(t)}
-                />
+            <div className="grid sm:grid-cols-3 gap-3">
+              {[
+                {
+                  title: "Find a mentor",
+                  text: "Connect with your assigned mentor or discover mentors across the school.",
+                  icon: <Icons.User />,
+                },
+                {
+                  title: "Ask privately",
+                  text: "Get answers to questions that you’d rather keep between you and a mentor.",
+                  icon: <Icons.MessageCircle />,
+                },
+                {
+                  title: "Explore the feed",
+                  text: "Learn from questions, answers, and experiences shared by other students.",
+                  icon: <Icons.Search />,
+                },
+              ].map(({ title, text, icon }) => (
+                <div
+                  key={title}
+                  className="rounded-2xl p-4"
+                  style={{ backgroundColor: C.borderLight, border: `1px solid ${C.border}` }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+                    style={{ backgroundColor: "#fff", color: C.primary }}
+                  >
+                    {icon}
+                  </div>
+                  <div className="text-sm font-bold" style={{ color: C.text }}>{title}</div>
+                  <p className="text-xs leading-5 mt-1.5" style={{ color: C.textSec }}>{text}</p>
+                </div>
               ))}
             </div>
 
-            {topics.length > 0 && (
-              <div
-                className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl"
-                style={{ backgroundColor: C.successLight, color: C.success }}
-              >
-                <Icons.Check />
-                <span className="font-medium">{topics.length} topic{topics.length > 1 ? "s" : ""} selected</span>
-              </div>
-            )}
-
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(3)}
-              disabled={topics.length === 0}
-            >
-              Continue
-              <Icons.ChevronRight />
-            </Button>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="flex flex-col items-center gap-6 fade-in text-center">
             <div
-              className="w-20 h-20 rounded-full flex items-center justify-center"
-              style={{ background: `linear-gradient(135deg, ${C.primaryLight} 0%, #C7D2FE 100%)` }}
+              className="mt-5 rounded-2xl p-4 flex items-center gap-3"
+              style={{ backgroundColor: C.primaryLight, border: `1px solid ${C.border}` }}
             >
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <path d="M10 20l7 7.5L30 12" stroke={C.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#fff", color: C.primary }}>
+                <Icons.Check />
+              </div>
+              <div>
+                <div className="text-xs font-bold" style={{ color: C.text }}>Profile ready</div>
+                <div className="text-[11px] mt-0.5" style={{ color: C.textSec }}>
+                  {name} · {year}
+                </div>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold mb-2" style={{ color: C.text }}>
-                You're all set, {name.split(" ")[0]}!
-              </h2>
-              <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
-                We're matching you with physician mentors based on your interests. You'll be connected shortly. In the meantime, explore questions from other students.
+
+            <div className="mt-6">
+              <Button variant="primary" size="lg" fullWidth onClick={() => void finishOnboarding()} className="h-12">
+                Go to My Dashboard
+                <Icons.ChevronRight />
+              </Button>
+              <p className="text-center text-[11px] mt-3" style={{ color: C.textSec }}>
+                You can personalize more from your profile later.
               </p>
             </div>
-            <div
-              className="w-full rounded-xl p-4 text-left"
-              style={{ backgroundColor: C.primaryLight, border: `1px solid #C7D2FE` }}
-            >
-              <div className="text-sm font-semibold mb-2" style={{ color: C.primary }}>
-                Your profile summary
-              </div>
-              <div className="flex flex-col gap-1 text-sm" style={{ color: C.text }}>
-                <span><strong>Name:</strong> {name}</span>
-                <span><strong>Year:</strong> {year}</span>
-                <span><strong>Track:</strong> {track === "preclinical" ? "Preclinical" : "Clinical Rotations"}</span>
-                <span><strong>Topics:</strong> {topics.slice(0, 3).join(", ")}{topics.length > 3 ? ` +${topics.length - 3} more` : ""}</span>
-              </div>
-            </div>
-            <Button variant="primary" size="lg" fullWidth onClick={onNext}>
-              Go to My Dashboard
-              <Icons.ChevronRight />
-            </Button>
           </div>
         )}
       </div>
@@ -9421,8 +9642,10 @@ export default function App() {
       )}
       {screen === "onboarding-mentee" && (
         <OnboardingMenteeScreen
-          onNext={() => {
-            addToast("success", "Welcome to MedMentor, Alex!");
+          onToast={addToast}
+          onNext={(profile) => {
+            const firstName = profile?.name?.trim().split(/\s+/)[0] || "there";
+            addToast("success", `Welcome to MedMentor, ${firstName}!`);
             setScreen("dashboard");
           }}
         />
