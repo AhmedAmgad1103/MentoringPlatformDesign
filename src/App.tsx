@@ -8259,7 +8259,7 @@ function MenteeProfileScreen({
     const fileName = file.name.trim().toLowerCase();
     const fileType = file.type.trim().toLowerCase();
     const isHeic =
-      /\\.(heic|heif)$/.test(fileName) ||
+      /\.(heic|heif)$/.test(fileName) ||
       fileType === "image/heic" ||
       fileType === "image/heif" ||
       fileType === "image/heic-sequence" ||
@@ -8267,7 +8267,7 @@ function MenteeProfileScreen({
     const isImage =
       isHeic ||
       fileType.startsWith("image/") ||
-      /\\.(jpe?g|png|gif|webp|bmp|avif)$/.test(fileName);
+      /\.(jpe?g|png|gif|webp|bmp|avif)$/.test(fileName);
 
     console.log("[Profile photo] selected file:", {
       name: file.name,
