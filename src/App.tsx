@@ -4641,22 +4641,22 @@ function AskQuestionScreen({
           subtitle="Visible to all physician mentors at the school"
         />
         <div className="max-w-2xl mx-auto px-6 py-8 fade-in">
-          {/* Identity preview */}
+          {/* Identity preview - loaded from the authenticated user */}
           <Card className="p-4 mb-6">
             <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: C.textSec }}>
               Your question will appear as:
             </div>
             <div className="flex items-center gap-3">
-              <img
-                src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=40&h=40&fit=crop"
-                alt="Alex Johnson"
-                className="w-10 h-10 rounded-full object-cover"
-              />
-              <div>
-                <div className="font-semibold text-sm" style={{ color: C.text }}>Alex Johnson</div>
-                <div className="text-xs" style={{ color: C.textSec }}>M2 · Clinical Rotations</div>
+              <Avatar name={currentUser?.name || currentUser?.email || "Student"} size={40} />
+              <div className="min-w-0">
+                <div className="font-semibold text-sm truncate" style={{ color: C.text }}>
+                  {currentUser?.name || "Student"}
+                </div>
+                <div className="text-xs truncate" style={{ color: C.textSec }}>
+                  {currentUser?.email || "Loading your account…"}
+                </div>
               </div>
-              <div className="ml-auto flex gap-2">
+              <div className="ml-auto flex gap-2 flex-shrink-0">
                 <PrivacyBadge type="public" />
                 <PrivacyBadge type="mentors" />
               </div>
