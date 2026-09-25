@@ -2864,14 +2864,14 @@ function DashboardScreen({
     {
       title: "Ask Any Mentor",
       sub: "Get another perspective from the school",
-      icon: <Icons.Users />,
+      icon: <Icons.MessageCircle />,
       tone: "success",
       onClick: () => onNavigate("ask-any-mentor"),
     },
     {
       title: "Ask Anonymously",
       sub: "Ask without revealing your identity",
-      icon: <Icons.Shield />,
+      icon: <Icons.Lock />,
       tone: "pending",
       onClick: () => onNavigate("ask-anonymous"),
     },
