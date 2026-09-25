@@ -1800,125 +1800,251 @@ function VerifyScreen({
   );
 }
 
-function SignupRoleScreen({ onSelect }: { onSelect: (role: Role) => void }) {
-  const [selected, setSelected] = useState<Role>(null);
+function SignupRoleScreen({
+  onSelect,
+}: {
+  onSelect: (role: "mentee" | "mentor", email: string) => void;
+}) {
+  const [selected, setSelected] = useState<"mentee" | "mentor" | null>(null);
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
 
-  const roles: { role: "mentee" | "mentor"; icon: React.ReactNode; title: string; label: string; sub: string }[] = [
+  const roles: {
+    role: "mentee" | "mentor";
+    icon: React.ReactNode;
+    eyebrow: string;
+    title: string;
+    sub: string;
+    detail: string;
+  }[] = [
     {
       role: "mentee",
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
-          <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-      ),
-      title: "I want to find a mentor",
-      label: "Mentee · Medical Student",
-      sub: "Connect with mentors, ask questions, and get guidance throughout your medical education and career.",
+      eyebrow: "MEDICAL STUDENT",
+      title: "I’m here to learn",
+      sub: "Find mentors, ask questions privately, and get guidance throughout medical school.",
+      detail: "Questions · Guidance · Mentorship",
+      icon: <Icons.User />,
     },
     {
       role: "mentor",
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
-          <path d="M4 26c0-4.418 3.582-7 8-7s8 2.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-          <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
-          <path d="M19.5 18.5c1-.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-      ),
-      title: "I want to mentor students",
-      label: "Mentor · Physician / Resident",
-      sub: "Share your clinical experience, answer questions, and support the next generation of medical professionals.",
+      eyebrow: "PHYSICIAN / RESIDENT",
+      title: "I’m here to mentor",
+      sub: "Share your experience, answer students, and help shape the next generation of doctors.",
+      detail: "Answer · Support · Inspire",
+      icon: <Icons.Users />,
     },
   ];
 
+  function validateEmail(value: string) {
+    if (!value.trim()) return "Enter your email address.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+      return "Please enter a valid email address.";
+    }
+    return "";
+  }
+
+  function handleContinue() {
+    const error = validateEmail(email);
+    setEmailError(error);
+    if (!selected || error) return;
+    onSelect(selected, email.trim().toLowerCase());
+  }
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6"
-      style={{
-        background: `radial-gradient(circle at top, ${C.primaryLight} 0%, ${C.bg} 42%, ${C.bg} 100%)`,
-      }}
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 relative overflow-hidden"
+      style={{ backgroundColor: C.bg }}
     >
-      <div className="w-full max-w-3xl fade-in">
-        <div className="flex justify-center mb-8">
-          <Logo size="md" />
-        </div>
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <div
+          className="absolute -top-40 -right-24 w-[34rem] h-[34rem] rounded-full opacity-50"
+          style={{ background: C.primaryLight, filter: "blur(8px)" }}
+        />
+        <div
+          className="absolute -bottom-48 -left-28 w-[32rem] h-[32rem] rounded-full opacity-35"
+          style={{ background: C.primaryLight, filter: "blur(12px)" }}
+        />
+      </div>
 
-        <div className="text-center mb-8">
+      <div className="w-full max-w-[1040px] relative z-10 fade-in">
+        <div
+          className="grid grid-cols-1 lg:grid-cols-[0.84fr_1.16fr] overflow-hidden rounded-[30px] bg-white"
+          style={{
+            border: `1px solid ${C.border}`,
+            boxShadow: "0 26px 80px rgba(30,27,58,0.10), 0 4px 18px rgba(30,27,58,0.04)",
+          }}
+        >
           <div
-            className="mx-auto mb-4 w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: C.primaryLight, color: C.primary }}
+            className="relative p-8 sm:p-10 lg:p-11 flex flex-col justify-between min-h-[650px]"
+            style={{ background: C.primaryLight, borderRight: `1px solid ${C.border}` }}
           >
-            <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-              <path d="M5 11.5a7.5 7.5 0 1114.2 3.4L21 19l-4.1-.8A7.5 7.5 0 015 11.5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-              <path d="M9 11.5h7M9 14.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <div>
+              <Logo size="md" />
+              <div className="mt-14 max-w-sm">
+                <div
+                  className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-[0.09em]"
+                  style={{ backgroundColor: "#fff", color: C.primary }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.primary }} />
+                  WELCOME TO MEDMENTOR
+                </div>
+
+                <h1
+                  className="mt-6 text-3xl sm:text-[2.55rem] font-bold leading-[1.04] tracking-[-0.045em]"
+                  style={{ color: C.text }}
+                >
+                  Build the right
+                  <br />
+                  mentorship
+                  <br />
+                  connection.
+                </h1>
+
+                <p className="mt-5 text-sm leading-6" style={{ color: C.textSec }}>
+                  One place for medical students to learn from experienced mentors — and for mentors to give back.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-10">
+              <div className="text-[10px] font-bold tracking-[0.09em] mb-3" style={{ color: C.textSec }}>
+                SIMPLE FROM THE START
+              </div>
+              <div className="rounded-2xl p-4 bg-white/75" style={{ border: `1px solid ${C.border}` }}>
+                {[
+                  ["Choose your role", "Tell us whether you’re joining as a student or mentor."],
+                  ["Use your email", "We’ll recognize an existing account and take you straight to the right place."],
+                  ["Finish only what’s needed", "New accounts can complete their profile after the role is confirmed."],
+                ].map(([title, text], index) => (
+                  <div
+                    key={title}
+                    className={`flex gap-3 ${index > 0 ? "mt-3 pt-3" : ""}`}
+                    style={index > 0 ? { borderTop: `1px solid ${C.borderLight}` } : undefined}
+                  >
+                    <span
+                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: C.successLight, color: C.success }}
+                    >
+                      <Icons.Check />
+                    </span>
+                    <div>
+                      <div className="text-xs font-bold" style={{ color: C.text }}>{title}</div>
+                      <div className="text-[11px] leading-4 mt-0.5" style={{ color: C.textSec }}>{text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: C.text }}>
-            Create your MedMentor account
-          </h1>
-          <p style={{ color: C.textSec }} className="text-sm sm:text-base">
-            Choose how you’ll use MedMentor to get started.
-          </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {roles.map(({ role, icon, title, sub, label }) => {
-            const isSelected = selected === role;
-            return (
-              <button
-                key={role}
-                type="button"
-                className="text-left rounded-2xl p-6 sm:p-7 transition-all duration-200"
-                style={{
-                  border: `1.5px solid ${isSelected ? C.primary : C.border}`,
-                  backgroundColor: isSelected ? C.primaryLight : "#fff",
-                  boxShadow: isSelected ? "0 8px 24px rgba(91,78,191,0.12)" : "0 2px 8px rgba(24,59,86,0.04)",
-                  transform: isSelected ? "translateY(-2px)" : "translateY(0)",
-                }}
-                onClick={() => setSelected(role)}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: isSelected ? "#fff" : C.primaryLight }}
-                  >
-                    {icon}
-                  </div>
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{
-                      border: `1.5px solid ${isSelected ? C.primary : C.border}`,
-                      backgroundColor: isSelected ? C.primary : "#fff",
-                    }}
-                  >
-                    {isSelected && (
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                        <path d="M2 5.5l2.1 2.1L9 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </div>
+          <div className="p-7 sm:p-10 lg:p-12 flex items-center">
+            <div className="w-full max-w-[560px] mx-auto">
+              <div className="mb-7">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5"
+                  style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                >
+                  <Icons.User />
                 </div>
-                <div className="mt-6">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] mb-2" style={{ color: C.textSec }}>
-                    {label}
-                  </div>
-                  <div className="font-bold text-lg mb-2" style={{ color: C.text }}>{title}</div>
-                  <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>{sub}</p>
+                <div className="text-[10px] font-bold tracking-[0.09em] mb-2" style={{ color: C.textSec }}>
+                  CREATE YOUR ACCOUNT
                 </div>
-              </button>
-            );
-          })}
+                <h2 className="text-2xl sm:text-[1.9rem] font-bold tracking-[-0.035em]" style={{ color: C.text }}>
+                  How will you use MedMentor?
+                </h2>
+                <p className="text-sm leading-6 mt-2" style={{ color: C.textSec }}>
+                  Select your role and enter your email. Existing accounts skip onboarding automatically.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {roles.map(({ role, icon, eyebrow, title, sub, detail }) => {
+                  const isSelected = selected === role;
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setSelected(role)}
+                      className="text-left rounded-2xl p-5 transition-all duration-150 active:scale-[0.99]"
+                      style={{
+                        border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                        backgroundColor: isSelected ? C.primaryLight : "#fff",
+                        boxShadow: isSelected ? "0 10px 28px rgba(91,78,191,0.12)" : "0 2px 10px rgba(30,27,58,0.04)",
+                        transform: isSelected ? "translateY(-1px)" : "translateY(0)",
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div
+                          className="w-11 h-11 rounded-xl flex items-center justify-center"
+                          style={{ backgroundColor: isSelected ? "#fff" : C.primaryLight, color: C.primary }}
+                        >
+                          {icon}
+                        </div>
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{
+                            border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                            backgroundColor: isSelected ? C.primary : "#fff",
+                          }}
+                        >
+                          {isSelected && <Icons.Check />}
+                        </span>
+                      </div>
+                      <div className="mt-5 text-[10px] font-bold tracking-[0.09em]" style={{ color: C.textSec }}>
+                        {eyebrow}
+                      </div>
+                      <div className="mt-1.5 text-base font-bold" style={{ color: C.text }}>
+                        {title}
+                      </div>
+                      <p className="text-xs leading-5 mt-2" style={{ color: C.textSec }}>
+                        {sub}
+                      </p>
+                      <div className="mt-4 text-[10px] font-semibold" style={{ color: C.primary }}>
+                        {detail}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6">
+                <InputField
+                  label="Email address"
+                  type="email"
+                  placeholder="you@university.edu"
+                  value={email}
+                  onChange={(value) => {
+                    setEmail(value);
+                    if (emailError) setEmailError(validateEmail(value));
+                  }}
+                  error={emailError}
+                  helperText="If this email already has a MedMentor account, we’ll take you straight to it."
+                  icon={<Icons.Mail />}
+                  autoFocus
+                />
+              </div>
+
+              <div className="mt-6">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleContinue}
+                  disabled={!selected || !email.trim()}
+                  className="h-12"
+                >
+                  Continue
+                  <Icons.ChevronRight />
+                </Button>
+              </div>
+
+              <p className="text-center text-[11px] mt-4" style={{ color: C.textSec }}>
+                Your role can be changed later where supported.
+              </p>
+            </div>
+          </div>
         </div>
-
-        <Button variant="primary" size="lg" fullWidth onClick={() => selected && onSelect(selected)} disabled={!selected}>
-          Continue
-          <Icons.ChevronRight />
-        </Button>
-
-        <p className="text-center text-xs mt-4" style={{ color: C.textSec }}>
-          You can complete your profile after choosing your role.
-        </p>
       </div>
     </div>
   );
@@ -9708,23 +9834,54 @@ export default function App() {
       )}
       {screen === "signup-role" && (
         <SignupRoleScreen
-          onSelect={(selectedRole) => {
-            if (selectedRole === "mentor") {
-              setScreen("mentor-signup");
-            } else {
-              setRole("mentee");
-              setScreen("onboarding-mentee");
+          onSelect={async (selectedRole, email) => {
+            const normalizedEmail = email.trim().toLowerCase();
+            setAuthEmail(normalizedEmail);
+
+            try {
+              const existing = await getAvailableRoles(normalizedEmail);
+
+              // An existing account for the selected role goes straight to
+              // its dashboard. No duplicate profile onboarding.
+              if (selectedRole === "mentee" && existing.roles.includes("STUDENT")) {
+                await handleRoleSelect("mentee");
+                return;
+              }
+
+              if (selectedRole === "mentor" && existing.roles.includes("MENTOR")) {
+                await handleRoleSelect("mentor");
+                return;
+              }
+
+              // A pending mentor application is not an active mentor account.
+              if (selectedRole === "mentor" && existing.mentorPending) {
+                addToast("info", "Your mentor application is still pending admin approval.");
+                setScreen("login");
+                return;
+              }
+
+              // New mentees are authenticated before onboarding so their
+              // profile and avatar can be persisted immediately.
+              if (selectedRole === "mentee") {
+                await login(normalizedEmail, "mentee");
+                setRole("mentee");
+                setScreen("onboarding-mentee");
+                return;
+              }
+
+              // New mentors are created as PENDING and must be approved
+              // before they can enter the mentor dashboard.
+              const result = await mentorSignup(normalizedEmail);
+              if (result.status === "PENDING") {
+                addToast("success", "Mentor signup submitted. An admin must approve your account before mentor access is enabled.");
+              } else if (result.status === "APPROVED") {
+                await handleRoleSelect("mentor");
+                return;
+              }
+              setScreen("login");
+            } catch (error) {
+              addToast("error", error instanceof Error ? error.message : "Unable to create your account.");
             }
-          }}
-        />
-      )}
-      {screen === "mentor-signup" && (
-        <MentorSignupScreen
-          onBack={() => setScreen("login")}
-          onSubmitted={(email) => {
-            setAuthEmail(email);
-            setScreen("login");
-            addToast("success", "Mentor signup submitted. An admin must approve the mentor account before mentor access is enabled.");
           }}
         />
       )}
