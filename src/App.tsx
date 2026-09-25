@@ -8851,6 +8851,43 @@ function AdminSettingsView({ onToast }: { onToast: (t: ToastType, msg: string) =
   const [anonApproval, setAnonApproval] = useState(true);
   const [emailNotifs, setEmailNotifs] = useState(true);
   const [autoFlag, setAutoFlag] = useState(true);
+  const [autoApprovePublic, setAutoApprovePublic] = useState(false);
+  const [autoApproveLoaded, setAutoApproveLoaded] = useState(false);
+  const [autoApproveSaving, setAutoApproveSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getAdminSettings()
+      .then((settings) => {
+        if (active) setAutoApprovePublic(settings.autoApprovePublicNonAnonymous);
+      })
+      .catch((error) => {
+        if (active) onToast("error", error instanceof Error ? error.message : "Could not load moderation settings.");
+      })
+      .finally(() => {
+        if (active) setAutoApproveLoaded(true);
+      });
+    return () => { active = false; };
+  }, []);
+
+  async function changeAutoApprovePublic(nextValue: boolean) {
+    if (autoApproveSaving || !autoApproveLoaded) return;
+    const previousValue = autoApprovePublic;
+    setAutoApprovePublic(nextValue);
+    setAutoApproveSaving(true);
+    try {
+      const settings = await updateAdminSettings(nextValue);
+      setAutoApprovePublic(settings.autoApprovePublicNonAnonymous);
+      onToast("success", nextValue
+        ? "Auto-approval enabled for public, non-anonymous questions."
+        : "Auto-approval disabled. Public questions will require approval.");
+    } catch (error) {
+      setAutoApprovePublic(previousValue);
+      onToast("error", error instanceof Error ? error.message : "Could not save moderation settings.");
+    } finally {
+      setAutoApproveSaving(false);
+    }
+  }
 
   function Toggle({ label, desc, value, onChange }: { label: string; desc: string; value: boolean; onChange: (v: boolean) => void }) {
     return (
@@ -8876,7 +8913,34 @@ function AdminSettingsView({ onToast }: { onToast: (t: ToastType, msg: string) =
   return (
     <div className="fade-in max-w-xl flex flex-col gap-5">
       <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${C.border}` }}>
-        <h3 className="text-sm font-bold mb-4" style={{ color: C.text }}>Moderation Settings</h3>
+        <h3 className="text-sm font-bold mb-1" style={{ color: C.text }}>Moderation Settings</h3>
+        <div className="flex items-center justify-between py-4" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+          <div className="pr-4">
+            <div className="text-sm font-semibold" style={{ color: C.text }}>Auto-approve public, non-anonymous questions</div>
+            <div className="text-xs mt-0.5" style={{ color: C.textSec }}>
+              {autoApprovePublic
+                ? "Ask Any Mentor questions become visible immediately without admin review. Anonymous questions still require approval."
+                : "Ask Any Mentor questions wait for admin approval. Anonymous questions always require approval."}
+            </div>
+            {!autoApproveLoaded && <div className="text-xs mt-1" style={{ color: C.textSec }}>Loading setting…</div>}
+            {autoApproveSaving && <div className="text-xs mt-1" style={{ color: C.textSec }}>Saving…</div>}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoApprovePublic}
+            aria-label="Auto-approve public, non-anonymous questions"
+            disabled={!autoApproveLoaded || autoApproveSaving}
+            onClick={() => void changeAutoApprovePublic(!autoApprovePublic)}
+            className="relative w-11 h-6 rounded-full transition-all flex-shrink-0 disabled:opacity-60"
+            style={{ backgroundColor: autoApprovePublic ? C.primary : C.border }}
+          >
+            <span
+              className="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all"
+              style={{ left: autoApprovePublic ? "24px" : "4px" }}
+            />
+          </button>
+        </div>
         <Toggle label="Require approval for student questions" desc="All questions require admin approval except direct private mentee → assigned mentor questions." value={anonApproval} onChange={setAnonApproval} />
         <Toggle label="Auto-flag suspicious activity" desc="Automatically flag accounts with unusual posting patterns." value={autoFlag} onChange={setAutoFlag} />
         <Toggle label="Email notifications for reports" desc="Send an email alert when new reports are filed." value={emailNotifs} onChange={setEmailNotifs} />
