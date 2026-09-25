@@ -273,6 +273,25 @@ export async function getMentorLeaderboard() {
   return request<MentorLeaderboardResponse>("/api/mentors/leaderboard")
 }
 
+export type MentorRewardHistoryItem = {
+  id: string
+  points: number
+  reason: "ANSWER" | "FAST_RESPONSE" | "HELPFUL_VOTE" | "ANY_MENTOR_RESPONSE"
+  month: string
+  createdAt: string
+  answerId: string | null
+}
+
+export type MentorRewardHistoryResponse = {
+  cycle: string
+  items: MentorRewardHistoryItem[]
+}
+
+export async function getMentorRewardHistory() {
+  return request<MentorRewardHistoryResponse>("/api/mentors/rewards")
+}
+
+
 export async function markAnswerHelpful(questionId: string, answerId: string) {
   return request<{ helpful: true; helpfulCount: number }>(
     `/api/questions/${encodeURIComponent(questionId)}/answers/${encodeURIComponent(answerId)}/helpful`,
