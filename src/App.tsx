@@ -2336,18 +2336,38 @@ function OnboardingMenteeScreen({
   }
 
   async function finishOnboarding() {
-    // If the user is already authenticated, persist the profile immediately.
-    // Signup can still complete while the account/session is being established elsewhere.
+    const profile = {
+      name: name.trim(),
+      avatarUrl,
+    };
+
+    // Signup onboarding currently happens before the dev-auth session exists.
+    // Keep the completed profile locally so the first real sign-in can persist
+    // it to the correct backend User record.
     try {
-      await updateMe({
-        name: name.trim() || null,
-        avatarUrl,
-      });
+      localStorage.setItem(
+        "medmentor_pending_mentee_profile",
+        JSON.stringify(profile),
+      );
     } catch {
-      // Don't block onboarding if this is the pre-auth signup flow.
+      // Ignore storage errors; the in-memory onboarding flow can still continue.
     }
 
-    onNext({ name: name.trim(), avatarUrl });
+    // If the user is already authenticated, persist immediately as well.
+    try {
+      await updateMe({
+        name: profile.name || null,
+        avatarUrl: profile.avatarUrl,
+      });
+      try {
+        localStorage.removeItem("medmentor_pending_mentee_profile");
+      } catch {}
+    } catch {
+      // The normal signup path is pre-auth, so the first sign-in will apply
+      // the locally saved profile.
+    }
+
+    onNext(profile);
   }
 
   return (
@@ -9564,6 +9584,36 @@ export default function App() {
       // Authenticate first, then use the authenticated session role to route.
       // This avoids blocking the mentee redirect on a second /api/me request.
       const result = await login(authEmail.trim(), r);
+
+      // A mentee can complete the signup onboarding before a backend
+      // session exists. Apply that locally saved profile now that login
+      // has established the authenticated user/session.
+      if (r === "mentee") {
+        try {
+          const rawProfile = localStorage.getItem("medmentor_pending_mentee_profile");
+          if (rawProfile) {
+            const pendingProfile = JSON.parse(rawProfile) as {
+              name?: unknown;
+              avatarUrl?: unknown;
+            };
+            const pendingName =
+              typeof pendingProfile.name === "string" ? pendingProfile.name.trim() : "";
+            const pendingAvatar =
+              typeof pendingProfile.avatarUrl === "string" ? pendingProfile.avatarUrl : null;
+
+            if (pendingName || pendingAvatar) {
+              await updateMe({
+                ...(pendingName ? { name: pendingName } : {}),
+                avatarUrl: pendingAvatar,
+              });
+            }
+            localStorage.removeItem("medmentor_pending_mentee_profile");
+          }
+        } catch {
+          // Keep sign-in working even if an old/incomplete pending profile
+          // cannot be applied.
+        }
+      }
 
       // Route from the role the user explicitly selected. The backend
       // session is still established above, but a stale/session role should
