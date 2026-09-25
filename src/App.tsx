@@ -4042,7 +4042,7 @@ function FeedScreen({
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const unread = ALL_NOTIFICATIONS.filter((n) => !n.read && !notifReadIds.includes(n.id)).length;
+  const unread = mentorNotifications.filter((n) => !n.read).length;
 
   useEffect(() => {
     if (!notifOpen) return;
