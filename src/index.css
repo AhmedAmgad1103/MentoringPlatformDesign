@@ -265,3 +265,157 @@ body {
   background: #EEEAF9;
   box-shadow: 0 4px 16px rgba(91,78,191,0.15);
 }
+
+
+/* ── Visual polish layer ─────────────────────────────────────
+   Uses the existing palette only. These rules improve hierarchy,
+   depth, spacing, response, and motion without introducing colors.
+──────────────────────────────────────────────────────────── */
+
+/* Direct manipulation: controls respond immediately and remain interruptible. */
+.ui-pressable {
+  will-change: transform;
+  transform: translateZ(0);
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 150ms ease;
+}
+
+.ui-pressable:not(:disabled):hover {
+  transform: translateY(-1px) translateZ(0);
+}
+
+.ui-pressable:not(:disabled):active {
+  transform: scale(0.985) translateZ(0);
+  transition-duration: 70ms;
+}
+
+.ui-pressable:disabled {
+  transform: none;
+}
+
+/* Surfaces: quieter borders, clearer elevation, stronger grouping. */
+.ui-surface {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms ease;
+}
+
+.ui-surface-interactive:hover {
+  transform: translateY(-2px) translateZ(0);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.07),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.ui-surface-interactive:active {
+  transform: translateY(0) scale(0.997) translateZ(0);
+  transition-duration: 80ms;
+}
+
+/* Forms: make the entire field feel like one responsive object. */
+.ui-field-shell {
+  will-change: box-shadow, border-color;
+}
+
+.ui-field-shell:focus-within {
+  transform: translateY(-1px);
+}
+
+.ui-field-control {
+  min-width: 0;
+}
+
+.ui-field-control::placeholder {
+  opacity: 0.72;
+}
+
+/* Avatars should feel crisp and anchored to their surrounding content. */
+.ui-avatar {
+  display: block;
+  object-position: center;
+}
+
+/* Make common interactive elements feel less browser-default and more deliberate. */
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 3px;
+}
+
+/* Keep page entrances subtle: motion communicates placement rather than decoration. */
+.fade-in {
+  will-change: opacity, transform;
+}
+
+/* More natural scrolling for long feeds and admin tables. */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 24px;
+}
+
+/* Respect users who explicitly request reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  .ui-pressable,
+  .ui-surface,
+  .ui-surface-interactive,
+  .ui-field-shell {
+    transform: none !important;
+  }
+}
+
+/* Narrow screens: preserve hierarchy and give dense content more breathing room. */
+@media (max-width: 640px) {
+  .ui-surface {
+    border-radius: 14px;
+  }
+
+  .ui-surface-interactive:hover {
+    transform: none;
+  }
+
+  .ui-pressable:not(:disabled):hover {
+    transform: none;
+  }
+
+  .ui-pressable:not(:disabled):active {
+    transform: scale(0.985);
+  }
+
+  .ui-field-shell:focus-within {
+    transform: none;
+  }
+}
