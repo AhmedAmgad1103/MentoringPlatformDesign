@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import heic2any from "heic2any";
 import {
   boostQuestion,
   createAnswer,
@@ -8254,7 +8255,12 @@ function MenteeProfileScreen({
 
   async function handleAvatarChange(file: File | null) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const isHeic = extension === "heic" || extension === "heif" || file.type === "image/heic" || file.type === "image/heif";
+    const isImage = file.type.startsWith("image/") || isHeic;
+
+    if (!isImage) {
       onToast("error", "Please select an image file.");
       return;
     }
@@ -8263,13 +8269,31 @@ function MenteeProfileScreen({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") setAvatarUrl(result);
-    };
-    reader.onerror = () => onToast("error", "Unable to read that image.");
-    reader.readAsDataURL(file);
+    try {
+      let fileToRead: Blob = file;
+
+      // Browsers do not reliably display HEIC images in <img>, so convert
+      // HEIC/HEIF profile photos to JPEG before storing them.
+      if (isHeic) {
+        const converted = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+        fileToRead = Array.isArray(converted) ? converted[0] : converted;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === "string") setAvatarUrl(result);
+      };
+      reader.onerror = () => onToast("error", "Unable to read that image.");
+      reader.readAsDataURL(fileToRead);
+    } catch (error) {
+      console.error("HEIC conversion failed", error);
+      onToast("error", "Unable to process this HEIC photo. Please try another image.");
+    }
   }
 
   async function saveProfile() {
@@ -8328,7 +8352,7 @@ function MenteeProfileScreen({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 className="hidden"
                 onChange={(e) => {
                   void handleAvatarChange(e.target.files?.[0] ?? null);
