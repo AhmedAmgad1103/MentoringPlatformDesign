@@ -1811,7 +1811,6 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
       className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 relative overflow-hidden"
       style={{ backgroundColor: C.bg }}
     >
-      {/* Soft depth using the existing palette only. */}
       <div
         className="absolute -top-32 -right-24 w-96 h-96 rounded-full pointer-events-none opacity-50"
         style={{ background: C.primaryLight, filter: "blur(2px)" }}
@@ -1821,21 +1820,21 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
         style={{ background: C.primaryLight, filter: "blur(10px)" }}
       />
 
-      <div className="w-full max-w-[980px] relative z-10 fade-in">
-        <div className="flex justify-center mb-6 sm:mb-8">
+      <div className="w-full max-w-[1000px] relative z-10 fade-in">
+        <div className="flex justify-center mb-6 sm:mb-7">
           <Logo size="md" />
         </div>
 
         <div
-          className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] overflow-hidden rounded-[28px] bg-white"
+          className="grid grid-cols-1 lg:grid-cols-[0.86fr_1.14fr] overflow-hidden rounded-[30px] bg-white"
           style={{
             border: `1px solid ${C.border}`,
-            boxShadow: "0 24px 70px rgba(30,27,58,0.10), 0 4px 16px rgba(30,27,58,0.04)",
+            boxShadow: "0 26px 80px rgba(30,27,58,0.10), 0 4px 18px rgba(30,27,58,0.04)",
           }}
         >
           {/* Context panel */}
           <div
-            className="relative p-7 sm:p-9 lg:p-10 flex flex-col justify-between min-h-[430px]"
+            className="relative p-7 sm:p-9 lg:p-10 flex flex-col min-h-[500px]"
             style={{
               background: C.primaryLight,
               borderRight: `1px solid ${C.border}`,
@@ -1843,7 +1842,7 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
           >
             <div>
               <div
-                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-[0.08em]"
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold tracking-[0.09em]"
                 style={{ backgroundColor: "#fff", color: C.primary }}
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.primary }} />
@@ -1852,42 +1851,79 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
 
               <div className="mt-8 max-w-sm">
                 <h1
-                  className="text-3xl sm:text-[2.15rem] font-bold leading-[1.08] tracking-[-0.035em]"
+                  className="text-3xl sm:text-[2.2rem] font-bold leading-[1.05] tracking-[-0.04em]"
                   style={{ color: C.text }}
                 >
-                  One platform.
+                  Mentorship that
                   <br />
-                  The right kind of guidance.
+                  fits your journey.
                 </h1>
 
                 <p className="mt-4 text-sm leading-6" style={{ color: C.textSec }}>
-                  Choose how you’ll use MedMentor. You can focus on learning from experienced mentors or giving back to the next generation.
+                  MedMentor brings medical students and experienced mentors together for practical, personal guidance.
                 </p>
               </div>
             </div>
 
-            <div className="mt-8 space-y-3">
-              {[
-                ["01", "Choose your role"],
-                ["02", "Set up your experience"],
-                ["03", "Start connecting"],
-              ].map(([number, label], index) => (
-                <div key={label} className="flex items-center gap-3">
-                  <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                    style={{
-                      backgroundColor: index === 0 ? C.primary : "#fff",
-                      color: index === 0 ? "#fff" : C.primary,
-                      border: index === 0 ? "none" : `1px solid ${C.border}`,
-                    }}
+            {/* Relevant value points instead of generic onboarding steps */}
+            <div className="mt-auto pt-9">
+              <div className="text-[10px] font-bold tracking-[0.09em] mb-3" style={{ color: C.textSec }}>
+                BUILT AROUND YOU
+              </div>
+
+              <div className="rounded-2xl p-4 bg-white/70" style={{ border: `1px solid ${C.border}` }}>
+                {[
+                  {
+                    title: "Private when you need it",
+                    text: "Ask sensitive questions in a space designed for trust.",
+                    icon: (
+                      <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                        <path d="M5.5 8.5V6.8A4.5 4.5 0 0110 2.5a4.5 4.5 0 014.5 4.3v1.7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        <rect x="3.5" y="8" width="13" height="9" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                        <circle cx="10" cy="12.5" r="1" fill="currentColor" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Real mentorship",
+                    text: "Connect around questions, experience, and clinical growth.",
+                    icon: (
+                      <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                        <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+                        <circle cx="13.5" cy="8" r="2" stroke="currentColor" strokeWidth="1.5" />
+                        <path d="M2.5 16c0-2.7 2-4.5 4.5-4.5s4.5 1.8 4.5 4.5M11 16c0-1.9 1.2-3.5 3.3-3.5 1.7 0 3 1 3.2 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Made for medical school",
+                    text: "Keep guidance relevant to the path you’re actually on.",
+                    icon: (
+                      <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                        <path d="M10 2.5l6.5 2.8v4.8c0 3.5-2.2 6.1-6.5 7.4-4.3-1.3-6.5-3.9-6.5-7.4V5.3L10 2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                        <path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ),
+                  },
+                ].map(({ title, text, icon }, index) => (
+                  <div
+                    key={title}
+                    className={`flex items-center gap-3 ${index > 0 ? "mt-3 pt-3" : ""}`}
+                    style={index > 0 ? { borderTop: `1px solid ${C.borderLight}` } : undefined}
                   >
-                    {number}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: C.text }}>
-                    {label}
-                  </span>
-                </div>
-              ))}
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                    >
+                      {icon}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold" style={{ color: C.text }}>{title}</div>
+                      <div className="text-[11px] leading-4 mt-0.5" style={{ color: C.textSec }}>{text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div
@@ -1902,25 +1938,26 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
 
           {/* Role selection */}
           <div className="p-7 sm:p-9 lg:p-10">
-            <div className="flex items-center justify-between gap-4 mb-7">
+            <div className="flex items-start justify-between gap-4 mb-7">
               <div>
-                <div className="text-[11px] font-bold tracking-[0.08em] mb-2" style={{ color: C.textSec }}>
-                  STEP 1 OF 2
+                <div className="text-[10px] font-bold tracking-[0.09em] mb-2" style={{ color: C.textSec }}>
+                  PERSONALIZE YOUR EXPERIENCE
                 </div>
-                <h2 className="text-2xl sm:text-[1.75rem] font-bold tracking-[-0.025em]" style={{ color: C.text }}>
-                  Choose your role
+                <h2 className="text-2xl sm:text-[1.8rem] font-bold tracking-[-0.03em]" style={{ color: C.text }}>
+                  How will you use MedMentor?
                 </h2>
-                <p className="text-sm mt-1.5" style={{ color: C.textSec }}>
-                  Select how you want to continue.
+                <p className="text-sm mt-2 leading-5" style={{ color: C.textSec }}>
+                  Choose the option that best describes you.
                 </p>
               </div>
 
               <div
                 className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                aria-hidden="true"
               >
-                <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <path d="M10 2.5v15M2.5 10h15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 3v14M3 10h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
               </div>
             </div>
@@ -1958,10 +1995,7 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div
-                          className="text-[10px] font-bold tracking-[0.08em] mb-1"
-                          style={{ color: C.textSec }}
-                        >
+                        <div className="text-[10px] font-bold tracking-[0.08em] mb-1" style={{ color: C.textSec }}>
                           {eyebrow}
                         </div>
                         <div className="font-bold text-base sm:text-[17px]" style={{ color: C.text }}>
@@ -2010,7 +2044,7 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
               <div className="flex items-center justify-center gap-2 mt-4">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.primary }} />
                 <p className="text-xs" style={{ color: C.textSec }}>
-                  You can update your profile details next.
+                  Your choice personalizes what you see next.
                 </p>
               </div>
             </div>
@@ -2018,7 +2052,7 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
         </div>
 
         <p className="text-center text-[11px] mt-5" style={{ color: C.textSec }}>
-          Your role helps us tailor the MedMentor experience to you.
+          You can change or update your profile details later.
         </p>
       </div>
     </div>
