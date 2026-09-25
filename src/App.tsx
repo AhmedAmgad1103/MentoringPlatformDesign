@@ -3877,44 +3877,6 @@ function FeedScreen({
       );
     }
   }
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
-
-  const unread = mentorNotifications.filter((n) => !n.read).length;
-
-  useEffect(() => {
-    if (!notifOpen) return;
-    function h(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node))
-        setNotifOpen(false);
-    }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [notifOpen]);
-
-  useEffect(() => {
-    const refreshNotifications = () => {
-      getNotifications()
-        .then((response) => {
-          setMentorUnreadCount(response.unreadCount);
-          setMentorNotifications(
-            response.items.map((n) => ({
-              id: n.id,
-              type: n.kind.toLowerCase(),
-              message: n.title,
-              detail: n.message,
-              time: formatDateTime(n.createdAt),
-              read: n.read,
-              questionId: null,
-            }))
-          );
-        })
-        .catch(() => {});
-    };
-    const interval = window.setInterval(refreshNotifications, 15000);
-    return () => window.clearInterval(interval);
-  }, []);
-
   const sourceQuestions = liveQuestions ?? [];
 
   const filtered = sourceQuestions.filter((q) => {
