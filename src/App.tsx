@@ -2227,7 +2227,6 @@ function DashboardScreen({
   // The mentee dashboard can show the assigned mentor tier without depending on mentor-dashboard state.
   // Keep the value local until mentor profile points are exposed by the backend.
   const rewardPoints = 0;
-  const [selectedSuggestedMentor, setSelectedSuggestedMentor] = useState<{ name: string; specialty: string; available: boolean; photo: string } | null>(null);
 
   useEffect(() => {
     getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
@@ -2717,70 +2716,6 @@ function DashboardScreen({
               </Card>
             </div>
 
-            {/* Suggested mentors */}
-            <div>
-              <h2 className="text-sm font-semibold mb-3" style={{ color: C.textSec }}>
-                SUGGESTED MENTORS
-              </h2>
-              <div className="flex flex-col gap-2">
-                {[
-                  { name: "Dr. James Chen", specialty: "Emergency Medicine", available: true, photo: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=80&h=80&fit=crop" },
-                  { name: "Dr. Priya Patel", specialty: "Neurology", available: false, photo: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=80&h=80&fit=crop" },
-                ].map((m) => (
-                  <Card key={m.name} className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedSuggestedMentor(m)}>
-                    <div className="relative flex-shrink-0">
-                      <Avatar name={m.name} size={40} />
-                      <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={m.available} /></span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate" style={{ color: C.text }}>{m.name}</div>
-                      <div className="text-xs" style={{ color: C.textSec }}>{m.specialty}</div>
-                    </div>
-                    <span style={{ color: C.textSec }}><Icons.ChevronRight /></span>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {selectedSuggestedMentor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setSelectedSuggestedMentor(null); }}
-        >
-          <div className="bg-white rounded-2xl card-shadow-lg w-full max-w-md p-6 fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start gap-4">
-              <div className="relative flex-shrink-0">
-                <img src={selectedSuggestedMentor.photo} alt={selectedSuggestedMentor.name} className="w-16 h-16 rounded-full object-cover" />
-                <span className="absolute -bottom-0.5 -right-0.5"><StatusDot available={selectedSuggestedMentor.available} /></span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-bold" style={{ color: C.text }}>{selectedSuggestedMentor.name}</h3>
-                  <button type="button" onClick={() => setSelectedSuggestedMentor(null)} className="text-lg px-2 hover:opacity-70" style={{ color: C.textSec }}>✕</button>
-                </div>
-                <p className="text-sm mt-1" style={{ color: C.textSec }}>{selectedSuggestedMentor.specialty}</p>
-                <div className="mt-3">
-                  <Badge variant={selectedSuggestedMentor.available ? "success" : "pending"}>
-                    {selectedSuggestedMentor.available ? "Available now" : "Currently busy"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            <div className="mt-5 p-4 rounded-xl" style={{ backgroundColor: C.primaryLight, border: "1px solid " + C.border }}>
-              <p className="text-sm leading-relaxed" style={{ color: C.textSec }}>
-                Mentor profile preview. Their full profile and mentor-matching flow can be connected to the backend later.
-              </p>
-            </div>
-            <div className="flex justify-end mt-5">
-              <Button variant="secondary" size="sm" onClick={() => setSelectedSuggestedMentor(null)}>Close</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -4340,12 +4275,10 @@ function AskPageHeader({
 function QuestionForm({
   title: formTitle,
   question,
-  category,
   tags,
   attachment,
   onTitle,
   onQuestion,
-  onCategory,
   onTags,
   onAttachment,
   showTags = false,
@@ -4356,12 +4289,10 @@ function QuestionForm({
 }: {
   title: string;
   question: string;
-  category: string;
   tags: string[];
   attachment: File | null;
   onTitle: (v: string) => void;
   onQuestion: (v: string) => void;
-  onCategory: (v: string) => void;
   onTags: (v: string[]) => void;
   onAttachment: (f: File | null) => void;
   showTags?: boolean;
@@ -4385,13 +4316,6 @@ function QuestionForm({
         onChange={onQuestion}
         rows={5}
       />
-      <SelectField
-        label="Category"
-        value={category}
-        onChange={onCategory}
-        placeholder="Select a category"
-        options={ASK_CATEGORIES.map((c) => ({ value: c, label: c }))}
-      />
       {showTags && <TagInput tags={tags} onChange={onTags} />}
       <AttachmentZone file={attachment} onChange={onAttachment} />
       {privacyNotice}
@@ -4400,7 +4324,7 @@ function QuestionForm({
         size="lg"
         fullWidth
         onClick={onSubmit}
-        disabled={disabled || !formTitle || !question || !category}
+        disabled={disabled || !formTitle || !question}
       >
         {submitLabel}
       </Button>
@@ -4425,7 +4349,6 @@ function AskQuestionScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
-  const [category, setCategory] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [sort, setSort] = useState<"helpful" | "newest" | "relevant">("helpful");
@@ -4440,7 +4363,6 @@ function AskQuestionScreen({
   function resetForm() {
     setTitle("");
     setQuestion("");
-    setCategory("");
     setTags([]);
     setAttachment(null);
   }
@@ -4449,7 +4371,7 @@ function AskQuestionScreen({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const created = await createQuestion({ title: title.trim(), category, body: question.trim(), privacy });
+      const created = await createQuestion({ title: title.trim(), body: question.trim(), privacy });
       setSubmittedQuestionId(created.id);
       onToast("success", toastMsg);
       setStep(successStep);
@@ -4634,14 +4556,10 @@ function AskQuestionScreen({
 
           <QuestionForm
             title={title}
-            question={question}
-            category={category}
-            tags={tags}
+            question={question}            tags={tags}
             attachment={attachment}
             onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
+            onQuestion={setQuestion}            onTags={setTags}
             onAttachment={setAttachment}
             showTags={false}
             privacyNotice={
@@ -4745,14 +4663,10 @@ function AskQuestionScreen({
 
           <QuestionForm
             title={title}
-            question={question}
-            category={category}
-            tags={tags}
+            question={question}            tags={tags}
             attachment={attachment}
             onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
+            onQuestion={setQuestion}            onTags={setTags}
             onAttachment={setAttachment}
             showTags
             privacyNotice={
@@ -4965,14 +4879,10 @@ function AskQuestionScreen({
 
           <QuestionForm
             title={title}
-            question={question}
-            category={category}
-            tags={tags}
+            question={question}            tags={tags}
             attachment={attachment}
             onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
+            onQuestion={setQuestion}            onTags={setTags}
             onAttachment={setAttachment}
             showTags
             privacyNotice={
@@ -5031,14 +4941,10 @@ function AskQuestionScreen({
 
           <QuestionForm
             title={title}
-            question={question}
-            category={category}
-            tags={tags}
+            question={question}            tags={tags}
             attachment={attachment}
             onTitle={setTitle}
-            onQuestion={setQuestion}
-            onCategory={setCategory}
-            onTags={setTags}
+            onQuestion={setQuestion}            onTags={setTags}
             onAttachment={setAttachment}
             showTags
             privacyNotice={
@@ -5090,9 +4996,7 @@ function AskQuestionScreen({
               <PrivacyBadge type="hidden" />
               <span className="text-xs" style={{ color: C.textSec }}>Awaiting approval</span>
             </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "How do I approach the neurology shelf exam with limited time?"}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Board Exams"}</p>
-          </Card>
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "How do I approach the neurology shelf exam with limited time?"}</p>          </Card>
           <div className="flex flex-col gap-2">
             <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
               Ask Another Question
@@ -5134,9 +5038,7 @@ function AskQuestionScreen({
               <PrivacyBadge type="hidden" />
               <PrivacyBadge type="mentors" />
             </div>
-            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "I'm struggling with burnout during rotations — how do I manage this without it affecting my evaluations?"}</p>
-            <p className="text-xs mt-1" style={{ color: C.textSec }}>{category || "Wellness & Burnout"}</p>
-          </Card>
+            <p className="text-sm font-medium" style={{ color: C.text }}>{title || "I'm struggling with burnout during rotations — how do I manage this without it affecting my evaluations?"}</p>          </Card>
           <div className="flex flex-col gap-2">
             <Button variant="primary" size="lg" fullWidth onClick={() => setStep("select")}>
               Ask Another Question
