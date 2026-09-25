@@ -229,6 +229,21 @@ export async function deleteAnswer(questionId: string, answerId: string) {
   )
 }
 
+export type MyMentorResponse = {
+  mentor: {
+    id: string
+    name: string | null
+    email: string
+    mentorStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
+    answerCount: number
+    studentCount: number
+  } | null
+}
+
+export async function getMyMentor() {
+  return request<MyMentorResponse>("/api/mentors/me")
+}
+
 export async function getMentors() {
   return request<
     Array<{
