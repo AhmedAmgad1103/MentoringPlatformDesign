@@ -2811,9 +2811,6 @@ function DashboardScreen({
   const markRead = onMarkRead ?? (() => {});
   const markAllRead = onMarkAllRead ?? (() => {});
   const unreadCount = 0;
-  // The mentee dashboard can show the assigned mentor tier without depending on mentor-dashboard state.
-  // Keep the value local until mentor profile points are exposed by the backend.
-  const rewardPoints = 0;
 
   useEffect(() => {
     getMe().then(setCurrentUser).catch(() => setCurrentUser(null));
@@ -2837,120 +2834,98 @@ function DashboardScreen({
   useEffect(() => {
     if (!notifDropdownOpen) return;
     function handler(e: MouseEvent) {
-      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node))
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node)) {
         setNotifDropdownOpen(false);
+      }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [notifDropdownOpen]);
 
-  const statusVariant: Record<string, "success" | "pending" | "error" | "info" | "neutral"> = {
-    Answered: "success",
-    "Awaiting Response": "pending",
-    "Pending Approval": "info",
-    Private: "neutral",
-    Public: "info",
-  };
+  const filteredQuestions = recentQuestions.filter((q) =>
+    !searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const questionCount = recentQuestions.length;
+  const responseCount = recentQuestions.reduce((sum, q) => sum + (q.responses || 0), 0);
+  const answeredCount = recentQuestions.filter((q) => q.status === "ANSWERED").length;
 
   const QUICK_ACTIONS = [
     {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="8" r="4" stroke={C.primary} strokeWidth="1.6" />
-          <path d="M4 20c0-4 3.582-6 8-6s8 2 8 6" stroke={C.primary} strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M18 10l2 2-3 3" stroke={C.primary} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
       title: "Ask My Mentor",
       sub: currentUser?.assignedMentor
-        ? `Send a private question directly to ${currentUser.assignedMentor.name || "your assigned mentor"}.`
-        : "You don't have an assigned mentor yet.",
-      color: C.primaryLight,
-      border: "#C7D2FE",
-      badge: currentUser?.assignedMentor?.name || "No mentor assigned",
+        ? `Private question to ${currentUser.assignedMentor.name || "your assigned mentor"}`
+        : "No assigned mentor yet",
+      icon: <Icons.User />,
+      tone: "primary",
+      onClick: () => currentUser?.assignedMentor
+        ? onNavigate("ask-my-mentor")
+        : onToast("info", "You do not have an assigned mentor yet."),
     },
     {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="9" cy="9" r="4" stroke="#0F9D6B" strokeWidth="1.6" />
-          <circle cx="17" cy="9" r="3" stroke="#0F9D6B" strokeWidth="1.6" />
-          <path d="M2 20c0-3.5 3.134-5 7-5 1.5 0 2.9.3 4 .9M14 20c0-2 1.5-3.5 5-3.5" stroke="#0F9D6B" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      ),
       title: "Ask Any Mentor",
-      sub: "Get perspectives from mentors across the school",
-      color: C.successLight,
-      border: "#A7F3D0",
-      badge: "Available mentors",
+      sub: "Get another perspective from the school",
+      icon: <Icons.Users />,
+      tone: "success",
+      onClick: () => onNavigate("ask-any-mentor"),
     },
     {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#E0A62A" strokeWidth="1.6" />
-          <path d="M12 7v5l3 3" stroke="#E0A62A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M8 2.5C5 4 3 6.8 3 10" stroke="#E0A62A" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      ),
       title: "Ask Anonymously",
       sub: "Ask without revealing your identity",
-      color: C.pendingLight,
-      border: "#FDE68A",
-      badge: "Identity protected",
-    },
-    {
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="4" width="18" height="16" rx="3" stroke="#7C3AED" strokeWidth="1.6" />
-          <path d="M7 9h10M7 13h7" stroke="#7C3AED" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      ),
-      title: "Browse Questions",
-      sub: "Learn from questions other students have asked",
-      color: "#EDE9FE",
-      border: "#C4B5FD",
-      badge: "Live database",
+      icon: <Icons.Shield />,
+      tone: "pending",
+      onClick: () => onNavigate("ask-anonymous"),
     },
   ];
 
+  const toneStyles: Record<string, { bg: string; border: string; iconBg: string; iconColor: string }> = {
+    primary: { bg: C.primaryLight, border: "#C7D2FE", iconBg: "#FFFFFF", iconColor: C.primary },
+    success: { bg: C.successLight, border: "#A7F3D0", iconBg: "#FFFFFF", iconColor: C.success },
+    pending: { bg: C.pendingLight, border: "#FDE68A", iconBg: "#FFFFFF", iconColor: C.pending },
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
-      {/* Header / Nav */}
       <header
-        className="sticky top-0 z-30 bg-white"
-        style={{ borderBottom: `1px solid ${C.border}` }}
+        className="sticky top-0 z-30"
+        style={{
+          backgroundColor: "rgba(255,255,255,0.86)",
+          backdropFilter: "blur(18px) saturate(160%)",
+          WebkitBackdropFilter: "blur(18px) saturate(160%)",
+          borderBottom: `1px solid ${C.border}`,
+        }}
       >
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
           <Logo size="sm" />
 
           <div
-            className="hidden sm:flex items-center rounded-xl px-3.5 py-2 gap-2 w-64"
-            style={{ border: `1.5px solid ${C.border}`, backgroundColor: C.bg }}
+            className="hidden sm:flex items-center rounded-xl px-3.5 py-2 gap-2 w-72 transition-all duration-150"
+            style={{ border: `1px solid ${C.border}`, backgroundColor: C.bg }}
           >
             <span style={{ color: C.textSec }}><Icons.Search /></span>
             <input
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
-              placeholder="Search questions, mentors..."
+              placeholder="Search your questions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ color: C.text }}
             />
+            <span className="text-[10px] font-medium hidden lg:inline" style={{ color: "#9B95B5" }}>⌘ K</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="relative" ref={notifDropdownRef}>
               <button
-                className="relative p-2 rounded-xl transition-colors"
+                aria-label="Notifications"
+                className="relative w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
                 style={{ color: C.textSec }}
                 onClick={() => setNotifDropdownOpen((o) => !o)}
               >
                 <Icons.Bell />
                 {unreadCount > 0 && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
-                    style={{ backgroundColor: C.error, fontSize: 9 }}
-                  >
-                    {unreadCount}
-                  </span>
+                    className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                    style={{ backgroundColor: C.error, boxShadow: "0 0 0 2px #fff" }}
+                  />
                 )}
               </button>
               {notifDropdownOpen && (
@@ -2970,7 +2945,12 @@ function DashboardScreen({
                 />
               )}
             </div>
-            <button onClick={() => onNavigate("mentee-profile")} className="rounded-full hover:opacity-80 transition-opacity">
+
+            <button
+              onClick={() => onNavigate("mentee-profile")}
+              className="rounded-full transition-transform active:scale-95"
+              aria-label="Open profile"
+            >
               <Avatar
                 src={currentUser?.avatarUrl || undefined}
                 name={currentUser?.name || currentUser?.email?.split("@")[0] || "User"}
@@ -2981,329 +2961,400 @@ function DashboardScreen({
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Greeting */}
-        <div className="mb-6 sm:mb-8 fade-in">
-          <h1 className="text-xl sm:text-2xl font-bold mb-1" style={{ color: C.text }}>
-            Good morning, {currentUser?.name || currentUser?.email?.split("@")[0] || "there"} 👋
-          </h1>
-          <p style={{ color: C.textSec }} className="text-sm">
-            How can we help you today?
-          </p>
-          {backendQuestionCount !== null && (
-            <p className="text-xs mt-2 font-medium" style={{ color: C.success }}>
-              Backend connected · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} available
-            </p>
-          )}
-          {backendQuestionCount === null && backendLoadError && !DEMO_MODE && (
-            <p className="text-xs mt-2 font-medium" style={{ color: C.error }}>
-              Backend unavailable — frontend is showing placeholder data.
-            </p>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {QUICK_ACTIONS.map((qa) => (
-            <div
-              key={qa.title}
-              className="quick-action-card rounded-2xl p-5 cursor-pointer card-shadow"
-              style={{ backgroundColor: qa.color, border: `1.5px solid ${qa.border}` }}
-              onClick={() => qa.title === "Browse Questions" ? onNavigate("feed") : qa.title === "Ask My Mentor" ? (currentUser?.assignedMentor ? onNavigate("ask-my-mentor") : onToast("info", "You do not have an assigned mentor yet.")) : qa.title === "Ask Any Mentor" ? onNavigate("ask-any-mentor") : qa.title === "Ask Anonymously" ? onNavigate("ask-anonymous") : onNavigate("ask-question")}
-            >
-              <div className="mb-3">{qa.icon}</div>
-              <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
-                {qa.title}
-              </div>
-              <p className="text-xs leading-snug mb-3" style={{ color: C.textSec }}>
-                {qa.sub}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-7 sm:py-10">
+        <section className="fade-in mb-7 sm:mb-9">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: C.primary }}>
+                Your mentorship space
               </p>
-              <span
-                className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: "rgba(255,255,255,0.7)", color: C.textSec }}
+              <h1
+                className="text-2xl sm:text-3xl font-bold mb-2"
+                style={{ color: C.text, letterSpacing: "-0.025em" }}
               >
-                {qa.badge}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Questions + Notifications */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
-            {/* Tabs */}
-            <div className="flex items-center gap-1" style={{ borderBottom: `1.5px solid ${C.border}` }}>
-              {(["questions", "notifications"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className="px-4 py-2.5 text-sm font-medium capitalize relative transition-colors"
-                  style={{
-                    color: activeTab === tab ? C.primary : C.textSec,
-                    borderBottom: activeTab === tab ? `2px solid ${C.primary}` : "2px solid transparent",
-                    marginBottom: -1.5,
-                  }}
-                >
-                  {tab === "notifications" ? "Notifications" : "Recent Questions"}
-                  {tab === "notifications" && unreadCount > 0 && (
-                    <span
-                      className="ml-1.5 px-1.5 py-0.5 rounded-full text-white text-xs font-bold"
-                      style={{ backgroundColor: C.error, fontSize: 10 }}
-                    >
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {activeTab === "questions" && (
-              <div className="flex flex-col gap-3">
-                {recentQuestions
-                  .filter((q) =>
-                    !searchQuery ||
-                    q.title.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((q) => (
-                    <Card
-                      key={q.id}
-                      className="p-5 hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => onOpenQuestion(q.id)}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <p className="text-sm font-medium leading-snug flex-1" style={{ color: C.text }}>
-                          {q.title}
-                        </p>
-                        <Badge
-                          variant={
-                            q.moderationStatus === "PENDING"
-                              ? "info"
-                              : q.status === "ANSWERED"
-                                ? "success"
-                                : q.status === "CLOSED"
-                                  ? "neutral"
-                                  : "pending"
-                          }
-                        >
-                          {q.moderationStatus === "PENDING"
-                            ? "Awaiting Approval"
-                            : q.status === "ANSWERED"
-                              ? "Answered"
-                              : q.status === "CLOSED"
-                                ? "Closed"
-                                : "Awaiting Response"}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{ backgroundColor: C.borderLight, color: C.textSec }}
-                        >
-                          {q.category}
-                        </span>
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full"
-                          style={{
-                            backgroundColor: q.isAnonymous
-                              ? "#F3E8FF"
-                              : q.visibility === "PRIVATE"
-                                ? C.pendingLight
-                                : C.primaryLight,
-                            color: q.isAnonymous
-                              ? "#7C3AED"
-                              : q.visibility === "PRIVATE"
-                                ? C.pending
-                                : C.primary,
-                          }}
-                        >
-                          {q.isAnonymous
-                            ? "👤 Anonymous"
-                            : q.visibility === "PRIVATE"
-                              ? "🔒 Private"
-                              : "🌐 Public"}
-                        </span>
-                        <span className="text-xs" style={{ color: C.textSec }}>
-                          {formatDateTime(q.createdAt)}
-                        </span>
-                        {q.moderationStatus === "PENDING" && (
-                          <span className="text-xs font-medium" style={{ color: C.primary }}>
-                            Awaiting admin approval
-                          </span>
-                        )}
-                        {q.responses > 0 && (
-                          <span className="text-xs flex items-center gap-1" style={{ color: C.textSec }}>
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                              <path
-                                d="M10.5 6c0 2.485-2.015 4.5-4.5 4.5a4.47 4.47 0 01-2.25-.6L1.5 10.5l.6-2.25A4.47 4.47 0 011.5 6C1.5 3.515 3.515 1.5 6 1.5S10.5 3.515 10.5 6z"
-                                stroke="currentColor"
-                                strokeWidth="1.1"
-                              />
-                            </svg>
-                            {q.responses} response{q.responses !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-
-                {recentQuestions.filter((q) =>
-                  !searchQuery ||
-                  q.title.toLowerCase().includes(searchQuery.toLowerCase())
-                ).length === 0 && (
-                  <div className="flex flex-col items-center py-12 gap-3">
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: C.borderLight }}
-                    >
-                      <Icons.Search />
-                    </div>
-                    <p className="text-sm font-medium" style={{ color: C.text }}>
-                      {searchQuery ? `No questions match "${searchQuery}"` : "No questions yet"}
-                    </p>
-                    <p className="text-xs" style={{ color: C.textSec }}>
-                      {searchQuery ? "Try a different search term" : "Questions you submit will appear here, newest first."}
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  className="text-sm font-medium flex items-center gap-1.5 self-start mt-1"
-                  style={{ color: C.primary }}
-                  onClick={() => onNavigate("feed")}
-                >
-                  View all questions <Icons.ChevronRight />
-                </button>
-              </div>
-            )}
-            {activeTab === "notifications" && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs" style={{ color: C.textSec }}>
-                    {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                Good morning, {currentUser?.name?.split(/\s+/)[0] || currentUser?.email?.split("@")[0] || "there"} 👋
+              </h1>
+              <p className="text-sm sm:text-base" style={{ color: C.textSec }}>
+                What would you like help with today?
+              </p>
+              {backendQuestionCount !== null && (
+                <div className="flex items-center gap-2 mt-3">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: C.success }} />
+                  <span className="text-xs font-medium" style={{ color: C.success }}>
+                    Connected · {backendQuestionCount} question{backendQuestionCount === 1 ? "" : "s"} in your history
                   </span>
-                  <div className="flex items-center gap-3">
-                    {unreadCount > 0 && (
-                      <button onClick={onMarkAllRead} className="text-xs font-semibold" style={{ color: C.primary }}>
-                        Mark all read
-                      </button>
-                    )}
-                    <button onClick={() => onNavigate("notifications-page")} className="text-xs font-semibold" style={{ color: C.primary }}>
-                      View all →
-                    </button>
-                  </div>
                 </div>
-                {ALL_NOTIFICATIONS.slice(0, 5).map((n) => {
-                  const isRead = n.read || notifReadIds.includes(n.id);
-                  return (
-                    <Card
-                      key={n.id}
-                      className="p-4 flex items-start gap-3 cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => {
-                        onMarkRead(n.id);
-                        if (n.questionId) onOpenQuestion(n.questionId);
-                      }}
-                    >
-                      <NotifIcon type={n.type} />
-                      <div className="flex-1">
-                        <p className="text-sm leading-snug" style={{ color: C.text, fontWeight: isRead ? 400 : 600 }}>
-                          {n.message}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: C.textSec }}>{n.detail}</p>
-                        <p className="text-xs mt-1" style={{ color: C.textSec }}>{n.time}</p>
-                      </div>
-                      {!isRead && (
-                        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: C.primary }} />
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+              )}
+              {backendQuestionCount === null && backendLoadError && !DEMO_MODE && (
+                <p className="text-xs mt-3 font-medium" style={{ color: C.error }}>
+                  We couldn't load your questions. Try refreshing the page.
+                </p>
+              )}
+            </div>
+
+            <Button
+              size="md"
+              onClick={() => onNavigate("ask-question")}
+              className="self-start lg:self-auto shadow-sm"
+            >
+              <Icons.Plus />
+              Ask a question
+            </Button>
+          </div>
+        </section>
+
+        <section className="mb-9">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-sm font-semibold" style={{ color: C.text }}>How can we help?</h2>
+              <p className="text-xs mt-0.5" style={{ color: C.textSec }}>Choose the path that fits your question.</p>
+            </div>
+            <button
+              onClick={() => onNavigate("feed")}
+              className="hidden sm:flex items-center gap-1 text-xs font-semibold"
+              style={{ color: C.primary }}
+            >
+              Browse the community <Icons.ChevronRight />
+            </button>
           </div>
 
-          {/* Right: My Mentor */}
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {QUICK_ACTIONS.map((qa) => {
+              const tone = toneStyles[qa.tone];
+              return (
+                <button
+                  key={qa.title}
+                  onClick={qa.onClick}
+                  className="group text-left rounded-2xl p-4 sm:p-5 transition-all duration-150 active:scale-[0.985] hover:-translate-y-0.5"
+                  style={{
+                    backgroundColor: tone.bg,
+                    border: `1px solid ${tone.border}`,
+                    boxShadow: "0 1px 2px rgba(30,27,58,0.03)",
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+                    style={{ backgroundColor: tone.iconBg, color: tone.iconColor }}
+                  >
+                    {qa.icon}
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold" style={{ color: C.text }}>{qa.title}</span>
+                    <span
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ color: tone.iconColor }}
+                    >
+                      <Icons.ChevronRight />
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed mt-1.5" style={{ color: C.textSec }}>{qa.sub}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => onNavigate("feed")}
+            className="sm:hidden flex items-center gap-1 mt-3 text-xs font-semibold"
+            style={{ color: C.primary }}
+          >
+            Browse the community <Icons.ChevronRight />
+          </button>
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+          <section className="min-w-0">
+            <div className="flex items-end justify-between gap-4 mb-3">
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: C.text }}>Your activity</h2>
+                <p className="text-xs mt-0.5" style={{ color: C.textSec }}>
+                  Keep track of the questions you've asked.
+                </p>
+              </div>
+              {activeTab === "questions" && (
+                <button
+                  onClick={() => onNavigate("feed")}
+                  className="hidden sm:flex items-center gap-1 text-xs font-semibold"
+                  style={{ color: C.primary }}
+                >
+                  View all <Icons.ChevronRight />
+                </button>
+              )}
+            </div>
+
+            <div
+              className="rounded-2xl overflow-hidden bg-white"
+              style={{ border: `1px solid ${C.border}`, boxShadow: "0 4px 18px rgba(30,27,58,0.045)" }}
+            >
+              <div
+                className="flex items-center gap-1 px-2 pt-2"
+                style={{ borderBottom: `1px solid ${C.borderLight}` }}
+              >
+                {(["questions", "notifications"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className="px-3.5 py-2.5 text-xs font-semibold relative transition-colors"
+                    style={{
+                      color: activeTab === tab ? C.primary : C.textSec,
+                    }}
+                  >
+                    {tab === "notifications" ? "Notifications" : "Recent questions"}
+                    {tab === "notifications" && unreadCount > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-white text-[9px] font-bold" style={{ backgroundColor: C.error }}>
+                        {unreadCount}
+                      </span>
+                    )}
+                    {activeTab === tab && (
+                      <span
+                        className="absolute left-3 right-3 bottom-0 h-0.5 rounded-full"
+                        style={{ backgroundColor: C.primary }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {activeTab === "questions" ? (
+                filteredQuestions.length > 0 ? (
+                  <div className="divide-y" style={{ borderColor: C.borderLight }}>
+                    {filteredQuestions.slice(0, 5).map((q) => (
+                      <button
+                        key={q.id}
+                        onClick={() => onOpenQuestion(q.id)}
+                        className="w-full text-left p-4 sm:p-5 flex items-start gap-3.5 group transition-colors hover:bg-[#FBFAFE]"
+                      >
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                          style={{
+                            backgroundColor: q.status === "ANSWERED" ? C.successLight : C.primaryLight,
+                            color: q.status === "ANSWERED" ? C.success : C.primary,
+                          }}
+                        >
+                          {q.status === "ANSWERED" ? <Icons.Check /> : <Icons.MessageCircle />}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold leading-snug line-clamp-2" style={{ color: C.text }}>
+                              {q.title}
+                            </p>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" style={{ color: C.primary }}>
+                              <Icons.ChevronRight />
+                            </span>
+                          </div>
+
+                          <div className="flex items-center flex-wrap gap-2 mt-2">
+                            <Badge
+                              variant={
+                                q.moderationStatus === "PENDING"
+                                  ? "info"
+                                  : q.status === "ANSWERED"
+                                    ? "success"
+                                    : q.status === "CLOSED"
+                                      ? "neutral"
+                                      : "pending"
+                              }
+                            >
+                              {q.moderationStatus === "PENDING"
+                                ? "Awaiting Approval"
+                                : q.status === "ANSWERED"
+                                  ? "Answered"
+                                  : q.status === "CLOSED"
+                                    ? "Closed"
+                                    : "Awaiting Response"}
+                            </Badge>
+                            <span className="text-[11px]" style={{ color: C.textSec }}>
+                              {q.responses || 0} response{(q.responses || 0) === 1 ? "" : "s"}
+                            </span>
+                            <span className="text-[11px]" style={{ color: C.textSec }}>·</span>
+                            <span className="text-[11px]" style={{ color: C.textSec }}>
+                              {formatDateTime(q.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-6 py-14 text-center">
+                    <div
+                      className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                      style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                    >
+                      {searchQuery ? <Icons.Search /> : <Icons.MessageCircle />}
+                    </div>
+                    <h3 className="text-sm font-semibold" style={{ color: C.text }}>
+                      {searchQuery ? `No questions match “${searchQuery}”` : "Your questions will appear here"}
+                    </h3>
+                    <p className="text-xs leading-relaxed mt-1.5 max-w-sm mx-auto" style={{ color: C.textSec }}>
+                      {searchQuery
+                        ? "Try a different search term."
+                        : "Start a conversation with a mentor and you'll be able to follow every response from this space."}
+                    </p>
+                    {!searchQuery && (
+                      <Button size="sm" className="mt-5" onClick={() => onNavigate("ask-question")}>
+                        Ask your first question
+                      </Button>
+                    )}
+                  </div>
+                )
+              ) : (
+                <div className="p-4 sm:p-5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs" style={{ color: C.textSec }}>
+                      {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {unreadCount > 0 && (
+                        <button onClick={onMarkAllRead} className="text-xs font-semibold" style={{ color: C.primary }}>
+                          Mark all read
+                        </button>
+                      )}
+                      <button onClick={() => onNavigate("notifications-page")} className="text-xs font-semibold" style={{ color: C.primary }}>
+                        View all
+                      </button>
+                    </div>
+                  </div>
+                  {ALL_NOTIFICATIONS.slice(0, 5).map((n) => {
+                    const isRead = n.read || notifReadIds?.includes(n.id);
+                    return (
+                      <div
+                        key={n.id}
+                        className="flex items-start gap-3 rounded-xl p-3 cursor-pointer transition-colors hover:bg-[#FBFAFE]"
+                        onClick={() => {
+                          onMarkRead(n.id);
+                          if (n.questionId) onOpenQuestion(n.questionId);
+                        }}
+                      >
+                        <NotifIcon type={n.type} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm leading-snug" style={{ color: C.text, fontWeight: isRead ? 400 : 600 }}>
+                            {n.message}
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: C.textSec }}>{n.detail}</p>
+                          <p className="text-[11px] mt-1" style={{ color: C.textSec }}>{n.time}</p>
+                        </div>
+                        {!isRead && <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: C.primary }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeTab === "questions" && filteredQuestions.length > 5 && (
+                <button
+                  onClick={() => onNavigate("feed")}
+                  className="w-full px-5 py-3 text-xs font-semibold text-left flex items-center justify-between transition-colors hover:bg-[#FBFAFE]"
+                  style={{ borderTop: `1px solid ${C.borderLight}`, color: C.primary }}
+                >
+                  <span>View all {filteredQuestions.length} questions</span>
+                  <Icons.ChevronRight />
+                </button>
+              )}
+            </div>
+          </section>
+
+          <aside className="flex flex-col gap-4">
             <div>
-              <h2 className="text-sm font-semibold mb-3" style={{ color: C.textSec }}>
-                MY MENTOR
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold" style={{ color: C.text }}>My mentor</h2>
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: C.textSec }}>
+                  {currentUser?.assignedMentor ? "Assigned" : "Not assigned"}
+                </span>
+              </div>
+
               <Card className="p-5">
                 {currentUser?.assignedMentor ? (
                   <>
-                    <div className="flex items-start gap-3 mb-4">
+                    <div className="flex items-center gap-3">
                       <div className="relative">
-                        <Avatar name={currentUser.assignedMentor.name || "Mentor"} size={56} />
+                        <Avatar name={currentUser.assignedMentor.name || "Mentor"} size={52} />
                         <span className="absolute -bottom-0.5 -right-0.5">
                           <StatusDot available />
                         </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm leading-tight" style={{ color: C.text }}>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm truncate" style={{ color: C.text }}>
                           {currentUser.assignedMentor.name || "Assigned Mentor"}
                         </div>
-                        <div className="text-xs mt-0.5 mb-1.5" style={{ color: C.textSec }}>
-                          Physician Mentor
-                        </div>
-                        <Badge variant="success">Available</Badge>
+                        <div className="text-xs mt-1" style={{ color: C.textSec }}>Physician mentor · Available</div>
                       </div>
                     </div>
-
-                    <p className="text-xs leading-relaxed mb-4" style={{ color: C.textSec }}>
-                      Your assigned mentor is available to answer your private questions and support you throughout your medical education.
-                    </p>
-
+                    <div
+                      className="mt-4 p-3 rounded-xl"
+                      style={{ backgroundColor: C.bg }}
+                    >
+                      <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
+                        Your mentor can help with private questions and support you throughout your medical education.
+                      </p>
+                    </div>
                     <Button
                       variant="secondary"
                       size="sm"
                       fullWidth
+                      className="mt-4"
                       onClick={() => onNavigate("ask-my-mentor")}
                     >
-                      Ask My Mentor
+                      Ask my mentor
                     </Button>
                   </>
                 ) : (
-                  <div className="text-center py-3">
+                  <div>
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                      style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                    >
+                      <Icons.User />
+                    </div>
                     <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
                       No mentor assigned yet
                     </div>
-                    <p className="text-xs leading-relaxed mb-4" style={{ color: C.textSec }}>
-                      Once an administrator assigns you a mentor, they will appear here and you can send them private questions.
+                    <p className="text-xs leading-relaxed" style={{ color: C.textSec }}>
+                      An administrator will assign a mentor to you. Until then, you can ask any mentor or ask anonymously.
                     </p>
                     <Button
                       variant="secondary"
                       size="sm"
                       fullWidth
-                      onClick={() => onNavigate("ask-my-mentor")}
-                      disabled
+                      className="mt-4"
+                      onClick={() => onNavigate("ask-any-mentor")}
                     >
-                      Ask My Mentor
+                      Ask any mentor
                     </Button>
                   </div>
                 )}
               </Card>
             </div>
 
-            {/* Stats */}
             <div>
-              <h2 className="text-sm font-semibold mb-3" style={{ color: C.textSec }}>
-                MY STATS
-              </h2>
-              <Card className="divide-y" style={{ borderColor: C.border }}>
-                {[
-                  { label: "Questions asked", value: "4" },
-                  { label: "Answers received", value: "7" },
-                  { label: "Mentoring sessions", value: "2" },
-                  { label: "Streak", value: "12 days 🔥" },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex items-center justify-between px-4 py-3">
-                    <span className="text-xs" style={{ color: C.textSec }}>{stat.label}</span>
-                    <span className="text-sm font-bold" style={{ color: C.text }}>{stat.value}</span>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold" style={{ color: C.text }}>Overview</h2>
+                <button
+                  onClick={() => onNavigate("mentee-profile")}
+                  className="text-[11px] font-semibold"
+                  style={{ color: C.primary }}
+                >
+                  Profile
+                </button>
+              </div>
+              <Card className="p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "Questions", value: questionCount },
+                    { label: "Responses", value: responseCount },
+                    { label: "Answered", value: answeredCount },
+                    { label: "Mentor", value: currentUser?.assignedMentor ? "Yes" : "—" },
+                  ].map((stat) => (
+                    <div key={stat.label} className="rounded-xl p-3" style={{ backgroundColor: C.bg }}>
+                      <div className="text-base font-bold" style={{ color: C.text }}>{stat.value}</div>
+                      <div className="text-[11px] mt-0.5" style={{ color: C.textSec }}>{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
               </Card>
             </div>
-          </div>
+          </aside>
         </div>
       </main>
     </div>
