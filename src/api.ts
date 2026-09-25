@@ -6,6 +6,7 @@ import {
   getAnswers as getAnswersApi,
   getMentorProfile,
   getMentors as getMentorsApi,
+  getMyMentor as getMyMentorApi,
   getMentorLeaderboard as getMentorLeaderboardApi,
   getNotifications as getNotificationsApi,
   markNotificationRead as markNotificationReadApi,
@@ -289,6 +290,10 @@ export async function getMessages(withUserId: string, before?: string) {
 
 export async function getMentors() {
   return getMentorsApi();
+}
+
+export async function getMyMentor() {
+  return getMyMentorApi();
 }
 
 export async function getMentorLeaderboard() {
