@@ -150,7 +150,7 @@ function Button({
   className?: string;
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-150 cursor-pointer select-none";
+    "ui-pressable inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-150 cursor-pointer select-none";
   const sizes = {
     sm: "px-3 py-1.5 text-sm",
     md: "px-4 py-2.5 text-sm",
@@ -241,7 +241,7 @@ function InputField({
         </label>
       )}
       <div
-        className="flex items-center rounded-xl px-3.5 transition-all duration-150"
+        className="ui-field-shell flex items-center rounded-xl px-3.5 transition-all duration-150"
         style={{
           border: `1.5px solid ${hasError ? C.error : focused ? C.primary : C.border}`,
           backgroundColor: "#fff",
@@ -261,7 +261,7 @@ function InputField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 py-3 text-sm bg-transparent outline-none placeholder:text-gray-400"
+          className="ui-field-control flex-1 py-3 text-sm bg-transparent outline-none placeholder:text-gray-400"
           style={{ color: C.text }}
         />
         {rightElement && <span className="ml-2">{rightElement}</span>}
@@ -312,7 +312,7 @@ function TextAreaField({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-xl px-3.5 py-3 text-sm resize-none outline-none placeholder:text-gray-400 transition-all duration-150"
+        className="ui-field-control rounded-xl px-3.5 py-3 text-sm resize-none outline-none placeholder:text-gray-400 transition-all duration-150"
         style={{
           border: `1.5px solid ${focused ? C.primary : C.border}`,
           backgroundColor: "#fff",
@@ -346,7 +346,7 @@ function SelectField({
         </label>
       )}
       <div
-        className="relative rounded-xl transition-all duration-150"
+        className="ui-field-shell relative rounded-xl transition-all duration-150"
         style={{
           border: `1.5px solid ${focused ? C.primary : C.border}`,
           backgroundColor: "#fff",
@@ -358,7 +358,7 @@ function SelectField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none px-3.5 py-3 text-sm bg-transparent outline-none rounded-xl cursor-pointer"
+          className="ui-field-control w-full appearance-none px-3.5 py-3 text-sm bg-transparent outline-none rounded-xl cursor-pointer"
           style={{ color: value ? C.text : "#9CA3AF" }}
         >
           {placeholder && (
@@ -425,7 +425,7 @@ function Card({
 }) {
   return (
     <div
-      className={`rounded-xl bg-white card-shadow ${className} ${onClick ? "cursor-pointer" : ""}`}
+      className={`ui-surface rounded-xl bg-white card-shadow ${className} ${onClick ? "ui-surface-interactive cursor-pointer" : ""}`}
       style={{ border: `1px solid ${C.border}`, ...style }}
       onClick={onClick}
     >
@@ -453,12 +453,12 @@ function Avatar({
     <img
       src={src}
       alt={name}
-      className="rounded-full object-cover flex-shrink-0"
+      className="ui-avatar rounded-full object-cover flex-shrink-0"
       style={{ width: size, height: size }}
     />
   ) : (
     <div
-      className="rounded-full flex items-center justify-center flex-shrink-0 font-semibold"
+      className="ui-avatar rounded-full flex items-center justify-center flex-shrink-0 font-semibold"
       style={{
         width: size,
         height: size,
