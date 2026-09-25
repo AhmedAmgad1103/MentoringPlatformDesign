@@ -619,6 +619,24 @@ export async function mentorSignup(email: string) {
   return request<{ status: string }>("/api/auth/mentor-signup", { method: "POST", body: JSON.stringify({ email }) })
 }
 
+export async function startEmailVerification(email: string) {
+  return request<{
+    sent: boolean
+    expiresInSeconds: number
+    development?: boolean
+  }>("/api/auth/email-verification/start", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+  })
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  return request<{ verified: true; email: string }>("/api/auth/email-verification/verify", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim().toLowerCase(), code }),
+  })
+}
+
 export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
   const result = await request<{ roles: string[]; mentorPending: boolean }>(
     `/api/auth/roles?email=${encodeURIComponent(email.trim().toLowerCase())}`
