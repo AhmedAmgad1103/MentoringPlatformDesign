@@ -1764,95 +1764,262 @@ function OnboardingRoleScreen({ onSelect, availableRoles = ["STUDENT", "MENTOR"]
   const [selected, setSelected] = useState<Role>(null);
   const allowed = new Set(availableRoles);
 
-  const roles: { role: "mentee" | "mentor"; icon: React.ReactNode; title: string }[] = [
+  const roles: {
+    role: "mentee" | "mentor";
+    icon: React.ReactNode;
+    title: string;
+    eyebrow: string;
+    description: string;
+    detail: string;
+  }[] = [
     {
       role: "mentee",
+      eyebrow: "MEDICAL STUDENT",
+      title: "I’m here to learn",
+      description: "Ask questions, get guidance, and build a relationship with mentors throughout medical school.",
+      detail: "Questions · Guidance · Mentorship",
       icon: (
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
-          <circle cx="16" cy="10" r="5" stroke={C.primary} strokeWidth="1.8" />
-          <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <circle cx="16" cy="10" r="5" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M6 28c0-5.523 4.477-9 10-9s10 3.477 10 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       ),
-      title: "Mentee",
     },
     {
       role: "mentor",
+      eyebrow: "PHYSICIAN / RESIDENT",
+      title: "I’m here to mentor",
+      description: "Share your experience, answer student questions, and help shape the next generation of doctors.",
+      detail: "Answer · Support · Inspire",
       icon: (
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
-          <circle cx="12" cy="10" r="4" stroke={C.primary} strokeWidth="1.8" />
-          <path d="M4 26c0-4.418 3.582-7 8-7s8 2.582 8 7" stroke={C.primary} strokeWidth="1.8" strokeLinecap="round" />
-          <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke={C.primary} strokeWidth="1.8" />
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <circle cx="12" cy="10" r="4" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M4 26c0-4.418 3.582-7 8-7s8 2.582 8 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="22" cy="12" r="3.5" fill={C.primaryLight} stroke="currentColor" strokeWidth="1.8" />
+          <path d="M19.5 18.5c1-.3 2.5-.3 3.5-.3 3.5 0 6.5 2.3 7 5.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       ),
-      title: "Mentor",
     },
   ];
 
+  const visibleRoles = roles.filter(({ role }) =>
+    role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")
+  );
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6"
-      style={{
-        background: `radial-gradient(circle at top, ${C.primaryLight} 0%, ${C.bg} 42%, ${C.bg} 100%)`,
-      }}
+      className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 relative overflow-hidden"
+      style={{ backgroundColor: C.bg }}
     >
-      <div className="w-full max-w-xl fade-in">
-        <div className="flex justify-center mb-8">
+      {/* Soft depth using the existing palette only. */}
+      <div
+        className="absolute -top-32 -right-24 w-96 h-96 rounded-full pointer-events-none opacity-50"
+        style={{ background: C.primaryLight, filter: "blur(2px)" }}
+      />
+      <div
+        className="absolute -bottom-40 -left-24 w-[28rem] h-[28rem] rounded-full pointer-events-none opacity-35"
+        style={{ background: C.primaryLight, filter: "blur(10px)" }}
+      />
+
+      <div className="w-full max-w-[980px] relative z-10 fade-in">
+        <div className="flex justify-center mb-6 sm:mb-8">
           <Logo size="md" />
         </div>
 
-        <div className="text-center mb-7">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: C.text }}>
-            Choose your role
-          </h1>
-          <p style={{ color: C.textSec }} className="text-sm">
-            Select how you want to continue.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          {roles.filter(({ role }) => role === "mentee" ? allowed.has("STUDENT") : allowed.has("MENTOR")).map(({ role, icon, title }) => {
-            const isSelected = selected === role;
-            return (
-              <button
-                key={role}
-                type="button"
-                className="rounded-2xl p-5 text-center transition-all duration-200"
-                style={{
-                  border: `1.5px solid ${isSelected ? C.primary : C.border}`,
-                  backgroundColor: isSelected ? C.primaryLight : "#fff",
-                  boxShadow: isSelected ? "0 6px 18px rgba(91,78,191,0.10)" : "0 2px 8px rgba(24,59,86,0.04)",
-                }}
-                onClick={() => setSelected(role)}
+        <div
+          className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] overflow-hidden rounded-[28px] bg-white"
+          style={{
+            border: `1px solid ${C.border}`,
+            boxShadow: "0 24px 70px rgba(30,27,58,0.10), 0 4px 16px rgba(30,27,58,0.04)",
+          }}
+        >
+          {/* Context panel */}
+          <div
+            className="relative p-7 sm:p-9 lg:p-10 flex flex-col justify-between min-h-[430px]"
+            style={{
+              background: C.primaryLight,
+              borderRight: `1px solid ${C.border}`,
+            }}
+          >
+            <div>
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-[0.08em]"
+                style={{ backgroundColor: "#fff", color: C.primary }}
               >
-                <div
-                  className="mx-auto w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-                  style={{ backgroundColor: isSelected ? "#fff" : C.primaryLight }}
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.primary }} />
+                WELCOME TO MEDMENTOR
+              </div>
+
+              <div className="mt-8 max-w-sm">
+                <h1
+                  className="text-3xl sm:text-[2.15rem] font-bold leading-[1.08] tracking-[-0.035em]"
+                  style={{ color: C.text }}
                 >
-                  {icon}
+                  One platform.
+                  <br />
+                  The right kind of guidance.
+                </h1>
+
+                <p className="mt-4 text-sm leading-6" style={{ color: C.textSec }}>
+                  Choose how you’ll use MedMentor. You can focus on learning from experienced mentors or giving back to the next generation.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 space-y-3">
+              {[
+                ["01", "Choose your role"],
+                ["02", "Set up your experience"],
+                ["03", "Start connecting"],
+              ].map(([number, label], index) => (
+                <div key={label} className="flex items-center gap-3">
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    style={{
+                      backgroundColor: index === 0 ? C.primary : "#fff",
+                      color: index === 0 ? "#fff" : C.primary,
+                      border: index === 0 ? "none" : `1px solid ${C.border}`,
+                    }}
+                  >
+                    {number}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: C.text }}>
+                    {label}
+                  </span>
                 </div>
-                <div className="font-bold text-base" style={{ color: C.text }}>{title}</div>
-                <div
-                  className="mx-auto mt-3 w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{
-                    border: `1.5px solid ${isSelected ? C.primary : C.border}`,
-                    backgroundColor: isSelected ? C.primary : "#fff",
-                  }}
-                >
-                  {isSelected && (
-                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                      <path d="M1.5 4.5l1.7 1.7L7.5 2.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
+              ))}
+            </div>
+
+            <div
+              className="absolute -right-14 -top-14 w-36 h-36 rounded-full pointer-events-none"
+              style={{ border: `1px solid ${C.primary}`, opacity: 0.12 }}
+            />
+            <div
+              className="absolute -right-7 -top-7 w-24 h-24 rounded-full pointer-events-none"
+              style={{ border: `1px solid ${C.primary}`, opacity: 0.12 }}
+            />
+          </div>
+
+          {/* Role selection */}
+          <div className="p-7 sm:p-9 lg:p-10">
+            <div className="flex items-center justify-between gap-4 mb-7">
+              <div>
+                <div className="text-[11px] font-bold tracking-[0.08em] mb-2" style={{ color: C.textSec }}>
+                  STEP 1 OF 2
                 </div>
-              </button>
-            );
-          })}
+                <h2 className="text-2xl sm:text-[1.75rem] font-bold tracking-[-0.025em]" style={{ color: C.text }}>
+                  Choose your role
+                </h2>
+                <p className="text-sm mt-1.5" style={{ color: C.textSec }}>
+                  Select how you want to continue.
+                </p>
+              </div>
+
+              <div
+                className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: C.primaryLight, color: C.primary }}
+              >
+                <svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M10 2.5v15M2.5 10h15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3.5">
+              {visibleRoles.map(({ role, icon, title, eyebrow, description, detail }) => {
+                const isSelected = selected === role;
+
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    aria-pressed={isSelected}
+                    className="group text-left w-full rounded-2xl p-4 sm:p-5 transition-all duration-200"
+                    style={{
+                      border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                      backgroundColor: isSelected ? C.primaryLight : "#fff",
+                      boxShadow: isSelected
+                        ? "0 10px 28px rgba(91,78,191,0.12)"
+                        : "0 3px 10px rgba(30,27,58,0.035)",
+                      transform: isSelected ? "translateY(-1px)" : "translateY(0)",
+                    }}
+                    onClick={() => setSelected(role)}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                        style={{
+                          backgroundColor: isSelected ? "#fff" : C.primaryLight,
+                          color: C.primary,
+                          border: `1px solid ${isSelected ? C.border : "transparent"}`,
+                        }}
+                      >
+                        {icon}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="text-[10px] font-bold tracking-[0.08em] mb-1"
+                          style={{ color: C.textSec }}
+                        >
+                          {eyebrow}
+                        </div>
+                        <div className="font-bold text-base sm:text-[17px]" style={{ color: C.text }}>
+                          {title}
+                        </div>
+                        <p className="text-xs sm:text-sm leading-5 mt-1.5 max-w-md" style={{ color: C.textSec }}>
+                          {description}
+                        </p>
+                        <div className="mt-3 text-[11px] font-semibold" style={{ color: C.primary }}>
+                          {detail}
+                        </div>
+                      </div>
+
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                        style={{
+                          border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                          backgroundColor: isSelected ? C.primary : "#fff",
+                        }}
+                      >
+                        {isSelected && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                            <path d="M2 5.2l1.8 1.8L8 2.9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-6">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={() => selected && onSelect(selected)}
+                disabled={!selected}
+                className="h-12"
+              >
+                Continue
+                <Icons.ChevronRight />
+              </Button>
+
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.primary }} />
+                <p className="text-xs" style={{ color: C.textSec }}>
+                  You can update your profile details next.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <Button variant="primary" size="lg" fullWidth onClick={() => selected && onSelect(selected)} disabled={!selected}>
-          Continue
-          <Icons.ChevronRight />
-        </Button>
+        <p className="text-center text-[11px] mt-5" style={{ color: C.textSec }}>
+          Your role helps us tailor the MedMentor experience to you.
+        </p>
       </div>
     </div>
   );
