@@ -32,6 +32,8 @@ import {
   getAdminUsers,
   getAdminMentors,
   getAdminStats,
+  getAdminSettings,
+  updateAdminSettings,
   getMentorLeaderboard,
   getMentorRewardHistory,
   getNotifications,
@@ -6196,10 +6198,10 @@ function MentorQuestionCard({
             </svg>
           </div>
         ) : (
-          <img
-            src={q.asker!.photo}
-            alt={q.asker!.name}
-            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+          <Avatar
+            src={q.asker!.photo || undefined}
+            name={q.asker!.name}
+            size={36}
           />
         )}
         <div className="flex-1 min-w-0">
