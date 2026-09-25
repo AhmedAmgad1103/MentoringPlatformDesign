@@ -46,7 +46,6 @@ import {
 
 type Screen =
   | "login"
-  | "mentor-signup"
   | "signup-role"
   | "verify"
   | "onboarding-role"
@@ -1831,7 +1830,7 @@ function SignupRoleScreen({
       title: "I’m here to mentor",
       sub: "Share your experience, answer students, and help shape the next generation of doctors.",
       detail: "Answer · Support · Inspire",
-      icon: <Icons.Users />,
+      icon: <Icons.User />,
     },
   ];
 
