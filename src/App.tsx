@@ -8257,7 +8257,11 @@ function MenteeProfileScreen({
     if (!file) return;
 
     const extension = file.name.split(".").pop()?.toLowerCase();
-    const isHeic = extension === "heic" || extension === "heif" || file.type === "image/heic" || file.type === "image/heif";
+    const isHeic =
+      extension === "heic" ||
+      extension === "heif" ||
+      file.type === "image/heic" ||
+      file.type === "image/heif";
     const isImage = file.type.startsWith("image/") || isHeic;
 
     if (!isImage) {
@@ -8272,16 +8276,36 @@ function MenteeProfileScreen({
     try {
       let fileToRead: Blob = file;
 
-      // Browsers do not reliably display HEIC images in <img>, so convert
-      // HEIC/HEIF profile photos to JPEG before storing them.
       if (isHeic) {
         const converted = await heic2any({
           blob: file,
           toType: "image/jpeg",
-          quality: 0.9,
+          quality: 0.85,
         });
         fileToRead = Array.isArray(converted) ? converted[0] : converted;
       }
+
+      // Normalize the image to a browser-friendly JPEG and keep the stored
+      // profile photo small enough for the Base64 database field.
+      const bitmap = await createImageBitmap(fileToRead);
+      const maxDimension = 1200;
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas is not supported");
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+
+      const jpeg = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error("JPEG conversion failed"))),
+          "image/jpeg",
+          0.82,
+        );
+      });
 
       const reader = new FileReader();
       reader.onload = () => {
@@ -8289,10 +8313,15 @@ function MenteeProfileScreen({
         if (typeof result === "string") setAvatarUrl(result);
       };
       reader.onerror = () => onToast("error", "Unable to read that image.");
-      reader.readAsDataURL(fileToRead);
+      reader.readAsDataURL(jpeg);
     } catch (error) {
-      console.error("HEIC conversion failed", error);
-      onToast("error", "Unable to process this HEIC photo. Please try another image.");
+      console.error("Profile photo conversion failed:", error);
+      onToast(
+        "error",
+        isHeic
+          ? "This HEIC photo could not be converted. Try another HEIC photo or convert it to JPG first."
+          : "Unable to process that image. Please try another photo.",
+      );
     }
   }
 
