@@ -6929,6 +6929,24 @@ function MentorDashboardScreen({
                       <div className="text-[10px] mt-0.5" style={{ color: C.textSec }}>Saved {formatDateTime(draft.savedAt)}</div>
                     </div>
                     <Button size="sm" variant="secondary" onClick={() => onAnswerQuestion(draft.question)}>Resume</Button>
+                    <button
+                      type="button"
+                      aria-label={`Remove draft for ${draft.question.question}`}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-red-50"
+                      style={{ color: C.textSec }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        const next = savedDrafts.filter((item) => item.id !== draft.id);
+                        setSavedDrafts(next);
+                        try {
+                          localStorage.setItem("medmentor_mentor_answer_drafts", JSON.stringify(next));
+                        } catch {}
+                        onToast("success", "Draft removed.");
+                      }}
+                      title="Remove draft"
+                    >
+                      <Icons.Trash />
+                    </button>
                   </div>
                 ))}
               </div>
