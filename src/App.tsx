@@ -16,6 +16,8 @@ import {
   getQuestions,
   getMe,
   getAvailableRoles,
+  startEmailVerification,
+  verifyEmailCode,
   mentorSignup,
   updateMentorApproval,
   getAdminQuestions,
@@ -1547,20 +1549,28 @@ function LoginScreen({ onNext, onSignup, onAdminTest }: { onNext: (email: string
   );
 }
 
-function VerifyScreen({ onNext }: { onNext: () => void }) {
+function VerifyScreen({
+  email,
+  onNext,
+  onChangeEmail,
+}: {
+  email: string;
+  onNext: () => void;
+  onChangeEmail: () => void;
+}) {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [resent, setResent] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   function handleInput(i: number, v: string) {
     if (!/^\d*$/.test(v)) return;
+    setError("");
     const next = [...code];
     next[i] = v.slice(-1);
     setCode(next);
     if (v && i < 5) inputRefs.current[i + 1]?.focus();
-    if (next.every((d) => d !== "") && next.join("").length === 6) {
-      setTimeout(onNext, 300);
-    }
   }
 
   function handleKeyDown(i: number, e: React.KeyboardEvent) {
@@ -1569,10 +1579,44 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
     }
   }
 
-  function handleResend() {
-    setResent(true);
-    setCode(["", "", "", "", "", ""]);
-    setTimeout(() => setResent(false), 3000);
+  function handlePaste(e: React.ClipboardEvent) {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    e.preventDefault();
+    const next = [...code];
+    pasted.split("").forEach((digit, index) => { next[index] = digit; });
+    setCode(next);
+    inputRefs.current[Math.min(pasted.length, 6) - 1]?.focus();
+  }
+
+  async function handleVerify() {
+    const value = code.join("");
+    if (value.length !== 6) return;
+
+    setVerifying(true);
+    setError("");
+    try {
+      await verifyEmailCode(email, value);
+      onNext();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to verify this code.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function handleResend() {
+    setResent(false);
+    setError("");
+    try {
+      await startEmailVerification(email);
+      setCode(["", "", "", "", "", ""]);
+      setResent(true);
+      inputRefs.current[0]?.focus();
+      setTimeout(() => setResent(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to resend the code.");
+    }
   }
 
   const filled = code.filter((d) => d !== "").length;
@@ -1582,14 +1626,29 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
       className="min-h-screen flex items-center justify-center px-5 py-8 sm:px-6 relative overflow-hidden"
       style={{ backgroundColor: C.bg }}
     >
-      <div
-        className="absolute -top-28 -right-28 w-80 h-80 rounded-full opacity-55 pointer-events-none"
-        style={{ background: C.primaryLight, filter: "blur(2px)" }}
-      />
-      <div
-        className="absolute -bottom-40 -left-28 w-96 h-96 rounded-full opacity-35 pointer-events-none"
-        style={{ background: C.primaryLight, filter: "blur(8px)" }}
-      />
+      {/* Decorative network background — uses the existing palette only. */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <div
+          className="absolute -top-24 -right-24 w-[34rem] h-[34rem] rounded-full opacity-35"
+          style={{ background: C.primaryLight, filter: "blur(8px)" }}
+        />
+        <div
+          className="absolute -bottom-40 -left-32 w-[30rem] h-[30rem] rounded-full opacity-30"
+          style={{ background: C.primaryLight, filter: "blur(12px)" }}
+        />
+        <div className="absolute top-[12%] left-[8%] w-2 h-2 rounded-full opacity-45" style={{ backgroundColor: C.primary }} />
+        <div className="absolute top-[22%] left-[18%] w-1.5 h-1.5 rounded-full opacity-35" style={{ backgroundColor: C.primary }} />
+        <div className="absolute bottom-[20%] right-[11%] w-2 h-2 rounded-full opacity-40" style={{ backgroundColor: C.primary }} />
+        <div className="absolute bottom-[31%] right-[20%] w-1.5 h-1.5 rounded-full opacity-30" style={{ backgroundColor: C.primary }} />
+        <div
+          className="absolute top-[13%] left-[8.2%] w-56 h-32 rounded-full opacity-10"
+          style={{ border: `1px solid ${C.primary}`, transform: "rotate(-20deg)" }}
+        />
+        <div
+          className="absolute bottom-[18%] right-[9%] w-64 h-40 rounded-full opacity-10"
+          style={{ border: `1px solid ${C.primary}`, transform: "rotate(18deg)" }}
+        />
+      </div>
 
       <div className="w-full max-w-[720px] relative z-10 fade-in">
         <div className="flex justify-center mb-6">
@@ -1623,7 +1682,7 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
               </h1>
               <p className="text-sm leading-6 mt-2 max-w-md" style={{ color: C.textSec }}>
                 Enter the 6-digit code we sent to{" "}
-                <span className="font-semibold" style={{ color: C.text }}>student@northwestern.edu</span>
+                <span className="font-semibold" style={{ color: C.text }}>{email}</span>
               </p>
             </div>
 
@@ -1640,7 +1699,7 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] font-bold tracking-[0.08em]" style={{ color: C.textSec }}>CODE SENT TO</div>
-                  <div className="text-sm font-semibold truncate mt-0.5" style={{ color: C.text }}>student@northwestern.edu</div>
+                  <div className="text-sm font-semibold truncate mt-0.5" style={{ color: C.text }}>{email}</div>
                 </div>
                 <div className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ backgroundColor: "#fff", color: C.success }}>
                   SENT
@@ -1658,7 +1717,7 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
                 </span>
               </div>
 
-              <div className="flex gap-2 sm:gap-3 justify-center">
+              <div className="flex gap-2 sm:gap-3 justify-center" onPaste={handlePaste}>
                 {code.map((digit, i) => (
                   <input
                     key={i}
@@ -1675,6 +1734,15 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
                   />
                 ))}
               </div>
+
+              {error && (
+                <div
+                  className="mt-4 rounded-xl px-3.5 py-3 text-xs font-medium text-center"
+                  style={{ backgroundColor: C.errorLight, color: C.error, border: `1px solid ${C.border}` }}
+                >
+                  {error}
+                </div>
+              )}
             </div>
 
             <div className="mt-7">
@@ -1682,12 +1750,12 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
                 variant="primary"
                 size="lg"
                 fullWidth
-                onClick={onNext}
-                disabled={filled < 6}
+                onClick={handleVerify}
+                disabled={filled < 6 || verifying}
                 className="h-12"
               >
-                Verify email
-                <Icons.ChevronRight />
+                {verifying ? "Verifying…" : "Verify email"}
+                {!verifying && <Icons.ChevronRight />}
               </Button>
             </div>
 
@@ -1704,7 +1772,7 @@ function VerifyScreen({ onNext }: { onNext: () => void }) {
                   </>
                 )}
               </div>
-              <button className="text-sm font-medium" style={{ color: C.textSec }}>
+              <button onClick={onChangeEmail} className="text-sm font-medium" style={{ color: C.textSec }}>
                 Change email
               </button>
             </div>
@@ -9300,13 +9368,15 @@ export default function App() {
           }}
           onNext={async (email) => {
             try {
-              const roles = await getAvailableRoles(email);
-              setAuthEmail(email);
+              const normalizedEmail = email.trim().toLowerCase();
+              const roles = await getAvailableRoles(normalizedEmail);
+              await startEmailVerification(normalizedEmail);
+              setAuthEmail(normalizedEmail);
               setAvailableRoles(roles.roles);
               setMentorPending(roles.mentorPending);
               setScreen("verify");
             } catch (error) {
-              addToast("error", error instanceof Error ? error.message : "Unable to check this account.");
+              addToast("error", error instanceof Error ? error.message : "Unable to send your verification code.");
             }
           }}
         />
@@ -9335,6 +9405,8 @@ export default function App() {
       )}
       {screen === "verify" && (
         <VerifyScreen
+          email={authEmail}
+          onChangeEmail={() => setScreen("login")}
           onNext={() => {
             addToast("success", "Email verified successfully!");
             void continueAfterVerification();
