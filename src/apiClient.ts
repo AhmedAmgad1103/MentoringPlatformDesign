@@ -46,7 +46,7 @@ export type ApiQuestion = {
   createdAt: string
   updatedAt: string
   isMine: boolean
-  student: { id: string; name: string | null } | null
+  student: { id: string; name: string | null; avatarUrl?: string | null; email?: string } | null
   mentor: { id: string; name: string | null } | null
   boostCount: number
   answerCount: number
@@ -586,6 +586,7 @@ export async function getMentorMentees() {
       id: string
       name: string | null
       email: string
+      avatarUrl?: string | null
       createdAt: string
       questionCount: number
     }>
