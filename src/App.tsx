@@ -2645,66 +2645,74 @@ function DashboardScreen({
                 MY MENTOR
               </h2>
               <Card className="p-5">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="relative">
-                    <img
-                      src={MENTOR.photo}
-                      alt={MENTOR.name}
-                      className="w-14 h-14 rounded-full object-cover flex-shrink-0"
-                    />
-                    <span className="absolute -bottom-0.5 -right-0.5">
-                      <StatusDot available={MENTOR.available} />
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm leading-tight" style={{ color: C.text }}>
-                      {MENTOR.name}
+                {myMentor ? (
+                  <>
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="relative">
+                        <Avatar name={myMentor.name || "Mentor"} size={56} />
+                        <span className="absolute -bottom-0.5 -right-0.5">
+                          <StatusDot available={myMentor.mentorStatus === "APPROVED"} />
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm leading-tight" style={{ color: C.text }}>
+                          {myMentor.name || "Assigned Mentor"}
+                        </div>
+                        <div className="text-xs mt-0.5 mb-1.5" style={{ color: C.textSec }}>
+                          Physician Mentor
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge variant={myMentor.mentorStatus === "APPROVED" ? "success" : "pending"}>
+                            {myMentor.mentorStatus === "APPROVED" ? "Available" : "Pending"}
+                          </Badge>
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full font-medium"
+                            style={{ backgroundColor: C.primaryLight, color: C.primary }}
+                          >
+                            {myMentor.answerCount} answers
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs mt-0.5 mb-1.5" style={{ color: C.textSec }}>
-                      {MENTOR.specialty} · {MENTOR.hospital}
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant={MENTOR.available ? "success" : "pending"}>
-                        {MENTOR.available ? "Available" : "Busy"}
-                      </Badge>
-                      <MentorTierBadge points={rewardPoints} />
-                    </div>
-                  </div>
-                </div>
 
-                <p className="text-xs leading-relaxed mb-3" style={{ color: C.textSec }}>
-                  {MENTOR.bio}
-                </p>
+                    <p className="text-xs leading-relaxed mb-4" style={{ color: C.textSec }}>
+                      Your assigned mentor is available to answer your private questions and support you throughout your medical education.
+                    </p>
 
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {MENTOR.expertise.map((e) => (
-                    <span
-                      key={e}
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      fullWidth
+                      onClick={() => onNavigate("ask-my-mentor")}
+                    >
+                      Ask My Mentor
+                    </Button>
+                  </>
+                ) : (
+                  <div className="text-center py-3">
+                    <div
+                      className="mx-auto mb-3 w-12 h-12 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: C.primaryLight, color: C.primary }}
                     >
-                      {e}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    fullWidth
-                    onClick={() => onNavigate("ask-my-mentor")}
-                  >
-                    Ask My Mentor
-                  </Button>
-                  <button
-                    onClick={() => onNavigate("leaderboard")}
-                    className="text-xs font-semibold text-center py-1"
-                    style={{ color: C.primary }}
-                  >
-                    🏆 See Top Mentors
-                  </button>
-                </div>
+                      <Icons.User />
+                    </div>
+                    <div className="font-semibold text-sm mb-1" style={{ color: C.text }}>
+                      No mentor assigned yet
+                    </div>
+                    <p className="text-xs leading-relaxed mb-4" style={{ color: C.textSec }}>
+                      Once an administrator assigns you a mentor, they will appear here and you can send them private questions.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      fullWidth
+                      onClick={() => onNavigate("ask-my-mentor")}
+                      disabled
+                    >
+                      Ask My Mentor
+                    </Button>
+                  </div>
+                )}
               </Card>
             </div>
 
