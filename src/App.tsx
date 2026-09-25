@@ -3112,7 +3112,7 @@ function DashboardScreen({
                 }}
                 title="Switch to your approved mentor account"
               >
-                <Icons.Users />
+                <Icons.User />
                 {switchingToMentor ? "Switching…" : "Mentor View"}
               </button>
             )}
