@@ -33,6 +33,7 @@ import {
   getAdminMentors,
   getAdminStats,
   getMentorLeaderboard,
+  getMentorRewardHistory,
   getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -994,13 +995,13 @@ const FEED_QUESTIONS: FeedQuestion[] = [
 ];
 
 interface NotificationItem {
-  id: number;
+  id: string | number;
   type: string;
   message: string;
   detail: string;
   time: string;
   read: boolean;
-  questionId: number | null;
+  questionId: string | number | null;
 }
 
 const ALL_NOTIFICATIONS: NotificationItem[] = [
@@ -3587,8 +3588,8 @@ function NotificationDropdown({
   onOpenQuestion,
 }: {
   notifications: NotificationItem[];
-  readIds: number[];
-  onMarkRead: (id: number) => void;
+  readIds: Array<string | number>;
+  onMarkRead: (id: string | number) => void;
   onMarkAllRead: () => void;
   onViewAll: () => void;
   onOpenQuestion: (id: number) => void;
@@ -5912,14 +5913,36 @@ function MentorAnswerScreen({
 
   const isAnon = question.type === "anon-public" || question.type === "anon-private";
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("medmentor_mentor_answer_drafts");
+      const drafts = raw ? JSON.parse(raw) : [];
+      const draft = Array.isArray(drafts) ? drafts.find((item) => item?.question?.id === question.id) : null;
+      if (draft?.answer) setAnswer(draft.answer);
+    } catch {}
+  }, [question.id]);
+
   function saveDraft() {
     if (!answer.trim()) return;
     setIsSavingDraft(true);
     setTimeout(() => {
+      try {
+        const raw = localStorage.getItem("medmentor_mentor_answer_drafts");
+        const drafts = raw ? JSON.parse(raw) : [];
+        const next = Array.isArray(drafts) ? drafts : [];
+        const draft = {
+          id: String(question.id),
+          question,
+          answer: answer.trim(),
+          savedAt: new Date().toISOString(),
+        };
+        const withoutCurrent = next.filter((item: any) => item?.id !== draft.id);
+        localStorage.setItem("medmentor_mentor_answer_drafts", JSON.stringify([draft, ...withoutCurrent]));
+        const now = new Date();
+        setDraftSavedAt(`${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`);
+      } catch {}
       setIsSavingDraft(false);
-      const now = new Date();
-      setDraftSavedAt(`${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`);
-    }, 600);
+    }, 250);
   }
 
   const TYPE_META: Record<
@@ -5993,6 +6016,14 @@ function MentorAnswerScreen({
     if (answer.trim().length < 10) return;
     try {
       await createAnswer(String(question.id), answer.trim());
+      try {
+        const raw = localStorage.getItem("medmentor_mentor_answer_drafts");
+        const drafts = raw ? JSON.parse(raw) : [];
+        localStorage.setItem(
+          "medmentor_mentor_answer_drafts",
+          JSON.stringify(Array.isArray(drafts) ? drafts.filter((item: any) => item?.id !== String(question.id)) : [])
+        );
+      } catch {}
       onToast("success", "Response sent successfully!");
       setStep("success");
     } catch (error) {
@@ -6036,14 +6067,10 @@ function MentorAnswerScreen({
           {/* Preview of what was sent */}
           <Card className="p-4 mb-4 text-left">
             <div className="flex items-center gap-2 mb-3">
-              <img
-                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-                alt="Dr. Khaled"
-                className="w-8 h-8 rounded-full object-cover"
-              />
+              <Avatar name="Mentor" size={32} />
               <div>
-                <div className="text-xs font-semibold" style={{ color: C.text }}>Dr. Mariam Khaled</div>
-                <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · Just now</div>
+                <div className="text-xs font-semibold" style={{ color: C.text }}>Your response</div>
+                <div className="text-xs" style={{ color: C.textSec }}>Mentor · Just now</div>
               </div>
               <div className="ml-auto">{meta.badge}</div>
             </div>
@@ -6186,14 +6213,10 @@ function MentorAnswerScreen({
         <Card className="p-5 mb-5">
           {/* Author preview */}
           <div className="flex items-center gap-3 mb-4 pb-4" style={{ borderBottom: `1px solid ${C.border}` }}>
-            <img
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-              alt="Dr. Khaled"
-              className="w-9 h-9 rounded-full object-cover"
-            />
+            <Avatar name="Mentor" size={36} />
             <div>
-              <div className="text-sm font-semibold" style={{ color: C.text }}>Dr. Mariam Khaled</div>
-              <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine · University Medical Center</div>
+              <div className="text-sm font-semibold" style={{ color: C.text }}>Your response</div>
+              <div className="text-xs" style={{ color: C.textSec }}>Mentor · MedMentor</div>
             </div>
           </div>
 
@@ -6465,7 +6488,7 @@ function MentorDashboardScreen({
   const [activeSection, setActiveSection] = useState<"all" | "mentees" | "waiting" | "any" | "anon">("all");
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  const notifReadIds: number[] = [];
+  const notifReadIds: Array<string | number> = mentorNotifications.filter((n) => !n.read).map((n) => n.id);
   type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & { id: string | number };
   const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
@@ -6476,6 +6499,17 @@ function MentorDashboardScreen({
   const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
   const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
   const [mentorPoints, setMentorPoints] = useState<number | null>(null);
+  const [mentorProfile, setMentorProfile] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [rewardHistory, setRewardHistory] = useState<Awaited<ReturnType<typeof getMentorRewardHistory>>["items"]>([]);
+  const [mentorNotifications, setMentorNotifications] = useState<NotificationItem[]>([]);
+  const [mentorUnreadCount, setMentorUnreadCount] = useState(0);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [savedDrafts, setSavedDrafts] = useState<Array<{
+    id: string;
+    question: MentorQuestion;
+    answer: string;
+    savedAt: string;
+  }>>([]);
 
   useEffect(() => {
     let active = true;
@@ -6490,6 +6524,14 @@ function MentorDashboardScreen({
         if (active) setLiveMentorQuestions(null);
       });
 
+    getMe()
+      .then((response) => {
+        if (active) setMentorProfile(response);
+      })
+      .catch(() => {
+        if (active) setMentorProfile(null);
+      });
+
     getMentorLeaderboard()
       .then((response) => {
         if (active) setMentorPoints(response.me?.points ?? 0);
@@ -6497,6 +6539,44 @@ function MentorDashboardScreen({
       .catch(() => {
         if (active) setMentorPoints(null);
       });
+
+    getMentorRewardHistory()
+      .then((response) => {
+        if (active) setRewardHistory(response.items);
+      })
+      .catch(() => {
+        if (active) setRewardHistory([]);
+      });
+
+    getNotifications()
+      .then((response) => {
+        if (!active) return;
+        setMentorUnreadCount(response.unreadCount);
+        setMentorNotifications(
+          response.items.map((n) => ({
+            id: n.id,
+            type: n.kind.toLowerCase(),
+            message: n.title,
+            detail: n.message,
+            time: formatDateTime(n.createdAt),
+            read: n.read,
+            questionId: null,
+          }))
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setMentorNotifications([]);
+          setMentorUnreadCount(0);
+        }
+      });
+
+    try {
+      const raw = localStorage.getItem("medmentor_mentor_answer_drafts");
+      if (raw && active) setSavedDrafts(JSON.parse(raw));
+    } catch {
+      if (active) setSavedDrafts([]);
+    }
 
     getMentorMentees()
       .then((response) => {
@@ -6659,11 +6739,26 @@ function MentorDashboardScreen({
               </button>
               {notifOpen && (
                 <NotificationDropdown
-                  notifications={[]}
-                  readIds={notifReadIds}
-                  onMarkRead={() => {}}
-                  onMarkAllRead={() => {}}
-                  onViewAll={() => setNotifOpen(false)}
+                  notifications={mentorNotifications}
+                  readIds={[]}
+                  onMarkRead={async (id) => {
+                    try {
+                      await markNotificationRead(String(id));
+                      setMentorNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+                      setMentorUnreadCount((count) => Math.max(0, count - 1));
+                    } catch {}
+                  }}
+                  onMarkAllRead={async () => {
+                    try {
+                      await markAllNotificationsRead();
+                      setMentorNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                      setMentorUnreadCount(0);
+                    } catch {}
+                  }}
+                  onViewAll={() => {
+                    setNotifOpen(false);
+                    onNavigate("notifications-page");
+                  }}
                   onOpenQuestion={() => setNotifOpen(false)}
                 />
               )}
@@ -6673,16 +6768,20 @@ function MentorDashboardScreen({
               className="flex items-center gap-2 hover:opacity-80 transition-opacity rounded-xl px-2 py-1"
             >
               <div className="relative">
-                <img
-                  src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=40&h=40&fit=crop"
-                  alt="Dr. Khaled"
-                  className="w-9 h-9 rounded-full object-cover"
+                <Avatar
+                  src={mentorProfile?.avatarUrl || undefined}
+                  name={mentorProfile?.name || mentorProfile?.email || "Mentor"}
+                  size={36}
                 />
-                <StatusDot available />
+                <span className="absolute -bottom-0.5 -right-0.5">
+                  <StatusDot available />
+                </span>
               </div>
               <div className="hidden sm:block text-left">
-                <div className="text-xs font-semibold" style={{ color: C.text }}>Dr. Khaled</div>
-                <div className="text-xs" style={{ color: C.textSec }}>Internal Medicine</div>
+                <div className="text-xs font-semibold" style={{ color: C.text }}>
+                  {mentorProfile?.name || "Mentor"}
+                </div>
+                <div className="text-xs" style={{ color: C.textSec }}>Mentor</div>
               </div>
             </button>
           </div>
@@ -6700,61 +6799,118 @@ function MentorDashboardScreen({
           </p>
         </div>
 
-        {/* Rewards banner */}
-        {(() => {
-          const rewardPoints = mentorPoints ?? 0;
-          const tier = getMentorTier(rewardPoints);
-          return (
-            <Card className="p-5 mb-6 fade-in flex items-end justify-between gap-5 flex-wrap lg:flex-nowrap">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
-                style={{ backgroundColor: tier.bg }}
-              >
-                {tier.emoji}
-              </div>
-              <div className="flex-1 min-w-[180px]">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="stat-numeral" style={{ color: tier.color }}>
-                    {rewardPoints}
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: C.textSec }}>
-                    reward points
-                  </span>
+        <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] gap-4 mb-6 fade-in">
+          {(() => {
+            const rewardPoints = mentorPoints ?? 0;
+            const tier = getMentorTier(rewardPoints);
+            return (
+              <Card className="p-5 flex items-center gap-5 flex-wrap">
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ backgroundColor: tier.bg }}
+                >
+                  {tier.emoji}
                 </div>
-                <div className="flex items-center gap-2">
-                  <MentorTierBadge points={rewardPoints} size="md" />
+                <div className="flex-1 min-w-[180px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="stat-numeral" style={{ color: tier.color }}>{rewardPoints}</span>
+                    <span className="text-xs font-medium" style={{ color: C.textSec }}>reward points</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <MentorTierBadge points={rewardPoints} size="md" />
+                    {tier.next && (
+                      <span className="text-xs" style={{ color: C.textSec }}>
+                        {tier.next.min - rewardPoints} points to {tier.next.label}
+                      </span>
+                    )}
+                  </div>
                   {tier.next && (
-                    <span className="text-xs" style={{ color: C.textSec }}>
-                      {tier.next.min - rewardPoints} points to {tier.next.label}
-                    </span>
+                    <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight, maxWidth: 280 }}>
+                      <div className="h-full rounded-full" style={{ width: `${tier.progress}%`, backgroundColor: tier.color }} />
+                    </div>
                   )}
                 </div>
-                {tier.next && (
-                  <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: C.borderLight, maxWidth: 280 }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${tier.progress}%`, backgroundColor: tier.color, transition: "width 0.4s ease" }}
-                    />
+                <div className="w-full sm:w-auto rounded-2xl p-4" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <h3 className="text-xs font-bold" style={{ color: C.text }}>Earn points</h3>
+                    <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>🏆 Leaderboard</Button>
                   </div>
-                )}
-              </div>
-              <div className="w-full lg:w-auto lg:min-w-[330px] rounded-2xl p-4" style={{ backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <h3 className="text-xs font-bold" style={{ color: C.text }}>How to score points</h3>
-                  <Button variant="secondary" size="sm" onClick={() => onNavigate("leaderboard")}>
-                    🏆 Leaderboard
-                  </Button>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs" style={{ color: C.textSec }}>
+                    <div><strong style={{ color: C.text }}>+5</strong> Answer</div>
+                    <div><strong style={{ color: C.text }}>+2</strong> Helpful vote</div>
+                    <div><strong style={{ color: C.text }}>+3</strong> Fast response</div>
+                    <div><strong style={{ color: C.text }}>+1</strong> Any Mentor response</div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs" style={{ color: C.textSec }}>
-                  <div><strong style={{ color: C.text }}>+5</strong> Answer a question</div>
-                  <div><strong style={{ color: C.text }}>+2</strong> Helpful vote</div>
-                  <div><strong style={{ color: C.text }}>+3</strong> Answer within 24h</div>
-                  <div><strong style={{ color: C.text }}>+1</strong> Ask Any Mentor response</div>
-                </div>
+              </Card>
+            );
+          })()}
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: C.text }}>Reward activity</h3>
+                <p className="text-[11px] mt-0.5" style={{ color: C.textSec }}>What you earned points for</p>
               </div>
-            </Card>
-          );
-        })()}
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: C.textSec }}>This cycle</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto space-y-2">
+              {rewardHistory.length === 0 ? (
+                <p className="text-xs py-4 text-center" style={{ color: C.textSec }}>No reward activity yet.</p>
+              ) : rewardHistory.slice(0, 6).map((item) => {
+                const reason = {
+                  ANSWER: "Answered a student's question",
+                  FAST_RESPONSE: "Answered within 24 hours",
+                  HELPFUL_VOTE: "Received a helpful vote",
+                  ANY_MENTOR_RESPONSE: "Answered an Ask Any Mentor question",
+                }[item.reason] || "Mentor contribution";
+                return (
+                  <div key={item.id} className="flex items-center gap-3 rounded-xl p-2.5" style={{ backgroundColor: C.bg }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs" style={{ backgroundColor: C.successLight, color: C.success }}>
+                      +{item.points}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold truncate" style={{ color: C.text }}>{reason}</div>
+                      <div className="text-[10px]" style={{ color: C.textSec }}>{formatDateTime(item.createdAt)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </section>
+
+        {savedDrafts.length > 0 && (
+          <Card className="p-4 mb-6 fade-in">
+            <button
+              className="w-full flex items-center justify-between text-left"
+              onClick={() => setDraftsOpen((open) => !open)}
+            >
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: C.text }}>Saved drafts</h3>
+                <p className="text-[11px] mt-0.5" style={{ color: C.textSec }}>
+                  {savedDrafts.length} response{savedDrafts.length === 1 ? "" : "s"} waiting to be finished
+                </p>
+              </div>
+              <span className="px-2 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: C.primaryLight, color: C.primary }}>
+                {savedDrafts.length}
+              </span>
+            </button>
+            {draftsOpen && (
+              <div className="mt-3 pt-3 space-y-2" style={{ borderTop: `1px solid ${C.borderLight}` }}>
+                {savedDrafts.map((draft) => (
+                  <div key={draft.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: C.bg }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold truncate" style={{ color: C.text }}>{draft.question.question}</div>
+                      <div className="text-[10px] mt-0.5" style={{ color: C.textSec }}>Saved {formatDateTime(draft.savedAt)}</div>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => onAnswerQuestion(draft.question)}>Resume</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Dashboard filters */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8 fade-in">
