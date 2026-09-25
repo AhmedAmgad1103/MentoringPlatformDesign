@@ -80,6 +80,7 @@ export type ApiUser = {
   id: string
   email: string
   name: string | null
+  avatarUrl: string | null
   role: "STUDENT" | "MENTOR" | "ADMIN"
   mentorStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
   assignedMentor: { id: string; name: string | null } | null
@@ -408,7 +409,7 @@ export async function getMe() {
   return request<ApiUser>("/api/me")
 }
 
-export async function updateMe(input: { name: string | null }) {
+export async function updateMe(input: { name?: string | null; avatarUrl?: string | null }) {
   return request<ApiUser>("/api/me", {
     method: "PATCH",
     body: JSON.stringify(input),
