@@ -120,7 +120,6 @@ export async function getAdminQuestions() {
 
 export async function createQuestion(input: {
   title: string;
-  category: string;
   body: string;
   privacy: string;
   askType?: "MY_MENTOR" | "ANY_MENTOR" | "ANONYMOUS";
@@ -145,7 +144,6 @@ export async function createQuestion(input: {
   const created = await createQuestionApi({
     title: input.title,
     body: input.body,
-    category: categoryValue(input.category || "Other"),
     askType,
     privacy,
   });
