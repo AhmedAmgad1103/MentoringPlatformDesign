@@ -16,6 +16,8 @@ import {
   unmarkAnswerHelpful as unmarkAnswerHelpfulApi,
   getAdminUsers as getAdminUsersApi,
   getAdminStats as getAdminStatsApi,
+  getAdminSettings as getAdminSettingsApi,
+  updateAdminSettings as updateAdminSettingsApi,
   getAdminMentors as getAdminMentorsApi,
   assignMentor as assignMentorApi,
   unassignMentor as unassignMentorApi,
@@ -115,6 +117,14 @@ export async function getQuestions(): Promise<DemoQuestion[]> {
 
 export async function getAdminStats() {
   return getAdminStatsApi();
+}
+
+export async function getAdminSettings() {
+  return getAdminSettingsApi();
+}
+
+export async function updateAdminSettings(autoApprovePublicNonAnonymous: boolean) {
+  return updateAdminSettingsApi({ autoApprovePublicNonAnonymous });
 }
 
 export async function getAdminQuestions() {
