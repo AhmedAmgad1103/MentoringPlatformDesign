@@ -2715,7 +2715,9 @@ function DashboardScreen({
                 ))}
               </Card>
             </div>
-
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
