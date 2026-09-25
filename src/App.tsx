@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import heic2any from "heic2any";
+import { heicTo } from "heic-to";
 import {
   boostQuestion,
   createAnswer,
@@ -8290,12 +8290,12 @@ function MenteeProfileScreen({
       let fileToRead: Blob = file;
 
       if (isHeic) {
-        const converted = await heic2any({
+        const converted = await heicTo({
           blob: file,
-          toType: "image/jpeg",
+          type: "image/jpeg",
           quality: 0.85,
         });
-        fileToRead = Array.isArray(converted) ? converted[0] : converted;
+        fileToRead = converted;
       }
 
       // Normalize the image to a browser-friendly JPEG and keep the stored
