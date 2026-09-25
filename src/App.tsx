@@ -1009,109 +1009,11 @@ interface NotificationItem {
   questionId: string | number | null;
 }
 
-const ALL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 1,
-    type: "mentor-answered",
-    message: "Dr. Mariam Khaled answered your question",
-    detail: "Your question about managing suspected PE in the ED received a detailed response.",
-    time: "2 hours ago",
-    read: false,
-    questionId: 101,
-  },
-  {
-    id: 2,
-    type: "any-mentor-responded",
-    message: "3 mentors responded to your Ask Any Mentor question",
-    detail: "Your question about Step 1 study schedules now has multiple perspectives.",
-    time: "5 hours ago",
-    read: false,
-    questionId: 101,
-  },
-  {
-    id: 3,
-    type: "anon-approved",
-    message: "Your anonymous question was approved by a moderator",
-    detail: "\"What should I expect during my first surgery rotation?\" is now live and visible to all students.",
-    time: "Yesterday",
-    read: false,
-    questionId: 102,
-  },
-  {
-    id: 4,
-    type: "anon-response",
-    message: "Your anonymous question received a new response",
-    detail: "Dr. James Chen answered your question about Step 2 CK preparation.",
-    time: "2 days ago",
-    read: false,
-    questionId: 101,
-  },
-  {
-    id: 5,
-    type: "rejected",
-    message: "Your question was rejected by a moderator",
-    detail: "Your submission may contain identifying information. Please review our anonymous posting guidelines before resubmitting.",
-    time: "3 days ago",
-    read: true,
-    questionId: null,
-  },
-  {
-    id: 6,
-    type: "session",
-    message: "Dr. Khaled confirmed your mentoring session",
-    detail: "September 3 at 3:00 PM via video call. A calendar invite has been sent to your school email.",
-    time: "3 days ago",
-    read: true,
-    questionId: null,
-  },
-  {
-    id: 7,
-    type: "helpful",
-    message: "Your Ask Any Mentor response was marked helpful 5 times",
-    detail: "Students found your answer about residency applications helpful.",
-    time: "4 days ago",
-    read: true,
-    questionId: 105,
-  },
-];
+
 
 // ─── MENTOR-SIDE DATA ─────────────────────────────────────────────────────────
 
-const MENTOR_MENTEES_DATA = [
-  {
-    id: 1,
-    name: "Alex Johnson",
-    year: "M2",
-    track: "Preclinical",
-    photo: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&h=80&fit=crop&auto=format",
-    lastActivity: "2 hours ago",
-    lastQuestion: "How do I approach Step 2 CK in a 10-week dedicated block?",
-    active: true,
-    totalQuestions: 4,
-  },
-  {
-    id: 2,
-    name: "Sarah Chen",
-    year: "M3",
-    track: "Clinical Rotations",
-    photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format",
-    lastActivity: "Yesterday",
-    lastQuestion: "Can you review my personal statement before I submit to ERAS?",
-    active: false,
-    totalQuestions: 7,
-  },
-  {
-    id: 3,
-    name: "Marcus Williams",
-    year: "M1",
-    track: "Preclinical",
-    photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&auto=format",
-    lastActivity: "3 days ago",
-    lastQuestion: "How do I manage the volume of first-year coursework without burning out?",
-    active: false,
-    totalQuestions: 2,
-  },
-];
+
 
 interface MentorQuestion {
   id: string | number;
@@ -2955,17 +2857,52 @@ function DashboardScreen({
   const [backendLoadError, setBackendLoadError] = useState(false);
   const [recentQuestions, setRecentQuestions] = useState<Awaited<ReturnType<typeof getQuestions>>>([]);
   const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
+  const [dashboardNotifications, setDashboardNotifications] = useState<NotificationItem[]>([]);
   const [switchingToMentor, setSwitchingToMentor] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const readIds = notifReadIds ?? [];
-  const markRead = onMarkRead ?? (() => {});
-  const markAllRead = onMarkAllRead ?? (() => {});
-  const unreadCount = 0;
+  const unreadCount = dashboardNotifications.filter((n) => !n.read).length;
+
+  async function markRead(id: string | number) {
+    try {
+      await markNotificationRead(String(id));
+      setDashboardNotifications((items) => items.map((item) => item.id === id ? { ...item, read: true } : item));
+      onMarkRead?.(Number(id));
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to mark notification as read.");
+    }
+  }
+
+  async function markAllRead() {
+    try {
+      await markAllNotificationsRead();
+      setDashboardNotifications((items) => items.map((item) => ({ ...item, read: true })));
+      onMarkAllRead?.();
+    } catch (error) {
+      onToast("error", error instanceof Error ? error.message : "Unable to mark notifications as read.");
+    }
+  }
 
   useEffect(() => {
     let active = true;
+    const refreshNotifications = () => {
+      getNotifications().then((response) => {
+        if (!active) return;
+        setDashboardNotifications(response.items.map((n) => ({
+          id: n.id,
+          type: n.kind.toLowerCase(),
+          message: n.title,
+          detail: n.message,
+          time: formatDateTime(n.createdAt),
+          read: n.read,
+          questionId: null,
+        })));
+      }).catch(() => { if (active) setDashboardNotifications([]); });
+    };
+    refreshNotifications();
+    const timer = window.setInterval(refreshNotifications, 15000);
     getMe()
       .then((me) => {
         if (active) setCurrentUser(me);
@@ -2973,7 +2910,7 @@ function DashboardScreen({
       .catch(() => {
         if (active) setCurrentUser(null);
       });
-    return () => { active = false; };
+    return () => { active = false; window.clearInterval(timer); };
   }, []);
 
   async function switchToMentorView() {
@@ -3122,7 +3059,7 @@ function DashboardScreen({
               </button>
               {notifDropdownOpen && (
                 <NotificationDropdown
-                  notifications={[]}
+                  notifications={dashboardNotifications}
                   readIds={readIds}
                   onMarkRead={markRead}
                   onMarkAllRead={markAllRead}
@@ -3408,14 +3345,18 @@ function DashboardScreen({
                       </button>
                     </div>
                   </div>
-                  {ALL_NOTIFICATIONS.slice(0, 5).map((n) => {
-                    const isRead = n.read || notifReadIds?.includes(n.id);
+                  {dashboardNotifications.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm" style={{ color: C.textSec }}>
+                      You're all caught up. New notifications will appear here.
+                    </div>
+                  ) : dashboardNotifications.slice(0, 5).map((n) => {
+                    const isRead = n.read || readIds.includes(Number(n.id));
                     return (
                       <div
                         key={n.id}
                         className="flex items-start gap-3 rounded-xl p-3 cursor-pointer transition-colors hover:bg-[#FBFAFE]"
                         onClick={() => {
-                          onMarkRead(n.id);
+                          void markRead(n.id);
                           if (n.questionId) onOpenQuestion(n.questionId);
                         }}
                       >
@@ -6555,7 +6496,7 @@ function MentorDashboardScreen({
   const [activeSection, setActiveSection] = useState<"all" | "mentees" | "waiting" | "any" | "anon">("all");
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  type MessageTarget = Omit<(typeof MENTOR_MENTEES_DATA)[number], "id"> & { id: string | number };
+  type MessageTarget = { id: string; name: string; email: string; avatarUrl?: string | null; totalQuestions: number; year?: string; track?: string; photo?: string };
   const [messageTarget, setMessageTarget] = useState<MessageTarget | null>(null);
   const [messageText, setMessageText] = useState("");
   const [messageSending, setMessageSending] = useState(false);
@@ -6563,7 +6504,7 @@ function MentorDashboardScreen({
   const [reportingQuestion, setReportingQuestion] = useState<MentorQuestion | null>(null);
   const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<string | number>>(new Set());
   const [liveMentorQuestions, setLiveMentorQuestions] = useState<MentorQuestion[] | null>(null);
-  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; createdAt: string; questionCount: number }> | null>(null);
+  const [liveMentees, setLiveMentees] = useState<Array<{ id: string; name: string | null; email: string; avatarUrl?: string | null; createdAt: string; questionCount: number }> | null>(null);
   const [mentorPoints, setMentorPoints] = useState<number | null>(null);
   const [mentorProfile, setMentorProfile] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
   const [rewardHistory, setRewardHistory] = useState<Awaited<ReturnType<typeof getMentorRewardHistory>>["items"]>([]);
@@ -6711,10 +6652,11 @@ function MentorDashboardScreen({
         id: m.id,
         name: m.name ?? "Mentee",
         email: m.email,
+        avatarUrl: m.avatarUrl ?? null,
         totalQuestions: m.questionCount,
         year: "",
         track: "",
-        photo: undefined,
+        photo: m.avatarUrl ?? undefined,
         active: false,
         lastActivity: "",
         lastQuestion: "",
@@ -7085,11 +7027,7 @@ function MentorDashboardScreen({
                 <Card key={m.id} className="p-4">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="relative flex-shrink-0">
-                      <img
-                        src={m.photo}
-                        alt={m.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
+                      <Avatar src={m.avatarUrl || undefined} name={m.name} size={48} />
                       <span className="absolute -bottom-0.5 -right-0.5">
                         <StatusDot available={m.active} />
                       </span>
@@ -7316,7 +7254,7 @@ function MentorDashboardScreen({
                   style={{ backgroundColor: C.bg, border: "1px solid " + C.border }}
                 >
                   <div className="relative flex-shrink-0">
-                    <img src={m.photo} alt={m.name} className="w-11 h-11 rounded-full object-cover" />
+                    <Avatar src={m.avatarUrl || undefined} name={m.name} size={44} />
                     <span className="absolute -bottom-0.5 -right-0.5">
                       <StatusDot available={m.active} />
                     </span>
@@ -7355,7 +7293,7 @@ function MentorDashboardScreen({
           >
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
               <div className="flex items-center gap-3">
-                <img src={messageTarget.photo} alt={messageTarget.name} className="w-9 h-9 rounded-full object-cover" />
+                <Avatar src={messageTarget.avatarUrl || messageTarget.photo || undefined} name={messageTarget.name} size={36} />
                 <div>
                   <div className="text-sm font-bold" style={{ color: C.text }}>Message {messageTarget.name}</div>
                   <div className="text-xs" style={{ color: C.textSec }}>{messageTarget.year} · {messageTarget.track}</div>
