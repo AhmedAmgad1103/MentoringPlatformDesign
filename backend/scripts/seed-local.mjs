@@ -49,6 +49,7 @@ async function main() {
         email: account.email,
         name: account.name,
         role: account.role,
+        mentorStatus: account.role === Role.MENTOR ? "APPROVED" : "NONE",
         passwordHash: hashPassword(account.password),
       },
     })
