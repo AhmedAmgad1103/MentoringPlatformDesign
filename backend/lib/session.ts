@@ -9,6 +9,7 @@ export type CurrentUser = {
   name: string | null
   role: Role
   assignedMentorId: string | null
+  mentorStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
 }
 
 export const SESSION_COOKIE = "medmentor_local_session"
@@ -20,6 +21,7 @@ const userSelect = {
   name: true,
   role: true,
   assignedMentorId: true,
+  mentorStatus: true,
 } as const
 
 function secret() {
@@ -38,25 +40,25 @@ function sign(input: string) {
   return createHmac("sha256", secret()).update(input).digest("base64url")
 }
 
-export function createSessionToken(email: string) {
+export function createSessionToken(email: string, role?: string) {
   const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
-  const payload = `${encode(email.toLowerCase())}.${exp}`
+  const payload = `${encode(email.toLowerCase())}.${encode(role ?? "")}.${exp}`
   return `${payload}.${sign(payload)}`
 }
 
 export function verifySessionToken(token: string) {
   const parts = token.split(".")
-  if (parts.length !== 3) return null
+  if (parts.length !== 4) return null
 
-  const [encodedEmail, expRaw, signature] = parts
-  const payload = `${encodedEmail}.${expRaw}`
+  const [encodedEmail, encodedRole, expRaw, signature] = parts
+  const payload = `${encodedEmail}.${encodedRole}.${expRaw}`
   if (sign(payload) !== signature) return null
 
   const exp = Number(expRaw)
   if (!Number.isFinite(exp) || exp <= Math.floor(Date.now() / 1000)) return null
 
   try {
-    return decode(encodedEmail).trim().toLowerCase()
+    return { email: decode(encodedEmail).trim().toLowerCase(), role: decode(encodedRole).trim().toLowerCase() }
   } catch {
     return null
   }
@@ -67,11 +69,13 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const token = cookieStore.get(SESSION_COOKIE)?.value
   if (!token) return null
 
-  const email = verifySessionToken(token)
-  if (!email) return null
+  const identity = verifySessionToken(token)
+  if (!identity) return null
 
-  return prisma.user.findUnique({
-    where: { email },
+  const where = identity.role ? { email: identity.email, role: identity.role.toUpperCase() as Role } : { email: identity.email }
+
+  return prisma.user.findFirst({
+    where,
     select: userSelect,
   })
 }
