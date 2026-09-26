@@ -95,8 +95,6 @@ model User {
 
   @@unique([email, role])
   @@index([email])
-  @@unique([email, role])
-  @@index([email])
   @@index([role])
   @@index([assignedMentorId])
 }
