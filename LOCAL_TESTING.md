@@ -37,7 +37,7 @@ The role is detected from the account. There is no role selector.
 
 ## Database
 
-Notifications are intentionally out of scope for the local test build; use the live question, answer, moderation, report, messaging, profile, and mentor-assignment flows instead.
+Notifications, mentor rewards, helpful votes, profile photos, moderation settings, reporting, messaging, and mentor assignment are persisted by the local backend.
 
 The database file is created at:
 
@@ -61,14 +61,24 @@ It is intentionally ignored by Git, so posts, answers, boosts, messages, assignm
 12. Sign out and sign in as the admin, then open Reports.
 13. Review the report, try Dismiss Report, then repeat the flow and use Remove Post.
 14. Confirm that Remove Post hides the reported post and resolves its pending reports.
-15. Test mentor-to-student messaging.
-16. Test the admin Users page and mentor assignment.
-17. Edit the student and mentor display name from Profile and confirm it persists after restarting.
-18. Restart both servers and confirm your created data is still present.
+15. Test mentor-to-student messaging and confirm the student receives a notification.
+16. Mark an answer helpful and verify the mentor's reward points increase.
+17. Open the mentor leaderboard/reward history and confirm the current monthly cycle is shown.
+18. Test the admin Users page, mentor approval, auto-approval setting, and mentor assignment.
+19. Edit the student and mentor display name/avatar from Profile and confirm it persists after restarting.
+20. Restart both servers and confirm your created data is still present.
 
 ## Reset the local database
 
 Delete `backend/data/mentoring.db` and run `npm run dev` again. The setup script will recreate the database and seed the three accounts.
+
+## Local authentication
+
+The frontend uses the local signed-cookie session. Email verification is a development-only flow: any six-digit code is accepted. Role selection is resolved from the account's available roles; there is no role selector on the initial login screen.
+
+## Mentor rewards
+
+Reward points are persisted in SQLite and scoped to the current calendar month. The cycle changes automatically each month; historical point rows remain in the database, while leaderboard/reward-history views show only the current cycle.
 
 ## Post reports
 
