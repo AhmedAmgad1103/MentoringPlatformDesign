@@ -15,7 +15,22 @@ export async function POST(request: Request) {
   if (!email || !email.includes("@")) return badRequest("Valid email is required")
   if (!role) return badRequest("Valid role is required")
 
-  const user = await prisma.user.findFirst({ where: { email, role }, select: { id:true,email:true,name:true,role:true,assignedMentorId:true,mentorStatus:true } })
+  let user = await prisma.user.findFirst({ where: { email, role }, select: { id:true,email:true,name:true,role:true,assignedMentorId:true,mentorStatus:true } })
+
+  // New student accounts are created automatically after email verification.
+  // Mentors still go through the separate approval flow.
+  if (!user && role === Role.STUDENT) {
+    user = await prisma.user.create({
+      data: {
+        email,
+        name: email.split("@")[0],
+        role: Role.STUDENT,
+        mentorStatus: "NONE",
+      },
+      select: { id:true,email:true,name:true,role:true,assignedMentorId:true,mentorStatus:true },
+    })
+  }
+
   if (!user) return unauthorized()
   if (role === Role.MENTOR && user.mentorStatus !== "APPROVED") return unauthorized()
 
