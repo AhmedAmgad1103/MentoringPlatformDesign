@@ -207,7 +207,13 @@ export async function POST(request: Request) {
   } else if (askType === "ANY_MENTOR") {
     // Community questions must be approved before they are visible.
     visibility = QuestionVisibility.PUBLIC
-    moderationStatus = ModerationStatus.PENDING
+    const platformSettings = await prisma.platformSettings.findUnique({
+      where: { id: "platform" },
+      select: { autoApprovePublicNonAnonymous: true },
+    })
+    moderationStatus = platformSettings?.autoApprovePublicNonAnonymous
+      ? ModerationStatus.APPROVED
+      : ModerationStatus.PENDING
     mentorId = null
   } else {
     isAnonymous = true
