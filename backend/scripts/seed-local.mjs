@@ -22,6 +22,7 @@ const accounts = [
     email: "mentor@gmail.com",
     name: "Dr. Mariam Khaled",
     role: Role.MENTOR,
+    mentorStatus: "APPROVED",
     password: "mentor@123",
   },
   {
@@ -37,10 +38,11 @@ async function main() {
 
   for (const account of accounts) {
     users[account.email] = await prisma.user.upsert({
-      where: { email: account.email },
+      where: { email_role: { email: account.email, role: account.role } },
       update: {
         name: account.name,
         role: account.role,
+        mentorStatus: account.role === Role.MENTOR ? "APPROVED" : "NONE",
         passwordHash: hashPassword(account.password),
       },
       create: {
