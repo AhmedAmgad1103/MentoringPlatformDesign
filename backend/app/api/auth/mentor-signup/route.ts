@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   const email = String(body.email ?? "").trim().toLowerCase()
   if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 })
 
-  const existing = await prisma.user.findUnique({ where: { email } })
+  const existing = await prisma.user.findFirst({ where: { email, role: Role.MENTOR } })
   if (existing) {
     if (existing.role === Role.MENTOR) {
       return NextResponse.json({ status: existing.mentorStatus }, { status: existing.mentorStatus === MentorStatus.APPROVED ? 200 : 409 })
