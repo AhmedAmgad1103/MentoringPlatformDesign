@@ -9965,10 +9965,10 @@ export default function App() {
           onSignup={() => setScreen("signup-role")}
           onAdminTest={async () => {
             try {
-              await login("admin@demo.medmentor.edu", "admin");
+              await login("admin@gmail.com", "admin");
               const me = await getMe();
               if (me.role !== "ADMIN") throw new Error("Admin test login did not return an admin account.");
-              setAuthEmail("admin@demo.medmentor.edu");
+              setAuthEmail("admin@gmail.com");
               setRole("admin");
               setScreen("admin-dashboard");
             } catch (error) {
