@@ -6,8 +6,18 @@ import {
   getAnswers as getAnswersApi,
   getMentorProfile,
   getMentors as getMentorsApi,
+  getMyMentor as getMyMentorApi,
+  getMentorLeaderboard as getMentorLeaderboardApi,
+  getMentorRewardHistory as getMentorRewardHistoryApi,
+  getNotifications as getNotificationsApi,
+  markNotificationRead as markNotificationReadApi,
+  markAllNotificationsRead as markAllNotificationsReadApi,
+  markAnswerHelpful as markAnswerHelpfulApi,
+  unmarkAnswerHelpful as unmarkAnswerHelpfulApi,
   getAdminUsers as getAdminUsersApi,
   getAdminStats as getAdminStatsApi,
+  getAdminSettings as getAdminSettingsApi,
+  updateAdminSettings as updateAdminSettingsApi,
   getAdminMentors as getAdminMentorsApi,
   assignMentor as assignMentorApi,
   unassignMentor as unassignMentorApi,
@@ -22,8 +32,11 @@ import {
   getQuestion as getQuestionApi,
   getQuestions as getQuestionsApi,
   getMe as getMeApi,
-  localLogin as localLoginApi,
-  localLogout as localLogoutApi,
+  getAvailableRoles as getAvailableRolesApi,
+  startEmailVerification as startEmailVerificationApi,
+  verifyEmailCode as verifyEmailCodeApi,
+  updateMentorApproval as updateMentorApprovalApi,
+  mentorSignup as mentorSignupApi,
   sendMessage as sendMessageApi,
   unboostQuestion as unboostQuestionApi,
   updateAnswer as updateAnswerApi,
@@ -35,6 +48,8 @@ import {
   type QuestionCategory,
   type ReportReason,
   type ReportStatus,
+  login as loginApi,
+  logout as logoutApi,
 } from "./apiClient";
 
 export interface DemoQuestion {
@@ -104,13 +119,20 @@ export async function getAdminStats() {
   return getAdminStatsApi();
 }
 
+export async function getAdminSettings() {
+  return getAdminSettingsApi();
+}
+
+export async function updateAdminSettings(autoApprovePublicNonAnonymous: boolean) {
+  return updateAdminSettingsApi({ autoApprovePublicNonAnonymous });
+}
+
 export async function getAdminQuestions() {
   return getQuestionsApi({ scope: "all", limit: 50, sort: "recent" });
 }
 
 export async function createQuestion(input: {
   title: string;
-  category: string;
   body: string;
   privacy: string;
   askType?: "MY_MENTOR" | "ANY_MENTOR" | "ANONYMOUS";
@@ -135,7 +157,6 @@ export async function createQuestion(input: {
   const created = await createQuestionApi({
     title: input.title,
     body: input.body,
-    category: categoryValue(input.category || "Other"),
     askType,
     privacy,
   });
@@ -210,6 +231,7 @@ export async function getMentorQueue() {
     asker: q.student
       ? {
           name: q.student.name ?? "Student",
+          photo: q.student.avatarUrl ?? undefined,
         }
       : null,
     responses: q.answerCount,
@@ -282,6 +304,30 @@ export async function getMentors() {
   return getMentorsApi();
 }
 
+export async function getMyMentor() {
+  return getMyMentorApi();
+}
+
+export async function getMentorLeaderboard() {
+  return getMentorLeaderboardApi();
+}
+
+export async function getMentorRewardHistory() {
+  return getMentorRewardHistoryApi();
+}
+
+export async function markAnswerHelpful(questionId: string, answerId: string) {
+  return markAnswerHelpfulApi(questionId, answerId);
+}
+
+export async function unmarkAnswerHelpful(questionId: string, answerId: string) {
+  return unmarkAnswerHelpfulApi(questionId, answerId);
+}
+
+export async function getNotifications() { return getNotificationsApi(); }
+export async function markNotificationRead(id: string) { return markNotificationReadApi(id); }
+export async function markAllNotificationsRead() { return markAllNotificationsReadApi(); }
+
 export async function getAdminUsers(
   options: {
     role?: "STUDENT" | "MENTOR" | "ADMIN";
@@ -309,8 +355,8 @@ export async function getMe(): Promise<ApiUser> {
   return getMeApi();
 }
 
-export async function updateMe(name: string | null) {
-  return updateMeApi({ name });
+export async function updateMe(input: { name?: string | null; avatarUrl?: string | null }) {
+  return updateMeApi(input);
 }
 
 export async function getMentorProfileById(id: string) {
@@ -335,10 +381,31 @@ export async function rejectQuestion(questionId: string) {
   return rejectQuestionApi(questionId);
 }
 
-export async function localLogin(email: string, password: string) {
-  return localLoginApi(email, password);
+
+export async function updateMentorApproval(id: string, status: "APPROVED" | "REJECTED") {
+  return updateMentorApprovalApi(id, status);
 }
 
-export async function localLogout() {
-  return localLogoutApi();
+export async function mentorSignup(email: string) {
+  return mentorSignupApi(email);
+}
+
+export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
+  return getAvailableRolesApi(email);
+}
+
+export async function startEmailVerification(email: string) {
+  return startEmailVerificationApi(email);
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  return verifyEmailCodeApi(email, code);
+}
+
+export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
+  return loginApi(email, role);
+}
+
+export function logout() {
+  return logoutApi();
 }
