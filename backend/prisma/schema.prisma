@@ -255,3 +255,10 @@ model QuestionReport {
   @@index([reporterId])
   @@index([status, createdAt])
 }
+
+
+model PlatformSettings {
+  id                            String   @id @default("platform")
+  autoApprovePublicNonAnonymous Boolean  @default(false)
+  updatedAt                     DateTime @updatedAt
+}
