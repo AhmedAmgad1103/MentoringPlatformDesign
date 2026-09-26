@@ -152,13 +152,28 @@ export async function POST(request: Request) {
     return forbidden("You can only message your assigned mentor or mentee")
   }
 
-  const item = await prisma.message.create({
-    data: {
-      content,
-      senderId: user.id,
-      recipientId: recipient.id,
-    },
-    select: messageSelect,
+  const item = await prisma.$transaction(async (tx) => {
+    const createdMessage = await tx.message.create({
+      data: {
+        content,
+        senderId: user.id,
+        recipientId: recipient.id,
+      },
+      select: messageSelect,
+    })
+
+    if (user.role === Role.MENTOR && recipient.role === Role.STUDENT) {
+      await tx.notification.create({
+        data: {
+          userId: recipient.id,
+          title: "New message from your mentor",
+          message: content.length > 180 ? `${content.slice(0, 177)}…` : content,
+          kind: "MENTOR_MESSAGE",
+        },
+      })
+    }
+
+    return createdMessage
   })
 
   return Response.json({ item }, { status: 201 })
