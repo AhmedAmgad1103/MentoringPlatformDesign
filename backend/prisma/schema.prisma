@@ -12,6 +12,13 @@ enum Role {
   ADMIN
 }
 
+enum MentorStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum QuestionVisibility {
   PRIVATE
   PUBLIC
@@ -63,7 +70,9 @@ model User {
   id                String     @id @default(cuid())
   email             String     @unique
   name              String?
+  avatarUrl         String?
   role              Role       @default(STUDENT)
+  mentorStatus      MentorStatus @default(NONE)
   passwordHash      String?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -81,6 +90,8 @@ model User {
   receivedMessages  Message[]  @relation("ReceivedMessages")
   reportsMade       QuestionReport[] @relation("QuestionReportsMade")
   reportsReviewed   QuestionReport[] @relation("QuestionReportsReviewed")
+  mentorPoints      MentorPoint[] @relation("MentorPointMentor")
+  helpfulVotes      AnswerHelpfulVote[]
 
   @@index([role])
   @@index([assignedMentorId])
@@ -128,7 +139,46 @@ model Answer {
   mentor      User     @relation(fields: [mentorId], references: [id])
 
   @@index([questionId])
+  helpfulVotes AnswerHelpfulVote[]
+
   @@index([mentorId])
+}
+
+enum MentorPointReason {
+  ANSWER
+  FAST_RESPONSE
+  HELPFUL_VOTE
+  ANY_MENTOR_RESPONSE
+}
+
+model MentorPoint {
+  id        String            @id @default(cuid())
+  mentorId  String
+  points    Int
+  reason    MentorPointReason
+  month     String
+  eventKey  String            @unique
+  answerId  String?
+  voterId   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  mentor    User              @relation("MentorPointMentor", fields: [mentorId], references: [id], onDelete: Cascade)
+  @@index([mentorId, month])
+  @@index([answerId, reason])
+  @@map("mentor_points")
+}
+
+model AnswerHelpfulVote {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  answerId  String
+  answer    Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([answerId, userId])
+  @@index([answerId])
+  @@index([userId])
+  @@map("answer_helpful_votes")
 }
 
 model QuestionBoost {
@@ -170,6 +220,8 @@ model Notification {
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+  kind      String   @default("GENERAL")
+  dedupeKey String?  @unique
 
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
