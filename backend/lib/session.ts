@@ -72,7 +72,15 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const identity = verifySessionToken(token)
   if (!identity) return null
 
-  const where = identity.role ? { email: identity.email, role: identity.role.toUpperCase() as Role } : { email: identity.email }
+  const normalizedRole = identity.role === "mentee" || identity.role === "student"
+    ? Role.STUDENT
+    : identity.role === "mentor"
+      ? Role.MENTOR
+      : identity.role === "admin"
+        ? Role.ADMIN
+        : null
+
+  const where = normalizedRole ? { email: identity.email, role: normalizedRole } : { email: identity.email }
 
   return prisma.user.findFirst({
     where,
