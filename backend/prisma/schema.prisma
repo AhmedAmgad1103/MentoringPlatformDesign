@@ -68,7 +68,7 @@ enum ReportStatus {
 
 model User {
   id                String     @id @default(cuid())
-  email             String     @unique
+  email             String
   name              String?
   avatarUrl         String?
   role              Role       @default(STUDENT)
@@ -93,6 +93,8 @@ model User {
   mentorPoints      MentorPoint[] @relation("MentorPointMentor")
   helpfulVotes      AnswerHelpfulVote[]
 
+  @@unique([email, role])
+  @@index([email])
   @@index([role])
   @@index([assignedMentorId])
 }
