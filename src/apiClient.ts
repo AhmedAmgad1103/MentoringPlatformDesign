@@ -683,30 +683,12 @@ export async function getAvailableRoles(email: string): Promise<{ roles: string[
 }
 
 export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
-  const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
-  const body = new URLSearchParams({
-    csrfToken: csrf.csrfToken,
-    email,
-    role,
-    callbackUrl: "http://localhost:8443/",
-    redirect: "false",
-    json: "true",
-  });
-  await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+  return request<{ ok: true; user: { email: string; role: string } }>("/api/auth/login", {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    redirect: "manual",
-    body,
-  });
-  const session = await request<{ user?: { email?: string; role?: string } }>(
-    "/api/auth/session",
-    { method: "GET" },
-  );
-  if (!session.user?.email) throw new Error("Unable to sign in");
-  return { ok: true, user: session.user };
+    body: JSON.stringify({ email: email.trim().toLowerCase(), role }),
+  })
 }
 
 export function logout() {
-  return request<void>("/api/auth/signout", { method: "POST" });
+  return request<{ success: true }>("/api/auth/logout", { method: "POST" })
 }
