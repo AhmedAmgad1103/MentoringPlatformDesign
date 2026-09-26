@@ -46,7 +46,7 @@ export type ApiQuestion = {
   createdAt: string
   updatedAt: string
   isMine: boolean
-  student: { id: string; name: string | null } | null
+  student: { id: string; name: string | null; avatarUrl?: string | null; email?: string } | null
   mentor: { id: string; name: string | null } | null
   boostCount: number
   answerCount: number
@@ -61,6 +61,8 @@ export type ApiAnswer = {
   createdAt: string
   updatedAt: string
   mentor: { id: string; name: string | null }
+  helpfulCount: number
+  helpfulByMe: boolean
 }
 
 
@@ -78,8 +80,11 @@ export type ApiUser = {
   id: string
   email: string
   name: string | null
+  avatarUrl: string | null
   role: "STUDENT" | "MENTOR" | "ADMIN"
+  mentorStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
   assignedMentor: { id: string; name: string | null } | null
+  hasApprovedMentorAccount?: boolean
 }
 
 type QuestionListResponse = {
@@ -226,14 +231,108 @@ export async function deleteAnswer(questionId: string, answerId: string) {
   )
 }
 
+export type MyMentorResponse = {
+  mentor: {
+    id: string
+    name: string | null
+    email: string
+    avatarUrl: string | null
+    mentorStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
+    answerCount: number
+    studentCount: number
+  } | null
+}
+
+export async function getMyMentor() {
+  return request<MyMentorResponse>("/api/mentors/me")
+}
+
 export async function getMentors() {
   return request<
     Array<{
       id: string
       name: string | null
+      avatarUrl: string | null
       isMyMentor: boolean
     }>
   >("/api/mentors")
+}
+
+export type MentorLeaderboardEntry = {
+  id: string
+  name: string | null
+  email: string
+  points: number
+  rank: number
+}
+
+export type MentorLeaderboardResponse = {
+  cycle: string
+  items: MentorLeaderboardEntry[]
+  me: MentorLeaderboardEntry | null
+}
+
+export async function getMentorLeaderboard() {
+  return request<MentorLeaderboardResponse>("/api/mentors/leaderboard")
+}
+
+export type MentorRewardHistoryItem = {
+  id: string
+  points: number
+  reason: "ANSWER" | "FAST_RESPONSE" | "HELPFUL_VOTE" | "ANY_MENTOR_RESPONSE"
+  month: string
+  createdAt: string
+  answerId: string | null
+}
+
+export type MentorRewardHistoryResponse = {
+  cycle: string
+  items: MentorRewardHistoryItem[]
+}
+
+export async function getMentorRewardHistory() {
+  return request<MentorRewardHistoryResponse>("/api/mentors/rewards")
+}
+
+
+export async function markAnswerHelpful(questionId: string, answerId: string) {
+  return request<{ helpful: true; helpfulCount: number }>(
+    `/api/questions/${encodeURIComponent(questionId)}/answers/${encodeURIComponent(answerId)}/helpful`,
+    { method: "POST" }
+  )
+}
+
+export async function unmarkAnswerHelpful(questionId: string, answerId: string) {
+  return request<{ helpful: false; helpfulCount: number }>(
+    `/api/questions/${encodeURIComponent(questionId)}/answers/${encodeURIComponent(answerId)}/helpful`,
+    { method: "DELETE" }
+  )
+}
+
+export type ApiNotification = {
+  id: string
+  title: string
+  message: string
+  read: boolean
+  createdAt: string
+  kind: string
+}
+
+export type NotificationsResponse = {
+  items: ApiNotification[]
+  unreadCount: number
+}
+
+export async function getNotifications() {
+  return request<NotificationsResponse>("/api/notifications")
+}
+
+export async function markNotificationRead(id: string) {
+  return request<{ ok: true }>("/api/notifications", { method: "PATCH", body: JSON.stringify({ id }) })
+}
+
+export async function markAllNotificationsRead() {
+  return request<{ ok: true }>("/api/notifications", { method: "PATCH", body: JSON.stringify({ readAll: true }) })
 }
 
 export async function getAdminMentors() {
@@ -263,6 +362,21 @@ export async function getAdminStats() {
   return request<AdminStats>("/api/admin/stats")
 }
 
+export type AdminPlatformSettings = {
+  autoApprovePublicNonAnonymous: boolean
+}
+
+export async function getAdminSettings() {
+  return request<AdminPlatformSettings>("/api/admin/settings")
+}
+
+export async function updateAdminSettings(input: AdminPlatformSettings) {
+  return request<AdminPlatformSettings>("/api/admin/settings", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+}
+
 export async function getAdminUsers(
   options: {
     role?: "STUDENT" | "MENTOR" | "ADMIN"
@@ -290,6 +404,13 @@ export async function getAdminUsers(
     limit: number
     total: number
   }>(`/api/admin/users${query ? `?${query}` : ""}`)
+}
+
+export async function updateMentorApproval(id: string, status: "APPROVED" | "REJECTED") {
+  return request<{ id: string; email: string; mentorStatus: string }>("/api/auth/mentor-signup", {
+    method: "PATCH",
+    body: JSON.stringify({ id, status }),
+  })
 }
 
 export async function assignMentor(studentId: string, mentorId: string) {
@@ -325,7 +446,7 @@ export async function getMe() {
   return request<ApiUser>("/api/me")
 }
 
-export async function updateMe(input: { name: string | null }) {
+export async function updateMe(input: { name?: string | null; avatarUrl?: string | null }) {
   return request<ApiUser>("/api/me", {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -482,6 +603,7 @@ export async function getMentorMentees() {
       id: string
       name: string | null
       email: string
+      avatarUrl?: string | null
       createdAt: string
       questionCount: number
     }>
@@ -531,33 +653,60 @@ export async function rejectQuestion(questionId: string) {
   })
 }
 
-export async function localLogin(email: string, password: string) {
-  await request<{
-    id: string
-    email: string
-    name: string | null
-    role: "STUDENT" | "MENTOR" | "ADMIN"
-    assignedMentorId: string | null
-  }>("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  })
-
-  // The login endpoint sets the session cookie. Verify that the browser
-  // actually has a usable authenticated session before continuing.
-  const session = await request<ApiUser>("/api/me", {
-    method: "GET",
-  })
-
-  if (!session?.email) {
-    throw new Error("Unable to sign in")
-  }
-
-  return session
+export async function mentorSignup(email: string) {
+  return request<{ status: string }>("/api/auth/mentor-signup", { method: "POST", body: JSON.stringify({ email }) })
 }
 
-export async function localLogout() {
-  return request<{ success: true }>("/api/auth/logout", {
+export async function startEmailVerification(email: string) {
+  return request<{
+    sent: boolean
+    expiresInSeconds: number
+    development?: boolean
+  }>("/api/auth/email-verification/start", {
     method: "POST",
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
   })
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  return request<{ verified: true; email: string }>("/api/auth/email-verification/verify", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim().toLowerCase(), code }),
+  })
+}
+
+export async function getAvailableRoles(email: string): Promise<{ roles: string[]; mentorPending: boolean }> {
+  const result = await request<{ roles: string[]; mentorPending: boolean }>(
+    `/api/auth/roles?email=${encodeURIComponent(email.trim().toLowerCase())}`
+  )
+  return result
+}
+
+export async function login(email: string, role: "mentee" | "mentor" | "admin" = "mentee") {
+  const csrf = await request<{ csrfToken: string }>("/api/auth/csrf", { method: "GET" });
+  const body = new URLSearchParams({
+    csrfToken: csrf.csrfToken,
+    email,
+    role,
+    callbackUrl: "http://localhost:8443/",
+    redirect: "false",
+    json: "true",
+  });
+  await fetch(`${API_BASE_URL}/api/auth/callback/credentials`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    redirect: "manual",
+    body,
+  });
+  const session = await request<{ user?: { email?: string; role?: string } }>(
+    "/api/auth/session",
+    { method: "GET" },
+  );
+  if (!session.user?.email) throw new Error("Unable to sign in");
+  return { ok: true, user: session.user };
+}
+
+export function logout() {
+  return request<void>("/api/auth/signout", { method: "POST" });
 }
