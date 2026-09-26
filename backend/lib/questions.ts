@@ -100,8 +100,17 @@ export function toQuestionDTO(row: ListRow | DetailRow, viewer: CurrentUser) {
 
   const { studentId, student, _count, boosts, reports, ...rest } = row
 
+  const mappedAnswers = "answers" in row
+    ? row.answers.map(({ helpfulVotes, ...answer }) => ({
+        ...answer,
+        helpfulCount: helpfulVotes.length,
+        helpfulByMe: helpfulVotes.some((vote) => vote.userId === viewer.id),
+      }))
+    : undefined
+
   return {
     ...rest,
+    ...(mappedAnswers ? { answers: mappedAnswers } : {}),
     isMine: studentId === viewer.id,
     student: hideStudent ? null : student,
     boostCount: _count.boosts,
