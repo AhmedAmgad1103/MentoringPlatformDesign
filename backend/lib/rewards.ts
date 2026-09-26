@@ -9,11 +9,9 @@ export const REWARD_POINTS = {
 
 // The leaderboard is intentionally a single 2027 cycle. It resets on
 // January 1, 2027 and stays on that cycle until this value is changed.
-export const REWARD_CYCLE_START = "2027-01-01"
-export const REWARD_CYCLE = "2027"
-
 export function getRewardCycle() {
-  return REWARD_CYCLE
+  const now = new Date()
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`
 }
 
 export async function awardMentorPoints(
